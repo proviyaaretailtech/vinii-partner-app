@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "vinii-partner-web-localdb",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd vinii_partner && VINII_ENV_FILE=.env.localdb ./tool/run_local.sh -d web-server --web-port 8090 --web-hostname 127.0.0.1"],
+      "port": 8090
+    }
+  ]
+}

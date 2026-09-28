@@ -1,0 +1,30 @@
+[
+  {
+    "_note": "Shape of GET /api/partner/orders?tab=new as built by shape() in One Local's frontend/server/restaurant.ts (read 2026-09-28). Replace with One Local's published sample when it exists (contract R6). Values are illustrative field shapes, not business data.",
+    "id": "5b0e8f3e-1c2d-4e5f-8a9b-0c1d2e3f4a5b",
+    "one_local_id": "9a8b7c6d-5e4f-4a3b-9c2d-1e0f9a8b7c6d",
+    "display_no": "OL-00029",
+    "status": "placed",
+    "pos_status": "new",
+    "version": "2026-09-28T06:41:12.345678+00:00",
+    "placed_at": "2026-09-28T06:41:12.300000+00:00",
+    "deadline": "2026-09-28T06:42:12.300000+00:00",
+    "seconds_left": 41,
+    "customer_name": "Customer",
+    "customer_phone": null,
+    "address": {"area": "Ganj Golai"},
+    "notes": "Less spicy",
+    "items": [
+      {"name": "Chicken Biriyani", "qty": 2, "price": 185, "notes": null},
+      {"name": "Thatte Idli", "qty": 1, "price": 45, "notes": "Extra chutney"}
+    ],
+    "item_count": 3,
+    "subtotal": 415,
+    "gst": 20.75,
+    "delivery_fee": 0,
+    "total": 435.75,
+    "payment": "Cash on delivery",
+    "prep_minutes": null,
+    "cancel_reason": null
+  }
+]
