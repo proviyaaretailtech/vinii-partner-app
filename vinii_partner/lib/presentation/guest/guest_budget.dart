@@ -89,11 +89,12 @@ class _GuestBudgetScreenState extends State<GuestBudgetScreen> {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final t = GuestCopy.of(context);
     final b = s.features.budget;
     final divisions = ((b.max - b.min) / b.step).round();
     return GuestPage(
       bottom: GuestButton(
-        label: 'Save & continue',
+        label: t('budget.cta'),
         onTap: () => _done(save: true),
       ),
       child: ListView(
@@ -112,13 +113,12 @@ class _GuestBudgetScreenState extends State<GuestBudgetScreen> {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
-            child: Text('Dining with friends?', style: p.display(30)),
+            child: Text(t('budget.title'), style: p.display(30)),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
             child: Text(
-              "Set a budget to stay on track. We'll show your progress as "
-              'you order.',
+              t('budget.subtitle'),
               style: p.body(15, color: p.inkMuted),
             ),
           ),

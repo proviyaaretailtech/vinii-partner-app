@@ -23,42 +23,74 @@ class _GuestTrackingScreenState extends State<GuestTrackingScreen> {
   bool _servedShown = false;
 
   /// The steps for how this order reaches the guest, with wording to match.
+  /// Step names the restaurant can change come from the copy registry;
+  /// "Packed", "Picked up" and "Delivered" mean something else and stay.
   static List<(GuestTrackingStep, String, String)> stepsFor(
     ServiceType t,
-  ) => switch (t) {
-    ServiceType.dineIn => [
-      for (final s in GuestTrackingStep.values) (s, s.title, s.subtitle),
-    ],
-    ServiceType.takeaway => [
-      (GuestTrackingStep.confirmed, 'Order confirmed', 'We have your order'),
-      (
-        GuestTrackingStep.inKitchen,
-        'In the kitchen',
-        'Your food is being prepared',
-      ),
-      (GuestTrackingStep.ready, 'Ready', 'Collect it at the counter'),
-      (GuestTrackingStep.served, 'Picked up', 'Enjoy your meal!'),
-    ],
-    ServiceType.delivery => [
-      (GuestTrackingStep.confirmed, 'Order confirmed', 'We have your order'),
-      (
-        GuestTrackingStep.inKitchen,
-        'In the kitchen',
-        'Your food is being prepared',
-      ),
-      (GuestTrackingStep.ready, 'Packed', 'Waiting for the rider'),
-      (GuestTrackingStep.onTheWay, 'On the way', 'Heading to you'),
-      (GuestTrackingStep.served, 'Delivered', 'Enjoy your meal!'),
-    ],
-  };
+    GuestCopy c,
+  ) {
+    final confirmed = (
+      GuestTrackingStep.confirmed,
+      c('order.confirmed'),
+      GuestTrackingStep.confirmed.subtitle,
+    );
+    final kitchen = (
+      GuestTrackingStep.inKitchen,
+      c('order.in_kitchen'),
+      GuestTrackingStep.inKitchen.subtitle,
+    );
+    return switch (t) {
+      ServiceType.dineIn => [
+        confirmed,
+        kitchen,
+        (
+          GuestTrackingStep.ready,
+          c('order.ready'),
+          GuestTrackingStep.ready.subtitle,
+        ),
+        (
+          GuestTrackingStep.onTheWay,
+          GuestTrackingStep.onTheWay.title,
+          GuestTrackingStep.onTheWay.subtitle,
+        ),
+        (
+          GuestTrackingStep.served,
+          // Its default line repeats the subtitle; only the restaurant's own.
+          c.own('order.served') ?? GuestTrackingStep.served.title,
+          GuestTrackingStep.served.subtitle,
+        ),
+      ],
+      ServiceType.takeaway => [
+        confirmed,
+        kitchen,
+        (
+          GuestTrackingStep.ready,
+          c('order.ready'),
+          'Collect it at the counter',
+        ),
+        (GuestTrackingStep.served, 'Picked up', 'Enjoy your meal!'),
+      ],
+      ServiceType.delivery => [
+        confirmed,
+        kitchen,
+        (GuestTrackingStep.ready, 'Packed', 'Waiting for the rider'),
+        (GuestTrackingStep.onTheWay, 'On the way', 'Heading to you'),
+        (GuestTrackingStep.served, 'Delivered', 'Enjoy your meal!'),
+      ],
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final t = GuestCopy.of(context);
     final order = s.latest!;
     final current = s.step;
-    final steps = stepsFor(order.serviceType);
+    final steps = stepsFor(order.serviceType, t);
+    // The restaurant's own heading, if it wrote one; the number then moves
+    // to the line underneath.
+    final heading = t.own('order.tracking');
     final cancelled = order.status == PosStatus.cancelled;
     if (current == GuestTrackingStep.served && !_servedShown) {
       _servedShown = true;
@@ -72,10 +104,11 @@ class _GuestTrackingScreenState extends State<GuestTrackingScreen> {
       child: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
-          GuestTopBar(title: 'Order #${order.displayNo}'),
+          GuestTopBar(title: heading ?? 'Order #${order.displayNo}'),
           Center(
             child: Text(
               [
+                if (heading != null) '#${order.displayNo}',
                 if (order.serviceType == ServiceType.dineIn &&
                     s.tableName != null)
                   s.tableName!,

@@ -3,13 +3,17 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../domain/organization.dart';
 import '../../domain/storefront.dart';
-import 'staff_theme.dart';
 
 /// The guest storefront's look, derived from a [StorefrontDefinition]: the
 /// template gives the palette and type, the definition's accent overrides
-/// the highlight colour. Two reference boards map to two templates:
-/// "Vinii Bistro" → [StorefrontTemplate.bistroNight], "The Windough" →
+/// the highlight colour, and the CMS's [StorefrontTheme] may override
+/// colours, button corners and style, and the heading and body faces. Two
+/// reference boards map to two templates: "Vinii Bistro" →
+/// [StorefrontTemplate.bistroNight], "The Windough" →
 /// [StorefrontTemplate.artisanDay].
+///
+/// Resolution follows the CMS's `resolveLook`, so the phone paints what the
+/// CMS preview shows.
 @immutable
 class GuestPalette extends ThemeExtension<GuestPalette> {
   const GuestPalette({
@@ -27,6 +31,9 @@ class GuestPalette extends ThemeExtension<GuestPalette> {
     required this.displayFamily,
     required this.scriptFamily,
     required this.bodyFamily,
+    this.displayFace = StorefrontFont.plusJakartaSans,
+    this.buttonRadius = 999,
+    this.buttonOutline = false,
   });
 
   final StorefrontTemplate template;
@@ -42,11 +49,31 @@ class GuestPalette extends ThemeExtension<GuestPalette> {
   final Color danger;
   final String? displayFamily;
 
-  /// Handwritten headline family (artisan template); null = use display.
+  /// Handwritten headline family (the artisan template's, or a script face
+  /// chosen as the heading font); null = the hero uses [display].
   final String? scriptFamily;
   final String? bodyFamily;
 
+  /// The heading face, so headings set it the way it is drawn: script faces
+  /// at their one weight, sans faces tightly tracked.
+  final StorefrontFont displayFace;
+
+  /// Corner radius of guest buttons: 999 pill, 14 rounded, 6 square.
+  final double buttonRadius;
+
+  /// Main buttons drawn as an accent outline instead of an accent fill.
+  final bool buttonOutline;
+
   bool get isDark => background.computeLuminance() < 0.2;
+
+  /// The shape of a guest button, with an optional border.
+  ShapeBorder buttonShape([BorderSide side = BorderSide.none]) =>
+      buttonRadius >= 999
+      ? StadiumBorder(side: side)
+      : RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(buttonRadius),
+          side: side,
+        );
 
   static GuestPalette of(BuildContext context) =>
       Theme.of(context).extension<GuestPalette>()!;
@@ -56,68 +83,92 @@ class GuestPalette extends ThemeExtension<GuestPalette> {
   static bool remoteFonts = true;
 
   factory GuestPalette.from(StorefrontDefinition def) {
+    final t = def.template;
+    final theme = def.theme;
     final accent =
-        parseHexColor(def.accentHex) ??
-        parseHexColor(def.template.defaultAccent)!;
-    String? family(String name) {
-      if (!remoteFonts) return null;
+        parseHexColor(def.accentHex) ?? parseHexColor(t.defaultAccent)!;
+    Color pick(String key, Color template) =>
+        parseHexColor(theme.colors[key]) ?? template;
+    String? family(StorefrontFont? font) {
+      if (font == null || !remoteFonts) return null;
       try {
-        return GoogleFonts.getFont(name).fontFamily;
+        return GoogleFonts.getFont(font.family).fontFamily;
       } catch (_) {
         return null;
       }
     }
 
-    return switch (def.template) {
-      StorefrontTemplate.bistroNight => GuestPalette(
-        template: def.template,
-        background: const Color(0xFF0B0B0C),
-        surface: const Color(0xFF17171A),
-        surfaceAlt: const Color(0xFF222226),
-        border: const Color(0xFF2C2C31),
-        ink: Colors.white,
-        inkMuted: const Color(0xFFA1A1AA),
-        accent: accent,
-        onAccent: onColor(accent),
-        success: const Color(0xFF22C55E),
-        danger: const Color(0xFFEF4444),
-        displayFamily: family('Plus Jakarta Sans'),
-        scriptFamily: null,
-        bodyFamily: family('Plus Jakarta Sans'),
+    // A face picked in the CMS sets every heading, the welcome headline
+    // included; script faces are never body text (the domain drops them).
+    final heading = theme.headingFont;
+    final display = heading ?? t.headingFont;
+    final script = heading == null
+        ? (t == StorefrontTemplate.artisanDay
+              ? StorefrontFont.kaushanScript
+              : null)
+        : (heading.headingOnly ? heading : null);
+    final (
+      bg,
+      surface,
+      surfaceAlt,
+      border,
+      ink,
+      muted,
+      success,
+      danger,
+    ) = switch (t) {
+      StorefrontTemplate.bistroNight => (
+        const Color(0xFF0B0B0C),
+        const Color(0xFF17171A),
+        const Color(0xFF222226),
+        const Color(0xFF2C2C31),
+        Colors.white,
+        const Color(0xFFA1A1AA),
+        const Color(0xFF22C55E),
+        const Color(0xFFEF4444),
       ),
-      StorefrontTemplate.artisanDay => GuestPalette(
-        template: def.template,
-        background: const Color(0xFFF6F0E7),
-        surface: Colors.white,
-        surfaceAlt: const Color(0xFFEFE5D8),
-        border: const Color(0xFFE2D5C4),
-        ink: const Color(0xFF1E1915),
-        inkMuted: const Color(0xFF7A6E64),
-        accent: accent,
-        onAccent: onColor(accent),
-        success: const Color(0xFF3E8E5A),
-        danger: const Color(0xFFD9534F),
-        displayFamily: family('Playfair Display'),
-        scriptFamily: family('Kaushan Script'),
-        bodyFamily: family('DM Sans'),
+      StorefrontTemplate.artisanDay => (
+        const Color(0xFFF6F0E7),
+        Colors.white,
+        const Color(0xFFEFE5D8),
+        const Color(0xFFE2D5C4),
+        const Color(0xFF1E1915),
+        const Color(0xFF7A6E64),
+        const Color(0xFF3E8E5A),
+        const Color(0xFFD9534F),
       ),
-      StorefrontTemplate.freshMinimal => GuestPalette(
-        template: def.template,
-        background: Colors.white,
-        surface: const Color(0xFFF6F7F6),
-        surfaceAlt: const Color(0xFFECEFEC),
-        border: const Color(0xFFE3E7E3),
-        ink: const Color(0xFF0F1A12),
-        inkMuted: const Color(0xFF65706A),
-        accent: accent,
-        onAccent: onColor(accent),
-        success: const Color(0xFF16A34A),
-        danger: const Color(0xFFDC2626),
-        displayFamily: family('Outfit'),
-        scriptFamily: null,
-        bodyFamily: family('Outfit'),
+      StorefrontTemplate.freshMinimal => (
+        Colors.white,
+        const Color(0xFFF6F7F6),
+        const Color(0xFFECEFEC),
+        const Color(0xFFE3E7E3),
+        const Color(0xFF0F1A12),
+        const Color(0xFF65706A),
+        const Color(0xFF16A34A),
+        const Color(0xFFDC2626),
       ),
     };
+    return GuestPalette(
+      template: t,
+      background: pick('background', bg),
+      surface: pick('surface', surface),
+      surfaceAlt: surfaceAlt,
+      border: border,
+      ink: pick('text', ink),
+      inkMuted: pick('muted', muted),
+      accent: accent,
+      onAccent:
+          parseHexColor(theme.colors['on_accent']) ??
+          parseHexColor(readableOn(toHexColor(accent)))!,
+      success: pick('success', success),
+      danger: pick('danger', danger),
+      displayFamily: family(display),
+      scriptFamily: family(script),
+      bodyFamily: family(theme.bodyFont ?? t.bodyFont),
+      displayFace: display,
+      buttonRadius: (theme.buttonShape ?? t.defaultButtonShape).radius,
+      buttonOutline: theme.buttonStyle == StorefrontButtonStyle.outline,
+    );
   }
 
   TextStyle display(
@@ -127,9 +178,10 @@ class GuestPalette extends ThemeExtension<GuestPalette> {
   }) => TextStyle(
     fontFamily: displayFamily ?? 'Inter',
     fontSize: size,
-    fontWeight: weight,
+    // A script face has one weight; a faux bold of it smears.
+    fontWeight: displayFace.headingOnly ? FontWeight.w400 : weight,
     height: 1.08,
-    letterSpacing: template == StorefrontTemplate.artisanDay ? 0 : -0.8,
+    letterSpacing: displayFace.serif || displayFace.headingOnly ? 0 : -0.8,
     color: color ?? ink,
   );
 
@@ -229,7 +281,34 @@ class GuestPalette extends ThemeExtension<GuestPalette> {
   }
 
   @override
-  GuestPalette copyWith() => this;
+  GuestPalette copyWith({
+    Color? background,
+    Color? surface,
+    Color? surfaceAlt,
+    Color? border,
+    Color? ink,
+    Color? inkMuted,
+    Color? accent,
+    Color? onAccent,
+  }) => GuestPalette(
+    template: template,
+    background: background ?? this.background,
+    surface: surface ?? this.surface,
+    surfaceAlt: surfaceAlt ?? this.surfaceAlt,
+    border: border ?? this.border,
+    ink: ink ?? this.ink,
+    inkMuted: inkMuted ?? this.inkMuted,
+    accent: accent ?? this.accent,
+    onAccent: onAccent ?? this.onAccent,
+    success: success,
+    danger: danger,
+    displayFamily: displayFamily,
+    scriptFamily: scriptFamily,
+    bodyFamily: bodyFamily,
+    displayFace: displayFace,
+    buttonRadius: buttonRadius,
+    buttonOutline: buttonOutline,
+  );
 
   @override
   GuestPalette lerp(GuestPalette? other, double t) =>

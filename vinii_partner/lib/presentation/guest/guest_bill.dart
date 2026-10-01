@@ -42,7 +42,7 @@ class BillLines extends StatelessWidget {
         if (bill.roundOff != 0) row('Round off', bill.roundOff),
         Divider(color: p.border, height: 20),
         row(
-          estimated ? 'Estimated total' : 'Total',
+          estimated ? GuestCopy.of(context)('cart.estimated') : 'Total',
           bill.payable,
           strong: true,
         ),
@@ -85,6 +85,7 @@ class _GuestBillScreenState extends State<GuestBillScreen> {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final t = GuestCopy.of(context);
     final orders = s.placed;
     final bill = combinedBill(orders);
     final merged = <String, CartLine>{};
@@ -111,7 +112,7 @@ class _GuestBillScreenState extends State<GuestBillScreen> {
           if (s.features.splitBill) ...[
             Expanded(
               child: GuestButton(
-                label: 'Split bill',
+                label: t('bill.split'),
                 style: GuestButtonStyle.outline,
                 onTap: () => _split(bill.payable),
               ),
@@ -122,7 +123,7 @@ class _GuestBillScreenState extends State<GuestBillScreen> {
             flex: 3,
             child: GuestButton(
               key: const ValueKey('ask-bill'),
-              label: _asked ? 'Bill requested' : 'Ask for the bill',
+              label: _asked ? 'Bill requested' : t('bill.ask'),
               icon: _asked ? Icons.check_rounded : Icons.receipt_long_rounded,
               onTap: _asked ? null : () => setState(() => _asked = true),
             ),
@@ -133,7 +134,7 @@ class _GuestBillScreenState extends State<GuestBillScreen> {
         padding: const EdgeInsets.only(bottom: 24),
         children: [
           GuestTopBar(
-            title: 'Your bill',
+            title: t('bill.title'),
             trailing: [
               TextButton(
                 onPressed: () => GuestFlow.orderMore(context),

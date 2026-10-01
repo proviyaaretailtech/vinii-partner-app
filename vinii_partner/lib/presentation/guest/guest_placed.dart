@@ -23,7 +23,9 @@ class GuestPlacedScreen extends StatelessWidget {
     final pre = order.scheduledFor != null;
     final minutes = s.estimatedMinutes(order);
     return CelebrationPage(
-      title: pre ? 'Pre-order confirmed!' : 'Order placed!',
+      title: pre
+          ? 'Pre-order confirmed!'
+          : GuestCopy.of(context)('order.placed'),
       lines: [
         '#${order.displayNo}',
         [
@@ -208,8 +210,7 @@ class _OnDark extends StatelessWidget {
     if (dark) return child;
     final p = GuestPalette.of(context);
     final darkAccent = p.accent.computeLuminance() < 0.25;
-    final inverted = GuestPalette(
-      template: p.template,
+    final inverted = p.copyWith(
       background: p.ink,
       surface: p.ink,
       surfaceAlt: p.ink.withValues(alpha: 0.8),
@@ -218,11 +219,6 @@ class _OnDark extends StatelessWidget {
       inkMuted: p.background.withValues(alpha: 0.7),
       accent: darkAccent ? p.background : p.accent,
       onAccent: darkAccent ? p.ink : p.onAccent,
-      success: p.success,
-      danger: p.danger,
-      displayFamily: p.displayFamily,
-      scriptFamily: p.scriptFamily,
-      bodyFamily: p.bodyFamily,
     );
     return Theme(
       data: Theme.of(context).copyWith(extensions: [inverted]),

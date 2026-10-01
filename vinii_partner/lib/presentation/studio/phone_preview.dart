@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/app_scope.dart';
 import '../../application/studio_controller.dart';
 import '../guest/guest_app.dart';
 import '../theme/guest_theme.dart';
@@ -33,6 +34,7 @@ class PhoneScreen extends StatelessWidget {
             definition: c.draft,
             menu: c.menu,
             gateway: c.gateway,
+            mediaBaseUrl: AppScope.of(context).config.mediaBaseUrl,
           )
         : _Stand(controller: c);
     return FittedBox(

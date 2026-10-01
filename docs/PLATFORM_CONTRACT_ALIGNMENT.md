@@ -178,10 +178,27 @@ New kinds are only ever added, and each one is added to this table in the same c
 
 - `vinii_storefronts`: `organization_id` (primary key), `draft jsonb`, `published_version int`, `updated_by uuid`, `updated_at`. The phone saves drafts with a plain upsert. The table's own row security lets org members with a storefront-editing role write only their own organization's row.
 - `vinii_storefront_versions`: `organization_id`, `version int`, `definition jsonb`, `published_by uuid`, `published_by_name text`, `published_at`; unique `(organization_id, version)`; **append-only** (no update or delete for anyone but the platform). Rollback means pointing back to an older version.
-- Publishing goes only through `vinii_publish_storefront(p jsonb)` with `{organization_id, definition, expected_version}`, which returns `{version, published_at}`. The function numbers the versions and checks for owner or admin (`org_owner`, `org_admin`), so G5 does not apply here. A stale `expected_version` raises `POS_STALE`.
+- Publishing goes only through `vinii_publish_storefront(p jsonb)` with `{organization_id, definition, expected_version}`, which returns `{version, published_at}`. The function numbers the versions and checks for owner or admin (`org_owner`, `org_admin`), so G5 does not apply here. A stale `expected_version` raises `VINII_STALE` (refusals: `VINII_FORBIDDEN`, `VINII_BAD_REQUEST`). The phone maps `POS_`, `OL_` and `VINII_` prefixes the same way.
+- **Draft migration written (2026-10-02):** `Repo-1-/supabase/migrations/0021_vinii_storefronts.sql` on branch `feat/experience-cms`. Not applied; it needs approval (Q2) and its final ledger number. It also adds the helper checks `vinii_is_member`, `vinii_can_edit_storefront` and `vinii_can_publish_storefront`, which are multi-organization safe (they never use `current_org_id()`).
 - The guest runtime reads only the published version.
 - `organizations.settings` is left to the Master.
 - Until these exist, the app keeps the draft on the phone and says publishing waits for the database update.
+
+#### 4.4.1 Storefront CMS fields (added 2026-10-02, schema_version stays 1)
+
+The founder asked for a CMS in the Master to set the guest storefront's colours, pictures, text and buttons. Editors are the Proviyaa team (all restaurants) and each restaurant's owner and admin (their own only); managers and marketing may edit drafts but not publish. The CMS edits the **same definition** as the phone's Studio. Every editor changes only its own sections and passes all other keys through untouched, so neither side wipes the other.
+
+| Key | Shape | Edited in |
+| --- | --- | --- |
+| `theme.colors` | `on_accent`, `background`, `surface`, `text`, `muted`, `success`, `danger` as `#RRGGBB`; absent means the template's colour | Master CMS |
+| `theme.buttons` | `shape`: `pill`, `rounded` or `square`; `style`: `filled` or `outline` | Master CMS |
+| `theme.fonts` | `heading` and `body` font ids from one shared catalogue; script faces are for headings only | Master CMS |
+| `brand.logo_url`, `brand.cover_url`, `media.hero`, `media.categories{category_id}` | picture references | Master CMS |
+| `copy{en,hi,mr}{key}` and `default_language` | guest text by key, from one registry (`apps/web/src/lib/storefront-copy.ts`; the phone keeps a copy of the same keys); fallback order is the guest's language, then English, then the registry default | Master CMS |
+
+**Pictures** live in the private bucket `storefront-media` under `<organization_id>/`. They are uploaded only by the Master, after `vinii_can_edit_storefront` is checked. Guests and phones load them from the Master's own address, `/media/<path>`, so no Supabase address reaches a browser. A stored picture reference is a bucket path; full `https` URLs from older data are still accepted.
+
+**Who reads what:** the table-QR page (`/t/<token>`) and the phone's guest runtime render the published version. The Master's `/t/preview/<organization_id>` shows the draft, to editors only. `organizations.theme` stays the staff apps' look.
 
 ---
 

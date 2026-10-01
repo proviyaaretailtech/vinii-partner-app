@@ -148,6 +148,7 @@ class _GuestHostScreenState extends State<GuestHostScreen> {
           gateway: _gateway!,
           table: data.table,
           onExit: _leave,
+          mediaBaseUrl: AppScope.of(context).config.mediaBaseUrl,
         );
       },
     );

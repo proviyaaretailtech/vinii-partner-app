@@ -25,7 +25,7 @@ if [[ -f "$ENV_FILE" ]]; then
     key="${line%%=*}"
     value="${line#*=}"
     case "$key" in
-      APP_ENV|SUPABASE_URL|SUPABASE_PUBLISHABLE_KEY|PARTNER_API_BASE_URL|STOREFRONT_BASE_URL)
+      APP_ENV|SUPABASE_URL|SUPABASE_PUBLISHABLE_KEY|PARTNER_API_BASE_URL|STOREFRONT_BASE_URL|MEDIA_BASE_URL)
         args+=("--dart-define=${key}=${value}") ;;
       *)
         printf 'Refusing unsupported or secret env key: %s\n' "$key" >&2

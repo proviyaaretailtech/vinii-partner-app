@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -149,6 +151,85 @@ void main() {
     expect(_studio(services).dirty, isFalse);
     expect(find.text('Draft saved'), findsOneWidget);
     expect(find.text('Unpublished changes'), findsOneWidget);
+  });
+
+  testWidgets('a Studio save keeps what the VINII OS CMS set', (tester) async {
+    // A draft last saved by the CMS: colours, fonts, pictures, guest text
+    // and keys this app has never heard of.
+    final starter = StorefrontDefinition.starter(testOrg).toJson();
+    final cms = jsonDecode(
+      jsonEncode({
+        ...starter,
+        'brand': {
+          ...starter['brand'] as Map<String, dynamic>,
+          'logo_url': 'org-1/logo.png',
+          'instagram': '@testkitchen',
+        },
+        'theme': {
+          'colors': {'background': '#101418', 'on_accent': '#FFFFFF'},
+          'buttons': {'shape': 'rounded', 'style': 'outline'},
+          'fonts': {'heading': 'poppins'},
+        },
+        'media': {
+          'hero': 'org-1/hero.webp',
+          'categories': {'c1': 'org-1/biriyani.jpg'},
+        },
+        'copy': {
+          'en': {'cart.place': 'Send to kitchen'},
+          'hi': {'cart.place': 'ऑर्डर भेजें'},
+        },
+        'default_language': 'hi',
+        'seo': {'title': 'Test Kitchen'},
+      }),
+    ) as Map<String, dynamic>;
+    final backend = FakeBackend(menu: _sellable)
+      ..storefrontState = StorefrontState(
+        draft: StorefrontDefinition.fromJson(cms, org: testOrg),
+      );
+    final services = await _services(backend, 'org_owner');
+    await _pumpStudio(tester, services);
+
+    // The look section says where these are edited, and what is set there.
+    await _openSection(tester, 'Template & colour');
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('cms-look-summary')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.textContaining('VINII OS storefront CMS'), findsOneWidget);
+    expect(find.textContaining('Poppins headings'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    // Edit something the phone owns, and save.
+    await _openSection(tester, 'Brand & welcome');
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Welcome headline'),
+      'Biriyani worth the wait',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Done'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.widgetWithText(OutlinedButton, 'Save draft'),
+      -300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Save draft'));
+    await tester.pumpAndSettle();
+    expect(find.text('Draft saved'), findsOneWidget);
+
+    // What would reach the database: the edit, and every CMS field as it was.
+    final saved = jsonDecode(
+      jsonEncode(backend.storefrontState.draft!.toJson()),
+    ) as Map<String, dynamic>;
+    for (final k in ['theme', 'media', 'copy', 'default_language', 'seo']) {
+      expect(jsonEncode(saved[k]), jsonEncode(cms[k]), reason: k);
+    }
+    final brand = saved['brand'] as Map<String, dynamic>;
+    expect(brand['hero_title'], 'Biriyani worth the wait');
+    expect(brand['logo_url'], 'org-1/logo.png');
+    expect(brand['instagram'], '@testkitchen');
   });
 
   testWidgets('publishing sends the draft and shows the new version', (

@@ -8,6 +8,8 @@ import 'guest_widgets.dart';
 
 /// Board 1 #1 / Board 2 #2: the full-bleed welcome. Everything written here
 /// is the merchant's own words; empty brand fields are simply left out.
+/// The picture behind it is the CMS's welcome picture, else its cover,
+/// else the restaurant's first dish photo, else a glow in the accent.
 class GuestWelcomeScreen extends StatelessWidget {
   const GuestWelcomeScreen({super.key});
 
@@ -15,17 +17,24 @@ class GuestWelcomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final t = GuestCopy.of(context);
     final brand = s.definition.brand;
-    final artisan = p.scriptFamily != null;
+    // The layout follows the template; the faces may be the CMS's.
+    final artisan = p.template == StorefrontTemplate.artisanDay;
     final hasHero = brand.heroTitle.trim().isNotEmpty;
     final modes = s.definition.serviceModes;
     final cover =
-        brand.coverUrl ??
+        GuestScope.mediaUrlOf(context, s.definition.media.hero) ??
+        GuestScope.mediaUrlOf(context, brand.coverUrl) ??
         s.catalog.allItems
             .where((i) => i.item.imageUrl != null)
             .firstOrNull
             ?.item
             .imageUrl;
+    // Shown only when the restaurant wrote it; the screen never had one.
+    final tableLine = s.tableName == null
+        ? null
+        : t.own('welcome.table_line', {'table': s.tableName!});
 
     return Scaffold(
       backgroundColor: p.isDark ? p.background : p.ink,
@@ -44,6 +53,10 @@ class GuestWelcomeScreen extends StatelessWidget {
                       : CrossAxisAlignment.start,
                   children: [
                     _BrandRow(artisan: artisan, showName: hasHero || artisan),
+                    if (s.languages.length > 1) ...[
+                      const SizedBox(height: 14),
+                      const _LanguageSwitch(),
+                    ],
                     const Spacer(),
                     _Rise(
                       delay: 0,
@@ -73,6 +86,23 @@ class GuestWelcomeScreen extends StatelessWidget {
                         ),
                       ),
                     ],
+                    if (tableLine != null) ...[
+                      const SizedBox(height: 14),
+                      _Rise(
+                        delay: 160,
+                        child: Text(
+                          tableLine,
+                          textAlign: artisan
+                              ? TextAlign.center
+                              : TextAlign.start,
+                          style: p.body(
+                            15,
+                            weight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 28),
                     _Rise(
                       delay: 220,
@@ -88,8 +118,10 @@ class GuestWelcomeScreen extends StatelessWidget {
                                 ],
                               )
                             : GuestButton(
-                                label: 'Start exploring',
+                                key: const ValueKey('welcome-cta'),
+                                label: t('welcome.cta'),
                                 trailingArrow: true,
+                                onImage: true,
                                 onTap: () => GuestFlow.start(context),
                               ),
                       ),
@@ -163,6 +195,10 @@ class _BrandRow extends StatelessWidget {
           Expanded(
             child: Column(
               children: [
+                if (GuestLogo.hasPicture(context)) ...[
+                  const GuestLogo(size: 56, initials: false),
+                  const SizedBox(height: 10),
+                ],
                 Text(
                   brand.displayName.toUpperCase(),
                   textAlign: TextAlign.center,
@@ -304,15 +340,27 @@ class _ModePill extends StatelessWidget {
       GuestServiceMode.preOrder => ('Pre-order', 'Schedule for later'),
       _ => (mode.label, mode.hint),
     };
-    final bg = primary
+    // An outlined main button sits on the dark welcome picture: white.
+    final outline = primary && p.buttonOutline;
+    final bg = outline
+        ? Colors.transparent
+        : primary
         ? p.accent
         : p.isDark
         ? p.surfaceAlt
         : p.background;
-    final fg = primary ? p.onAccent : p.ink;
+    final fg = outline
+        ? Colors.white
+        : primary
+        ? p.onAccent
+        : p.ink;
     return Material(
       color: bg,
-      shape: const StadiumBorder(),
+      shape: p.buttonShape(
+        outline
+            ? const BorderSide(color: Colors.white, width: 1.8)
+            : BorderSide.none,
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => GuestFlow.start(context, chosen: mode),
@@ -338,6 +386,64 @@ class _ModePill extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// English · हिन्दी · मराठी — only the languages the restaurant wrote guest
+/// text in (English is always readable). Glass chips over the picture.
+class _LanguageSwitch extends StatelessWidget {
+  const _LanguageSwitch();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = GuestPalette.of(context);
+    final s = GuestScope.of(context);
+    final current = s.languages.contains(s.language)
+        ? s.language
+        : CopyLanguage.en;
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      alignment: p.template == StorefrontTemplate.artisanDay
+          ? WrapAlignment.center
+          : WrapAlignment.start,
+      children: [
+        for (final l in s.languages)
+          Semantics(
+            button: true,
+            selected: l == current,
+            label: l.label,
+            child: GestureDetector(
+              key: ValueKey('guest-language-${l.key}'),
+              onTap: () => s.setLanguage(l),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: l == current
+                      ? Colors.white
+                      : Colors.black.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Text(
+                  l.nativeName,
+                  style: p.body(
+                    12.5,
+                    weight: FontWeight.w700,
+                    color: l == current ? Colors.black : Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

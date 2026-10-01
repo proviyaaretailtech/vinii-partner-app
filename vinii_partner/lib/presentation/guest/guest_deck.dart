@@ -115,7 +115,9 @@ class _SwipeDeckState extends State<SwipeDeck>
     if (left.isEmpty) {
       return _EndOfDeck(items: widget.items, categoryName: widget.categoryName);
     }
+    // A handwritten hint only when there is a handwritten face.
     final artisan = p.scriptFamily != null;
+    final hint = GuestCopy.of(context)('menu.swipe_hint');
     return Column(
       children: [
         Expanded(
@@ -155,15 +157,19 @@ class _SwipeDeckState extends State<SwipeDeck>
         ),
         const SizedBox(height: 8),
         artisan
-            ? Text('Swipe right to add', style: p.hero(20, color: p.inkMuted))
+            ? Text(hint, style: p.hero(20, color: p.inkMuted))
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.arrow_back_rounded, size: 18, color: p.danger),
                   const SizedBox(width: 8),
-                  Text(
-                    'Swipe right to add',
-                    style: p.body(13.5, weight: FontWeight.w600),
+                  Flexible(
+                    child: Text(
+                      hint,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: p.body(13.5, weight: FontWeight.w600),
+                    ),
                   ),
                   const SizedBox(width: 8),
                   Icon(Icons.arrow_forward_rounded, size: 18, color: p.accent),
@@ -536,7 +542,7 @@ class _EndOfDeck extends StatelessWidget {
             const SizedBox(height: 24),
             if (s.lines.isNotEmpty) ...[
               GuestButton(
-                label: 'View order (${s.itemCount})',
+                label: '${GuestCopy.of(context)('cart.view')} (${s.itemCount})',
                 trailingArrow: true,
                 onTap: () => GuestFlow.toOrder(context),
               ),

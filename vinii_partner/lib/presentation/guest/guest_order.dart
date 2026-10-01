@@ -20,6 +20,7 @@ class GuestOrderScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final t = GuestCopy.of(context);
     final status = s.budgetStatus;
     final saved = s.features.likes
         ? <GuestItem>[
@@ -47,7 +48,7 @@ class GuestOrderScreen extends StatelessWidget {
         padding: const EdgeInsets.only(bottom: 24),
         children: [
           GuestTopBar(
-            title: 'Your order',
+            title: t('cart.title'),
             trailing: [
               if (s.lines.isNotEmpty)
                 TextButton(
@@ -141,7 +142,7 @@ class GuestOrderScreen extends StatelessWidget {
                         RoundIcon(
                           icon: Icons.add_rounded,
                           size: 34,
-                          tooltip: 'Add',
+                          tooltip: t('menu.add'),
                           background: p.accent,
                           color: p.onAccent,
                           onTap: () => addWithHaptic(context, item),
@@ -164,7 +165,7 @@ class GuestOrderScreen extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            'Estimated total',
+                            t('cart.estimated'),
                             style: p.body(15, weight: FontWeight.w700),
                           ),
                         ),
@@ -342,8 +343,8 @@ class _GuestReviewScreenState extends State<GuestReviewScreen> {
               maxLength: 240,
               onChanged: (v) => s.notes = v,
               style: p.body(15),
-              decoration: const InputDecoration(
-                hintText: 'e.g. Less spicy, no onions, extra cheese…',
+              decoration: InputDecoration(
+                hintText: GuestCopy.of(context)('cart.notes_hint'),
               ),
             ),
           ),

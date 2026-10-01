@@ -7,22 +7,35 @@ import '../../application/guest_session.dart';
 import '../../core/money.dart';
 import '../../domain/billing.dart';
 import '../../domain/guest_catalog.dart';
+import '../../domain/storefront.dart';
 import '../theme/guest_theme.dart';
 import '../widgets/rings.dart';
 
-/// Gives every guest screen the party's [GuestSession] and the staff exit.
-/// Lives above the runtime's own Navigator, so pushed screens and sheets
-/// (shown with `useRootNavigator: false`) all see it.
+/// Gives every guest screen the party's [GuestSession], the staff exit and
+/// where CMS pictures are served from. Lives above the runtime's own
+/// Navigator, so pushed screens and sheets (shown with
+/// `useRootNavigator: false`) all see it.
 class GuestScope extends InheritedNotifier<GuestSession> {
   const GuestScope({
     super.key,
     required GuestSession session,
     required this.onExit,
+    this.mediaBaseUrl = '',
     required super.child,
   }) : super(notifier: session);
 
   /// Staff-only way out; null inside Studio's preview.
   final VoidCallback? onExit;
+
+  /// The Master's public origin for bucket pictures (see [mediaUrl]).
+  final String mediaBaseUrl;
+
+  /// A displayable address for a CMS picture reference, or null when there
+  /// is none (or it cannot be shown on this phone).
+  static String? mediaUrlOf(BuildContext context, String? ref) => mediaUrl(
+    ref,
+    context.getInheritedWidgetOfExactType<GuestScope>()?.mediaBaseUrl ?? '',
+  );
 
   /// Rebuilds the caller whenever the session changes.
   static GuestSession of(BuildContext context) =>
@@ -34,6 +47,34 @@ class GuestScope extends InheritedNotifier<GuestSession> {
 
   static VoidCallback? exitOf(BuildContext context) =>
       context.getInheritedWidgetOfExactType<GuestScope>()?.onExit;
+}
+
+/// The restaurant's own guest-facing words (the copy registry, edited in the
+/// VINII OS storefront CMS) in the party's language, falling back to its
+/// English and then to the registry's English default:
+///
+/// ```dart
+/// final t = GuestCopy.of(context);
+/// Text(t('cart.place'));
+/// ```
+class GuestCopy {
+  const GuestCopy(this.copy, this.language);
+
+  /// Rebuilds the caller when the party switches language.
+  factory GuestCopy.of(BuildContext context) {
+    final s = GuestScope.of(context);
+    return GuestCopy(s.definition.copy, s.language);
+  }
+
+  final StorefrontCopy copy;
+  final CopyLanguage language;
+
+  String call(String key, [Map<String, String> vars = const {}]) =>
+      copyText(copy, key, language, vars);
+
+  /// Only what the restaurant wrote; null keeps a screen's own wording.
+  String? own(String key, [Map<String, String> vars = const {}]) =>
+      ownCopyText(copy, key, language, vars);
 }
 
 /// A soft slide-and-fade used for every guest screen, so the runtime feels
@@ -121,8 +162,10 @@ class GuestColumn extends StatelessWidget {
 
 enum GuestButtonStyle { primary, outline, soft, success }
 
-/// The one button shape of the runtime: a full-width pill, accent-filled by
-/// default ("Start exploring →", "Place order →").
+/// The one button of the runtime: full width, accent-filled by default
+/// ("Start exploring →", "Place order →"). Its corners (pill, rounded,
+/// square) and whether the main button is filled or outlined come from the
+/// storefront's theme.
 class GuestButton extends StatelessWidget {
   const GuestButton({
     super.key,
@@ -133,6 +176,7 @@ class GuestButton extends StatelessWidget {
     this.trailingArrow = false,
     this.busy = false,
     this.dense = false,
+    this.onImage = false,
   });
 
   final String label;
@@ -143,10 +187,20 @@ class GuestButton extends StatelessWidget {
   final bool busy;
   final bool dense;
 
+  /// Over a darkened photo: an outlined main button is drawn in white, so
+  /// a dark accent never disappears into the picture.
+  final bool onImage;
+
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
+    final line = onImage ? Colors.white : p.accent;
     final (bg, fg, border) = switch (style) {
+      GuestButtonStyle.primary when p.buttonOutline => (
+        Colors.transparent,
+        line,
+        line,
+      ),
       GuestButtonStyle.primary => (p.accent, p.onAccent, null),
       GuestButtonStyle.success => (p.success, Colors.white, null),
       GuestButtonStyle.soft => (p.surfaceAlt, p.ink, null),
@@ -158,10 +212,13 @@ class GuestButton extends StatelessWidget {
       opacity: onTap == null ? 0.45 : 1,
       child: Material(
         color: bg,
-        shape: StadiumBorder(
-          side: border == null
+        shape: p.buttonShape(
+          border == null
               ? BorderSide.none
-              : BorderSide(color: border, width: 1.4),
+              : BorderSide(
+                  color: border,
+                  width: style == GuestButtonStyle.primary ? 1.8 : 1.4,
+                ),
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -359,37 +416,56 @@ class GuestExitButton extends StatelessWidget {
   }
 }
 
-/// The restaurant's mark: its logo, or its initials on the accent.
+/// The restaurant's mark: its logo (uploaded in the CMS), or its initials
+/// on the accent.
 class GuestLogo extends StatelessWidget {
-  const GuestLogo({super.key, this.size = 36});
+  const GuestLogo({super.key, this.size = 36, this.initials = true});
   final double size;
+
+  /// False: nothing at all when there is no logo picture to show.
+  final bool initials;
+
+  /// Whether the restaurant has a logo this phone can show.
+  static bool hasPicture(BuildContext context) =>
+      GuestScope.mediaUrlOf(
+        context,
+        GuestScope.read(context).definition.brand.logoUrl,
+      ) !=
+      null;
 
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final brand = GuestScope.read(context).definition.brand;
+    final url = GuestScope.mediaUrlOf(context, brand.logoUrl);
     final words = brand.displayName
         .split(RegExp(r'\s+'))
         .where((w) => w.isNotEmpty && w.toLowerCase() != 'the')
         .toList();
-    final initials = words.isEmpty
+    final letters = words.isEmpty
         ? '·'
         : words.take(2).map((w) => w[0].toUpperCase()).join();
-    final fallback = Container(
-      width: size,
-      height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: p.accent,
-        borderRadius: BorderRadius.circular(size * 0.3),
-      ),
-      child: Text(initials, style: p.display(size * 0.38, color: p.onAccent)),
-    );
-    if (brand.logoUrl == null) return fallback;
+    final fallback = !initials
+        ? const SizedBox.shrink()
+        : Container(
+            width: size,
+            height: size,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: p.accent,
+              borderRadius: BorderRadius.circular(size * 0.3),
+            ),
+            child: Text(
+              letters,
+              style: p.display(size * 0.38, color: p.onAccent),
+            ),
+          );
+    if (url == null) return fallback;
     return ClipRRect(
       borderRadius: BorderRadius.circular(size * 0.3),
       child: Image.network(
-        brand.logoUrl!,
+        url,
+        key: const ValueKey('guest-logo-image'),
         width: size,
         height: size,
         fit: BoxFit.cover,

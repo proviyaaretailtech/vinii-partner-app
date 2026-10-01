@@ -27,6 +27,7 @@ class GuestApp extends StatefulWidget {
     required this.gateway,
     this.table,
     this.onExit,
+    this.mediaBaseUrl = '',
   });
 
   final StorefrontDefinition definition;
@@ -39,6 +40,9 @@ class GuestApp extends StatefulWidget {
 
   /// Leaves the guest experience (staff only). Null inside Studio's preview.
   final VoidCallback? onExit;
+
+  /// Where pictures uploaded in the CMS are served (`AppConfig.mediaBaseUrl`).
+  final String mediaBaseUrl;
 
   @override
   State<GuestApp> createState() => _GuestAppState();
@@ -115,6 +119,7 @@ class _GuestAppState extends State<GuestApp> {
       child: GuestScope(
         session: _session,
         onExit: widget.onExit,
+        mediaBaseUrl: widget.mediaBaseUrl,
         child: ScaffoldMessenger(
           // Handed to guests, "back" only ever moves within the runtime;
           // in a preview it may leave once the runtime is at its start.
@@ -208,7 +213,7 @@ class _MenuPreparing extends StatelessWidget {
                     const Text('👩‍🍳', style: TextStyle(fontSize: 52)),
                     const SizedBox(height: 16),
                     Text(
-                      'The menu is being prepared',
+                      GuestCopy.of(context)('menu.empty'),
                       textAlign: TextAlign.center,
                       style: p.display(22, weight: FontWeight.w700),
                     ),

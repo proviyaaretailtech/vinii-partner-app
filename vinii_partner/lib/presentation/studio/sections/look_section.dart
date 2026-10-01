@@ -25,6 +25,37 @@ const curatedAccents = [
   '#2B211B',
 ];
 
+/// What the VINII OS storefront CMS has set beyond the template, in a few
+/// words, so a person knows why the preview looks the way it does. Read
+/// only: the phone has no editors for these.
+List<String> cmsLookSummary(StorefrontDefinition d) {
+  final theme = d.theme;
+  final shape = theme.buttonShape, style = theme.buttonStyle;
+  final pictures = [
+    d.brand.logoUrl,
+    d.brand.coverUrl,
+    d.media.hero,
+    ...d.media.categories.values,
+  ].where((r) => r != null && r.trim().isNotEmpty).length;
+  final languages = d.copy.texts.keys.toList()
+    ..sort((a, b) => a.index.compareTo(b.index));
+  String plural(int n, String one) => n == 1 ? '1 $one' : '$n ${one}s';
+  return [
+    if (theme.colors.isNotEmpty) plural(theme.colors.length, 'custom colour'),
+    if (shape != null || style != null)
+      [
+        if (shape != null) shape.key,
+        if (style == StorefrontButtonStyle.outline) 'outlined',
+        'buttons',
+      ].join(' '),
+    if (theme.headingFont != null) '${theme.headingFont!.family} headings',
+    if (theme.bodyFont != null) '${theme.bodyFont!.family} text',
+    if (pictures > 0) plural(pictures, 'picture'),
+    if (languages.isNotEmpty)
+      'guest text in ${languages.map((l) => l.nativeName).join(', ')}',
+  ];
+}
+
 /// Template, accent colour and category style: the storefront's look.
 class LookSection extends StatelessWidget {
   const LookSection({super.key, required this.controller});
@@ -129,6 +160,48 @@ class LookSection extends StatelessWidget {
             ],
           ],
         ),
+        const PanelLabel('More in VINII OS'),
+        _CmsNote(summary: cmsLookSummary(d)),
+      ],
+    );
+  }
+}
+
+/// Colours, fonts, pictures and guest text are edited in the VINII OS
+/// storefront CMS, on the same draft; a save here keeps them.
+class _CmsNote extends StatelessWidget {
+  const _CmsNote({required this.summary});
+  final List<String> summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = ViniiTokens.of(context);
+    final text = Theme.of(context).textTheme;
+    return Panel(
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.desktop_windows_outlined, color: t.inkSecondary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Colours, fonts, pictures and all guest text can also be '
+                'edited in the VINII OS storefront CMS. Both edit the same '
+                'draft, and saving here keeps what was set there.',
+                style: text.bodyMedium,
+              ),
+            ),
+          ],
+        ),
+        if (summary.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Text(
+            'Set there now: ${summary.join(' · ')}.',
+            key: const ValueKey('cms-look-summary'),
+            style: text.bodySmall,
+          ),
+        ],
       ],
     );
   }

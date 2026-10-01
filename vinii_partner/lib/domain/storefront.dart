@@ -1,4 +1,10 @@
+import 'dart:math' as math;
+
+import '../core/json.dart';
 import 'organization.dart';
+import 'storefront_copy.dart';
+
+export 'storefront_copy.dart';
 
 /// The guest-facing storefront — the organization's own ordering website and
 /// table app — described as data. Storefront Studio edits it; the guest
@@ -8,6 +14,14 @@ import 'organization.dart';
 /// Stored as JSON (snake_case keys, `schema_version`). Readers ignore unknown
 /// keys and fill missing ones with defaults, so an older app can read a newer
 /// definition and the reverse.
+///
+/// The same document is edited by the VINII OS storefront CMS (Master app,
+/// `apps/web/src/lib/storefront.ts`). Each editor changes only what it owns
+/// and passes everything else through: [theme], [media], [copy] and
+/// [defaultLanguage] are the CMS's and are written back exactly as read;
+/// keys this app does not know at all are kept in [extra] (and
+/// [StorefrontBrand.extra]) and written back too. So a save from the phone
+/// never deletes something a newer CMS added.
 class StorefrontDefinition {
   const StorefrontDefinition({
     this.schemaVersion = currentSchemaVersion,
@@ -27,6 +41,11 @@ class StorefrontDefinition {
     this.limitedToday = const [],
     this.gstPercent = 5,
     this.tableLabel = 'Table',
+    this.theme = StorefrontTheme.empty,
+    this.media = StorefrontMedia.empty,
+    this.copy = StorefrontCopy.empty,
+    this.defaultLanguage,
+    this.extra = const {},
   });
 
   static const currentSchemaVersion = 1;
@@ -60,6 +79,27 @@ class StorefrontDefinition {
   /// "Table" → "Table 12"; a hotel might use "Room".
   final String tableLabel;
 
+  /// Colour, button and font choices from the CMS. Empty = the template's.
+  final StorefrontTheme theme;
+
+  /// Welcome and category pictures from the CMS.
+  final StorefrontMedia media;
+
+  /// The restaurant's own guest-facing text, per language (the copy
+  /// registry in `storefront_copy.dart`).
+  final StorefrontCopy copy;
+
+  /// The language a guest starts in. Null when none is stored (or it is one
+  /// this app does not know yet, which is then kept in [extra]).
+  final CopyLanguage? defaultLanguage;
+
+  /// Top-level keys this app does not understand, kept verbatim and written
+  /// back by [toJson].
+  final Map<String, dynamic> extra;
+
+  /// The language a guest party starts in: [defaultLanguage], else English.
+  CopyLanguage get guestLanguage => defaultLanguage ?? CopyLanguage.en;
+
   bool offers(GuestServiceMode mode) => serviceModes.contains(mode);
 
   ItemPresentation presentationOf(String itemId) =>
@@ -82,6 +122,11 @@ class StorefrontDefinition {
     List<LimitedOffer>? limitedToday,
     double? gstPercent,
     String? tableLabel,
+    StorefrontTheme? theme,
+    StorefrontMedia? media,
+    StorefrontCopy? copy,
+    CopyLanguage? defaultLanguage,
+    Map<String, dynamic>? extra,
   }) => StorefrontDefinition(
     schemaVersion: schemaVersion,
     template: template ?? this.template,
@@ -97,6 +142,11 @@ class StorefrontDefinition {
     limitedToday: limitedToday ?? this.limitedToday,
     gstPercent: gstPercent ?? this.gstPercent,
     tableLabel: tableLabel ?? this.tableLabel,
+    theme: theme ?? this.theme,
+    media: media ?? this.media,
+    copy: copy ?? this.copy,
+    defaultLanguage: defaultLanguage ?? this.defaultLanguage,
+    extra: extra ?? this.extra,
   );
 
   StorefrontDefinition withItem(ItemPresentation p) =>
@@ -145,7 +195,54 @@ class StorefrontDefinition {
     'limited_today': [for (final l in limitedToday) l.toJson()],
     'gst_percent': gstPercent,
     'table_label': tableLabel,
+    if (!theme.isEmpty) 'theme': theme.toJson(),
+    if (!media.isEmpty) 'media': media.toJson(),
+    if (!copy.isEmpty) 'copy': copy.toJson(),
+    if (defaultLanguage != null) 'default_language': defaultLanguage!.key,
+    // Last, and never over a key written above.
+    for (final e in extra.entries)
+      if (!_knownKeys.contains(e.key) || !_writes(e.key))
+        e.key: jsonCopy(e.value),
   };
+
+  /// Every top-level key this model reads.
+  static const _knownKeys = {
+    'schema_version',
+    'template',
+    'accent',
+    'brand',
+    'service_modes',
+    'pre_order',
+    'features',
+    'category_style',
+    'categories',
+    'items',
+    'chefs_picks',
+    'limited_today',
+    'gst_percent',
+    'table_label',
+    'theme',
+    'media',
+    'copy',
+    'default_language',
+  };
+
+  /// Whether [toJson] writes known key [k] itself for this definition.
+  bool _writes(String k) => switch (k) {
+    'theme' => !theme.isEmpty,
+    'media' => !media.isEmpty,
+    'copy' => !copy.isEmpty,
+    'default_language' => defaultLanguage != null,
+    _ => true,
+  };
+
+  /// A stored key this model cannot use as it is, so it is carried through
+  /// untouched instead: unknown keys, and CMS sections in a shape this app
+  /// does not understand.
+  static bool _passThrough(String k, Object? v) =>
+      !_knownKeys.contains(k) ||
+      (const {'theme', 'media', 'copy'}.contains(k) && v is! Map) ||
+      (k == 'default_language' && CopyLanguage.fromKey(v) == null);
 
   factory StorefrontDefinition.fromJson(
     Map<String, dynamic> j, {
@@ -198,6 +295,20 @@ class StorefrontDefinition {
       tableLabel: (j['table_label'] as String?)?.trim().isNotEmpty == true
           ? j['table_label'] as String
           : 'Table',
+      theme: j['theme'] is Map
+          ? StorefrontTheme.fromJson(_map(j['theme']))
+          : StorefrontTheme.empty,
+      media: j['media'] is Map
+          ? StorefrontMedia.fromJson(_map(j['media']))
+          : StorefrontMedia.empty,
+      copy: j['copy'] is Map
+          ? StorefrontCopy.fromJson(_map(j['copy']))
+          : StorefrontCopy.empty,
+      defaultLanguage: CopyLanguage.fromKey(j['default_language']),
+      extra: {
+        for (final e in j.entries)
+          if (_passThrough(e.key, e.value)) e.key: jsonCopy(e.value),
+      },
     );
   }
 }
@@ -217,6 +328,8 @@ enum StorefrontTemplate {
     defaultHeroTitle: 'Food Looks Better When You Explore It.',
     defaultHeroSubtitle:
         'Swipe through dishes, set a budget, and order together.',
+    headingFont: StorefrontFont.plusJakartaSans,
+    bodyFont: StorefrontFont.plusJakartaSans,
   ),
   artisanDay(
     key: 'artisan_day',
@@ -227,6 +340,8 @@ enum StorefrontTemplate {
     defaultHeroTitle: 'Good Food Rises People Together',
     defaultHeroSubtitle:
         'Fresh bakes, honest ingredients and a little more joy for your table.',
+    headingFont: StorefrontFont.playfairDisplay,
+    bodyFont: StorefrontFont.dmSans,
   ),
   freshMinimal(
     key: 'fresh_minimal',
@@ -238,6 +353,8 @@ enum StorefrontTemplate {
     defaultHeroTitle: 'Hungry? Swipe. Tap. Done.',
     defaultHeroSubtitle:
         'Pick what you like, we will have it ready in minutes.',
+    headingFont: StorefrontFont.outfit,
+    bodyFont: StorefrontFont.outfit,
   );
 
   const StorefrontTemplate({
@@ -248,6 +365,8 @@ enum StorefrontTemplate {
     required this.defaultTagline,
     required this.defaultHeroTitle,
     required this.defaultHeroSubtitle,
+    required this.headingFont,
+    required this.bodyFont,
   });
 
   final String key;
@@ -260,6 +379,17 @@ enum StorefrontTemplate {
   final String defaultTagline;
   final String defaultHeroTitle;
   final String defaultHeroSubtitle;
+
+  /// The template's own faces, used unless [StorefrontTheme] picks others
+  /// (the CMS's `TEMPLATES[].fonts`).
+  final StorefrontFont headingFont;
+  final StorefrontFont bodyFont;
+
+  /// Button corners when the theme does not choose: pill on Bistro Night,
+  /// rounded elsewhere (the CMS's `resolveLook`).
+  StorefrontButtonShape get defaultButtonShape => this == bistroNight
+      ? StorefrontButtonShape.pill
+      : StorefrontButtonShape.rounded;
 
   static StorefrontTemplate? fromKey(String? k) =>
       values.where((t) => t.key == k).firstOrNull;
@@ -293,6 +423,238 @@ enum CategoryStyle {
       values.where((c) => c.key == k).firstOrNull;
 }
 
+/// The curated faces a storefront may use, all available both to the web
+/// (Google Fonts CSS) and here (google_fonts). The id is what is stored.
+enum StorefrontFont {
+  plusJakartaSans('plus-jakarta-sans', 'Plus Jakarta Sans'),
+  inter('inter', 'Inter'),
+  dmSans('dm-sans', 'DM Sans'),
+  poppins('poppins', 'Poppins'),
+  outfit('outfit', 'Outfit'),
+  playfairDisplay('playfair-display', 'Playfair Display', serif: true),
+  sourceSerif4('source-serif-4', 'Source Serif 4', serif: true),
+  kaushanScript('kaushan-script', 'Kaushan Script', headingOnly: true);
+
+  const StorefrontFont(
+    this.id,
+    this.family, {
+    this.serif = false,
+    this.headingOnly = false,
+  });
+
+  final String id;
+
+  /// The Google Fonts family name (what `GoogleFonts.getFont` takes).
+  final String family;
+  final bool serif;
+
+  /// Script faces are for headings only: unreadable as body text.
+  final bool headingOnly;
+
+  static StorefrontFont? fromId(Object? id) =>
+      values.where((f) => f.id == id).firstOrNull;
+}
+
+enum StorefrontButtonShape {
+  pill('pill', 999),
+  rounded('rounded', 14),
+  square('square', 6);
+
+  const StorefrontButtonShape(this.key, this.radius);
+  final String key;
+
+  /// Corner radius in logical pixels; 999 means fully round ends.
+  final double radius;
+
+  static StorefrontButtonShape? fromKey(Object? k) =>
+      values.where((s) => s.key == k).firstOrNull;
+}
+
+enum StorefrontButtonStyle {
+  filled('filled'),
+  outline('outline');
+
+  const StorefrontButtonStyle(this.key);
+  final String key;
+
+  static StorefrontButtonStyle? fromKey(Object? k) =>
+      values.where((s) => s.key == k).firstOrNull;
+}
+
+/// `#RRGGBB`, the only colour form the storefront stores.
+bool isHexColor(Object? v) =>
+    v is String && RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(v);
+
+/// The CMS's colour, button and font choices (the definition's `theme`).
+/// Absent values mean "the template's". The phone does not edit these: it
+/// paints them and passes them through.
+///
+/// The typed fields are the clean view (valid colours upper-cased, known
+/// shapes and faces, never a script face as body text — the CMS's
+/// `cleanTheme`). The stored JSON is kept as read and written back by
+/// [toJson], so values this app cannot use yet are not lost.
+class StorefrontTheme {
+  const StorefrontTheme._({
+    this.colors = const {},
+    this.buttonShape,
+    this.buttonStyle,
+    this.headingFont,
+    this.bodyFont,
+    this._raw = const {},
+  });
+
+  static const empty = StorefrontTheme._();
+
+  /// Builds a theme in code (tests; a future phone editor).
+  factory StorefrontTheme({
+    Map<String, String> colors = const {},
+    StorefrontButtonShape? buttonShape,
+    StorefrontButtonStyle? buttonStyle,
+    StorefrontFont? headingFont,
+    StorefrontFont? bodyFont,
+  }) => StorefrontTheme.fromJson({
+    if (colors.isNotEmpty) 'colors': Map<String, String>.of(colors),
+    if (buttonShape != null || buttonStyle != null)
+      'buttons': {
+        if (buttonShape != null) 'shape': buttonShape.key,
+        if (buttonStyle != null) 'style': buttonStyle.key,
+      },
+    if (headingFont != null || bodyFont != null)
+      'fonts': {
+        if (headingFont != null) 'heading': headingFont.id,
+        if (bodyFont != null) 'body': bodyFont.id,
+      },
+  });
+
+  factory StorefrontTheme.fromJson(Map<String, dynamic> j) {
+    final c = _map(j['colors']), b = _map(j['buttons']), f = _map(j['fonts']);
+    final body = StorefrontFont.fromId(f['body']);
+    return StorefrontTheme._(
+      colors: {
+        for (final k in colorKeys)
+          if (isHexColor(c[k])) k: (c[k] as String).toUpperCase(),
+      },
+      buttonShape: StorefrontButtonShape.fromKey(b['shape']),
+      buttonStyle: StorefrontButtonStyle.fromKey(b['style']),
+      headingFont: StorefrontFont.fromId(f['heading']),
+      bodyFont: body == null || body.headingOnly ? null : body,
+      raw: jsonCopyMap(j),
+    );
+  }
+
+  /// The colours the CMS may override. The accent is the definition's own
+  /// `accent`; surface_alt and border always come from the template.
+  static const colorKeys = [
+    'on_accent',
+    'background',
+    'surface',
+    'text',
+    'muted',
+    'success',
+    'danger',
+  ];
+
+  /// Valid overrides only, `#RRGGBB` upper-case, by [colorKeys] key.
+  final Map<String, String> colors;
+  final StorefrontButtonShape? buttonShape;
+  final StorefrontButtonStyle? buttonStyle;
+  final StorefrontFont? headingFont;
+  final StorefrontFont? bodyFont;
+  final Map<String, dynamic> _raw;
+
+  bool get isEmpty => _raw.isEmpty;
+
+  Map<String, dynamic> toJson() => jsonCopyMap(_raw);
+}
+
+/// The CMS's pictures (the definition's `media`): the welcome picture and
+/// one per menu category. Values are picture references for [mediaUrl].
+/// Like [StorefrontTheme], the stored JSON is written back as read.
+class StorefrontMedia {
+  const StorefrontMedia._({
+    this.hero,
+    this.categories = const {},
+    this._raw = const {},
+  });
+
+  static const empty = StorefrontMedia._();
+
+  factory StorefrontMedia({
+    String? hero,
+    Map<String, String> categories = const {},
+  }) => StorefrontMedia.fromJson({
+    if (hero != null && hero.isNotEmpty) 'hero': hero,
+    if (categories.isNotEmpty) 'categories': Map<String, String>.of(categories),
+  });
+
+  factory StorefrontMedia.fromJson(Map<String, dynamic> j) => StorefrontMedia._(
+    hero: j['hero'] is String && (j['hero'] as String).isNotEmpty
+        ? j['hero'] as String
+        : null,
+    categories: {
+      for (final e in _map(j['categories']).entries)
+        if (e.value is String && (e.value as String).isNotEmpty)
+          e.key: e.value as String,
+    },
+    raw: jsonCopyMap(j),
+  );
+
+  /// Full-bleed welcome picture behind the headline.
+  final String? hero;
+
+  /// Category tile pictures, by `menu_categories.id`.
+  final Map<String, String> categories;
+  final Map<String, dynamic> _raw;
+
+  bool get isEmpty => _raw.isEmpty;
+
+  Map<String, dynamic> toJson() => jsonCopyMap(_raw);
+}
+
+/// A guest-facing address for a picture reference, as the CMS's `mediaUrl`:
+/// a full `http(s)://` URL is used as it is; a bucket path
+/// (`<organization id>/<file>`) is served by the Master's `/media` route at
+/// [base]. A phone has no "same origin", so with an empty [base] a bucket
+/// path gives null and screens show their illustrated fallback.
+String? mediaUrl(String? ref, String base) {
+  if (ref == null || ref.trim().isEmpty) return null;
+  final r = ref.trim();
+  if (RegExp(r'^https?://').hasMatch(r)) return r;
+  final b = base.trim().replaceFirst(RegExp(r'/+$'), '');
+  if (b.isEmpty) return null;
+  return '$b/media/${r.replaceFirst(RegExp(r'^/+'), '')}';
+}
+
+/// WCAG relative luminance of `#RRGGBB` (0 for anything else), as the CMS.
+double hexLuminance(String hex) {
+  final m = RegExp(r'^#?([0-9a-fA-F]{6})$').firstMatch(hex);
+  if (m == null) return 0;
+  final v = int.parse(m[1]!, radix: 16);
+  double ch(int c) {
+    final s = c / 255;
+    return s <= 0.03928
+        ? s / 12.92
+        : math.pow((s + 0.055) / 1.055, 2.4).toDouble();
+  }
+
+  return 0.2126 * ch((v >> 16) & 255) +
+      0.7152 * ch((v >> 8) & 255) +
+      0.0722 * ch(v & 255);
+}
+
+double contrastRatio(String a, String b) {
+  final la = hexLuminance(a), lb = hexLuminance(b);
+  final hi = math.max(la, lb), lo = math.min(la, lb);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/// Near-black or white, whichever reads better on [bg] — the CMS's
+/// `readableOn`, so button text matches its preview.
+String readableOn(String bg) =>
+    contrastRatio(bg, '#111115') >= contrastRatio(bg, '#FFFFFF')
+    ? '#111115'
+    : '#FFFFFF';
+
 class StorefrontBrand {
   const StorefrontBrand({
     required this.displayName,
@@ -302,6 +664,7 @@ class StorefrontBrand {
     this.heroSubtitle = '',
     this.logoUrl,
     this.coverUrl,
+    this.extra = const {},
   });
 
   final String displayName;
@@ -311,8 +674,23 @@ class StorefrontBrand {
   final String locationLine;
   final String heroTitle;
   final String heroSubtitle;
+
+  /// Picture references ([mediaUrl]), uploaded in the CMS.
   final String? logoUrl;
   final String? coverUrl;
+
+  /// Keys of `brand` this app does not know, written back unchanged.
+  final Map<String, dynamic> extra;
+
+  static const _knownKeys = {
+    'display_name',
+    'tagline',
+    'location_line',
+    'hero_title',
+    'hero_subtitle',
+    'logo_url',
+    'cover_url',
+  };
 
   StorefrontBrand copyWith({
     String? displayName,
@@ -322,6 +700,7 @@ class StorefrontBrand {
     String? heroSubtitle,
     String? logoUrl,
     String? coverUrl,
+    Map<String, dynamic>? extra,
   }) => StorefrontBrand(
     displayName: displayName ?? this.displayName,
     tagline: tagline ?? this.tagline,
@@ -330,6 +709,7 @@ class StorefrontBrand {
     heroSubtitle: heroSubtitle ?? this.heroSubtitle,
     logoUrl: logoUrl ?? this.logoUrl,
     coverUrl: coverUrl ?? this.coverUrl,
+    extra: extra ?? this.extra,
   );
 
   Map<String, dynamic> toJson() => {
@@ -340,6 +720,8 @@ class StorefrontBrand {
     'hero_subtitle': heroSubtitle,
     if (logoUrl != null) 'logo_url': logoUrl,
     if (coverUrl != null) 'cover_url': coverUrl,
+    for (final e in extra.entries)
+      if (!_knownKeys.contains(e.key)) e.key: jsonCopy(e.value),
   };
 
   factory StorefrontBrand.fromJson(
@@ -358,8 +740,12 @@ class StorefrontBrand {
           : fallback.locationLine,
       heroTitle: s('hero_title', fallback.heroTitle),
       heroSubtitle: s('hero_subtitle', fallback.heroSubtitle),
-      logoUrl: j['logo_url'] as String?,
-      coverUrl: j['cover_url'] as String?,
+      logoUrl: j['logo_url'] is String ? j['logo_url'] as String : null,
+      coverUrl: j['cover_url'] is String ? j['cover_url'] as String : null,
+      extra: {
+        for (final e in j.entries)
+          if (!_knownKeys.contains(e.key)) e.key: jsonCopy(e.value),
+      },
     );
   }
 }

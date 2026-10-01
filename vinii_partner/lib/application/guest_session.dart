@@ -26,7 +26,8 @@ class GuestSession extends ChangeNotifier {
   }) : catalog = GuestCatalog(menu: menu, definition: definition, now: now),
        mode = definition.serviceModes.isEmpty
            ? GuestServiceMode.dineIn
-           : definition.serviceModes.first;
+           : definition.serviceModes.first,
+       language = definition.guestLanguage;
 
   /// Replaced by [reconfigure] while Studio's live preview is being edited.
   StorefrontDefinition definition;
@@ -39,7 +40,15 @@ class GuestSession extends ChangeNotifier {
     required StorefrontDefinition definition,
     required MenuSnapshot menu,
   }) {
+    final previous = this.definition;
     this.definition = definition;
+    // A new default restarts the party there; a language whose text was
+    // removed falls back to it.
+    if (definition.guestLanguage != previous.guestLanguage ||
+        (!languages.contains(language) &&
+            language != definition.guestLanguage)) {
+      language = definition.guestLanguage;
+    }
     catalog = GuestCatalog(menu: menu, definition: definition);
     if (!definition.serviceModes.contains(mode) &&
         definition.serviceModes.isNotEmpty) {
@@ -54,6 +63,21 @@ class GuestSession extends ChangeNotifier {
 
   // ── Choices ───────────────────────────────────────────────────────────
   GuestServiceMode mode;
+
+  /// The language the party reads the restaurant's guest text in. Starts
+  /// at the storefront's default language; text missing in it falls back
+  /// to the restaurant's English, then the registry's English.
+  CopyLanguage language;
+
+  /// The languages the party can switch between: English and every
+  /// language the restaurant wrote guest text in.
+  List<CopyLanguage> get languages => definition.copy.guestLanguages;
+
+  void setLanguage(CopyLanguage l) {
+    if (l == language) return;
+    language = l;
+    _notify();
+  }
 
   /// The table the phone was handed to. Never chosen by the guest.
   final DiningTable? table;

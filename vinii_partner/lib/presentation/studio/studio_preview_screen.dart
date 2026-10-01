@@ -94,6 +94,9 @@ class _StudioPreviewScreenState extends State<StudioPreviewScreen> {
                           definition: c.draft,
                           menu: c.menu,
                           gateway: c.gateway,
+                          mediaBaseUrl: AppScope.of(context)
+                              .config
+                              .mediaBaseUrl,
                         )
                       : const SizedBox.shrink(),
                 ),

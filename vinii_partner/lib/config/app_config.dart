@@ -14,6 +14,7 @@ class AppConfig {
     required this.supabasePublishableKey,
     required this.partnerApiBaseUrl,
     required this.storefrontBaseUrl,
+    this.mediaBaseUrl = '',
   });
 
   /// `local`, `staging` or `production`. Shown in Settings → About.
@@ -30,6 +31,13 @@ class AppConfig {
   /// Where the published guest storefront lives, e.g. `https://vinii.app`.
   /// The organization's slug is appended: `https://vinii.app/s/<slug>`.
   final String storefrontBaseUrl;
+
+  /// The Master (VINII OS) public origin that serves storefront pictures
+  /// uploaded in the CMS, at `<origin>/media/<path>`. Empty means bucket
+  /// pictures are not shown (a phone has no "same origin") and the guest
+  /// runtime draws its illustrated fallbacks; full https picture URLs still
+  /// show.
+  final String mediaBaseUrl;
 
   /// This build's own version. Compared with the organization's
   /// `min_app_version` at boot (the update gate).
@@ -60,5 +68,6 @@ class AppConfig {
       'STOREFRONT_BASE_URL',
       defaultValue: 'https://vinii.app',
     ),
+    mediaBaseUrl: String.fromEnvironment('MEDIA_BASE_URL'),
   );
 }

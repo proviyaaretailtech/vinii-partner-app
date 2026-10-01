@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../core/json.dart';
 import '../domain/storefront.dart';
 
 /// What guests will see change if [next] is published over [live], in
@@ -23,6 +24,8 @@ List<String> describeStorefrontChanges(
       'Template: ${live.template.label} → ${next.template.label}',
     if (live.accentHex.toUpperCase() != next.accentHex.toUpperCase())
       'Accent colour: ${live.accentHex.toUpperCase()} → ${next.accentHex.toUpperCase()}',
+    if (!jsonEquals(live.theme.toJson(), next.theme.toJson()))
+      'Colours, buttons and fonts',
     if (live.categoryStyle != next.categoryStyle)
       'Category style: ${live.categoryStyle.label} → ${next.categoryStyle.label}',
     if (a.displayName != b.displayName) 'Name: ${b.displayName}',
@@ -30,6 +33,13 @@ List<String> describeStorefrontChanges(
     if (a.locationLine != b.locationLine) 'Location line',
     if (a.heroTitle != b.heroTitle) 'Welcome headline',
     if (a.heroSubtitle != b.heroSubtitle) 'Welcome text',
+    if (a.logoUrl != b.logoUrl) 'Logo',
+    if (a.coverUrl != b.coverUrl ||
+        !jsonEquals(live.media.toJson(), next.media.toJson()))
+      'Pictures',
+    if (!jsonEquals(live.copy.toJson(), next.copy.toJson())) 'Guest text',
+    if (live.guestLanguage != next.guestLanguage)
+      'Guests start in ${next.guestLanguage.label}',
     if (j([for (final m in live.serviceModes) m.key]) !=
         j([for (final m in next.serviceModes) m.key]))
       'Ways to order: ${next.serviceModes.map((m) => m.label).join(', ')}',

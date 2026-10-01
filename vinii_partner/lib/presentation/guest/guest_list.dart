@@ -156,22 +156,27 @@ class _AddPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
+    final outline = p.buttonOutline;
+    final fg = outline ? p.accent : p.onAccent;
+    final shape = p.buttonShape(
+      outline ? BorderSide(color: p.accent, width: 1.6) : BorderSide.none,
+    );
     return Material(
-      color: p.accent,
-      shape: const StadiumBorder(),
+      color: outline ? Colors.transparent : p.accent,
+      shape: shape,
       child: InkWell(
-        customBorder: const StadiumBorder(),
+        customBorder: shape,
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.add_rounded, size: 18, color: p.onAccent),
+              Icon(Icons.add_rounded, size: 18, color: fg),
               const SizedBox(width: 4),
               Text(
-                'Add',
-                style: p.body(14, weight: FontWeight.w800, color: p.onAccent),
+                GuestCopy.of(context)('menu.add'),
+                style: p.body(14, weight: FontWeight.w800, color: fg),
               ),
             ],
           ),

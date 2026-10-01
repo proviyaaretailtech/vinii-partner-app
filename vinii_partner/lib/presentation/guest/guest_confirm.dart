@@ -55,7 +55,9 @@ class GuestConfirmScreen extends StatelessWidget {
             ),
           GuestButton(
             key: const ValueKey('place-order'),
-            label: s.placeError == null ? 'Place order' : 'Try again',
+            label: s.placeError == null
+                ? GuestCopy.of(context)('cart.place')
+                : 'Try again',
             trailingArrow: true,
             busy: s.placing,
             onTap: blocker == null ? () => _place(context) : null,

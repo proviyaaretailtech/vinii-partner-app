@@ -19,6 +19,7 @@ class GuestCategoriesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final t = GuestCopy.of(context);
     final wheel = s.definition.categoryStyle == CategoryStyle.wheel;
     final hasDiscover =
         s.catalog.chefsPicks.isNotEmpty || s.catalog.limitedToday.isNotEmpty;
@@ -48,9 +49,11 @@ class GuestCategoriesScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
             child: Text(
+              // The wheel keeps its own instruction unless the restaurant
+              // wrote its own menu heading.
               wheel
-                  ? 'Swipe to explore categories'
-                  : 'What are you in the mood for?',
+                  ? t.own('menu.title') ?? 'Swipe to explore categories'
+                  : t('menu.title'),
               style: wheel ? p.hero(30) : p.display(28),
             ),
           ),
@@ -61,13 +64,30 @@ class GuestCategoriesScreen extends StatelessWidget {
   }
 }
 
-/// A category's picture: its first dish with a photo, else the illustrated
-/// fallback with the category's emoji.
+/// A category's picture: the one uploaded for it in the CMS, else its first
+/// dish with a photo, else the illustrated fallback with the category's
+/// emoji (also what a picture that fails to load turns into).
 Widget categoryArt(
+  BuildContext context,
   GuestCategory? c,
   GuestCatalog catalog, {
   double radius = 0,
 }) {
+  final picture = c == null
+      ? null
+      : GuestScope.mediaUrlOf(
+          context,
+          GuestScope.read(context).definition.media.categories[c.category.id],
+        );
+  if (c != null && picture != null) {
+    return FoodArt(
+      key: ValueKey('category-picture-${c.category.id}'),
+      name: c.category.name,
+      imageUrl: picture,
+      emoji: c.emoji,
+      radius: radius,
+    );
+  }
   final items = c?.items ?? catalog.allItems;
   final photo = items.where((i) => i.item.imageUrl != null).firstOrNull;
   return FoodArt(
@@ -136,7 +156,7 @@ class _Tile extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                categoryArt(category, s.catalog),
+                categoryArt(context, category, s.catalog),
                 const PhotoScrim(strength: 0.8),
                 Positioned(
                   left: 14,
@@ -235,7 +255,7 @@ class _WheelState extends State<_Wheel> {
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        categoryArt(cats[i], s.catalog),
+                        categoryArt(context, cats[i], s.catalog),
                         const PhotoScrim(strength: 0.75),
                         Positioned(
                           left: 18,
@@ -335,9 +355,11 @@ class CartBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final t = GuestCopy.of(context);
+    // Always filled: it floats over the menu. Its corners follow the theme.
     return Material(
       color: p.accent,
-      shape: const StadiumBorder(),
+      shape: p.buttonShape(),
       clipBehavior: Clip.antiAlias,
       elevation: 6,
       shadowColor: p.accent.withValues(alpha: 0.4),
@@ -364,7 +386,9 @@ class CartBar extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'View order (${s.itemCount})',
+                  '${t('cart.view')} (${s.itemCount})',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: p.body(16, weight: FontWeight.w700, color: p.onAccent),
                 ),
               ),
@@ -432,9 +456,9 @@ class _SearchSheetState extends State<_SearchSheet> {
                 autofocus: true,
                 onChanged: (v) => setState(() => _q = v),
                 style: p.body(16),
-                decoration: const InputDecoration(
-                  hintText: 'Search dishes',
-                  prefixIcon: Icon(Icons.search_rounded),
+                decoration: InputDecoration(
+                  hintText: GuestCopy.of(context)('menu.search'),
+                  prefixIcon: const Icon(Icons.search_rounded),
                 ),
               ),
             ),
