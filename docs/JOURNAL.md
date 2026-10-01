@@ -1,5 +1,34 @@
 # Proviyaa (workspace) — Development Journal
 
+## 2026-10-02 — VINII Partner: Storefront CMS in the Master; the phone follows it
+
+**The guest QR menu's colours, buttons, fonts, pictures and text are now set in a CMS in the Master (owners for their own restaurant, the Proviyaa team for any), and both the table QR page and this app's guest mode show the published version.**
+
+- **Why:**
+  - The founder asked for a CMS in the Master admin to configure colours, images, text and buttons.
+  - The founder also asked that the Supabase address of pictures never be exposed publicly.
+- **Structural decisions:**
+  - The CMS edits the same storefront record as the phone's Studio. Each editor changes only its own parts, so neither wipes the other.
+  - Pictures sit in a private store and are served from the Master's own address.
+  - The database change for this (Master migration 0021) was written by this session because no other session was available. It follows the platform contract §4.4, now extended in §4.4.1.
+  - Work is on a separate Master branch, `feat/experience-cms`, in its own working copy, so other sessions' work is untouched.
+- **What works now:**
+  - The Master branch passes its type check, lint and production build.
+  - The phone app's guest screens use the CMS look and text; 121 automated checks pass.
+  - The app now runs only against the live VinniPos database. The local copy is no longer used, as the founder asked.
+  - Local-only test logins exist on One Local's dev database.
+- **Left undone:**
+  - Migration 0021 is not applied or tried anywhere, so the CMS is read-only for now.
+  - Nothing was clicked through in a browser: that needs the migration and a login.
+  - The phone shows CMS pictures only once `MEDIA_BASE_URL` is set to the Master's public address.
+  - Whether rider tables exist on the live database could not be confirmed. Both the expired access token and the refused service-role route blocked a live check. The 27 Sep snapshot and both repositories have none.
+- **Open questions for the founder:**
+  1. Approve migration 0021?
+  2. What is the Master's public address?
+  3. Should Restore bring back only the look, or the whole version?
+  4. Refresh the Supabase access token so the rider tables can be checked live?
+  5. Remove the test logins and copied access rules from One Local's local database?
+
 ## 2026-09-28 — VINII Partner: Flutter app for delivery orders, phone POS and the storefront, on real data only
 
 **Built the restaurant staff app in Flutter. It rings for delivery orders, takes table orders, edits the menu, and lets the restaurant design and preview the swipe-to-order experience from the two reference boards. Everything runs on the real Supabase data, with no sample data.**
