@@ -1,5 +1,29 @@
 # Proviyaa (workspace) — Development Journal
 
+## 2026-10-02 — VINII Partner: Product record and founder decisions captured before the design pass
+
+**Wrote the one-page product record the design toolkit (Impeccable) needs, saved the two reference boards into the project, and recorded four founder decisions. No app screens were changed.**
+
+- **Why:** The founder said the screens "need more life" and asked for the design toolkit to redesign the app. The toolkit will not design without a written record of who the product is for and what it must keep, so the design work starts from the founder's words and not from guesses. The same session also checked the product against the founder's full requirement list; that audit was given in the conversation and is not yet a saved document.
+- **Structural decisions:**
+  - **Web first.** The app is designed for the browser first and must fit phone, tablet and a counter computer. The same code can still become Android and iPhone apps later. Designing phone-only lost because the founder's brief says "web first" and "fit all screen sizes". Today's screens are phone-only.
+  - **Guest first, then staff.** The swipe-to-order experience for guests is the first design target; the staff screens follow.
+  - **One QR code per table.** A guest scans it and lands in the storefront already set to their table.
+  - **Payments through the payments page, with Cashfree as the gateway.** The app never holds the gateway's secret keys; the server creates the payment and records the result.
+- **What works now:** The product record is in `PRODUCT.md`. The two boards are in `docs/reference/` (`board-1-vinii-bistro.webp`, `board-2-the-windough.webp`). Impeccable is installed in the project's `.claude/` folder (the founder ran its installer).
+- **Left undone:**
+  - The design pass itself. Next step: a critique of the guest flow, then colour, motion and layout work.
+  - Service-charge ON/OFF with a "remove at final order" prompt, and the Open / Paused / Closed store control. Paused, not dropped; nothing was changed.
+  - Cashfree payments and table QR codes. Both need server pieces that are not in this project: creating the payment, receiving the result, and storing a safe table-session token.
+  - A saved version of the audit against the founder's requirement list.
+  - The installed design tool (about 14 MB, mostly one program file) is not committed.
+- **Open questions for the founder:**
+  1. Do you have a Cashfree account, and may we use its test keys on the development server only?
+  2. Does the guest pay inside the guest flow, or does staff collect at the table?
+  3. Should the 14 MB design tool folder be committed to the project, or stay on this computer only?
+  4. The platform contract still names Razorpay for online payments; may it be changed to Cashfree?
+  5. The last entry says the app now runs only on the live VinniPos database. To see the screens while redesigning, I need either a test login there or permission to use the local test database. Which?
+
 ## 2026-10-02 — VINII Partner: Storefront CMS in the Master; the phone follows it
 
 **The guest QR menu's colours, buttons, fonts, pictures and text are now set in a CMS in the Master (owners for their own restaurant, the Proviyaa team for any), and both the table QR page and this app's guest mode show the published version.**
