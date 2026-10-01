@@ -45,6 +45,22 @@ class LocalPrefs {
   Future<void> clearPendingKey(String scope) =>
       _prefs.remove('pending_key:$scope');
 
+  /// The last service charge percentage above zero that this organization
+  /// had, so switching the service charge back ON restores it instead of
+  /// asking for the number again.
+  double? lastServiceCharge(String orgId) =>
+      _prefs.getDouble('last_service_charge:$orgId');
+  Future<void> setLastServiceCharge(String orgId, double percent) =>
+      _prefs.setDouble('last_service_charge:$orgId', percent);
+
+  /// What the cashier chose when the final-order prompt offered to remove the
+  /// service charge from this order: `keep` or `remove`. Remembered so the
+  /// prompt shows once per order, even after the app restarts.
+  String? serviceChargeChoice(String orderId) =>
+      _prefs.getString('service_charge_choice:$orderId');
+  Future<void> setServiceChargeChoice(String orderId, String choice) =>
+      _prefs.setString('service_charge_choice:$orderId', choice);
+
   /// Storefront drafts are kept per organization on this phone until
   /// published (see StorefrontRepository implementations).
   Map<String, dynamic>? storefrontDraft(String orgId) {

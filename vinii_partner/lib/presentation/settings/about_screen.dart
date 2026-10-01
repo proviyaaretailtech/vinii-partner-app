@@ -43,6 +43,14 @@ class AboutScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
+            child: Text(
+              'Support may ask you to read these out. You do not need to '
+              'change or do anything with them.',
+              style: TextStyle(color: t.inkMuted, fontSize: 14, height: 1.4),
+            ),
+          ),
           Card(
             child: Column(
               children: [

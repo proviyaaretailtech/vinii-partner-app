@@ -6,10 +6,13 @@ import '../../domain/guest_catalog.dart';
 import '../../domain/pos_order.dart';
 import '../../domain/storefront.dart';
 import '../theme/guest_theme.dart';
+import '../widgets/dish_art.dart';
 import '../widgets/food_art.dart';
 import 'guest_bill.dart';
 import 'guest_flow.dart';
 import 'guest_widgets.dart';
+import 'look/look.dart';
+import 'look/motion.dart';
 
 /// Board 1 #9 / Board 2 #7 & #12: "Your order" — steppers, the saved-for-
 /// later row, and the budget against the estimated total.
@@ -80,7 +83,16 @@ class GuestOrderScreen extends StatelessWidget {
               padding: const EdgeInsets.all(32),
               child: Column(
                 children: [
-                  const Text('🧺', style: TextStyle(fontSize: 48)),
+                  SizedBox(
+                    height: 130,
+                    child: DishArt(
+                      name: 'plate',
+                      family: DishFamily.plate,
+                      light: p.keyLight,
+                      onDark: p.isDark,
+                      animate: false,
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   Text('Your order is empty', style: p.display(22)),
                   const SizedBox(height: 20),
@@ -91,7 +103,8 @@ class GuestOrderScreen extends StatelessWidget {
                 ],
               ),
             ),
-          for (final l in s.lines) _LineRow(line: l),
+          for (final (n, l) in s.lines.indexed)
+            _LineRow(key: ValueKey(l.itemId), line: l, index: n),
           if (saved.isNotEmpty) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
@@ -169,7 +182,12 @@ class GuestOrderScreen extends StatelessWidget {
                             style: p.body(15, weight: FontWeight.w700),
                           ),
                         ),
-                        Text(rupees(s.estimate.payable), style: p.price(22)),
+                        CountUp(
+                          value: s.estimate.payable,
+                          format: rupees,
+                          duration: GuestMotion.base,
+                          style: p.price(22),
+                        ),
                       ],
                     ),
                     if (s.charges != null)
@@ -203,58 +221,112 @@ class GuestOrderScreen extends StatelessWidget {
 }
 
 class _LineRow extends StatelessWidget {
-  const _LineRow({required this.line});
+  const _LineRow({super.key, required this.line, required this.index});
   final CartLine line;
+  final int index;
 
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
     final item = s.catalog.item(line.itemId);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 6, 20, 6),
-      child: Row(
-        children: [
-          SizedBox.square(
-            dimension: 58,
-            child: FoodArt(
-              name: line.name,
-              imageUrl: item?.item.imageUrl,
-              radius: 16,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  line.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: p.body(15, weight: FontWeight.w700),
+    // Slide a dish away to remove it; the steppers still work as before.
+    return Reveal(
+      index: index,
+      dx: 18,
+      dy: 0,
+      child: Dismissible(
+        key: ValueKey('dismiss-${line.itemId}'),
+        direction: DismissDirection.endToStart,
+        onDismissed: (_) => s.setQty(line.itemId, 0),
+        background: Container(
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 28),
+          color: p.danger.withValues(alpha: 0.18),
+          child: Icon(Icons.delete_outline_rounded, color: p.danger),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 6, 20, 6),
+          child: Row(
+            children: [
+              SizedBox.square(
+                dimension: 58,
+                child: FoodArt(
+                  name: line.name,
+                  imageUrl: item?.item.imageUrl,
+                  radius: 16,
+                  animate: false,
                 ),
-                Text(
-                  rupees(line.unitPrice),
-                  style: p.body(13, color: p.inkMuted),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      line.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: p.body(15, weight: FontWeight.w700),
+                    ),
+                    Text(
+                      rupees(line.unitPrice),
+                      style: p.body(13, color: p.inkMuted),
+                    ),
+                    // One tap to give everyone at the table the same dish.
+                    if (s.hasParty && line.qty != s.partySize)
+                      GestureDetector(
+                        key: ValueKey('repeat-${line.itemId}'),
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => s.setQty(line.itemId, s.partySize),
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 4, bottom: 2),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.groups_rounded,
+                                size: 15,
+                                color: p.isDark ? p.keyLight : p.ink,
+                              ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  'For all ${s.partySize}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: p.body(
+                                    12.5,
+                                    weight: FontWeight.w700,
+                                    color: p.isDark ? p.keyLight : p.ink,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              QtyStepper(
+                qty: line.qty,
+                compact: true,
+                onChanged: (v) => s.setQty(line.itemId, v),
+              ),
+              SizedBox(
+                width: 70,
+                child: CountUp(
+                  value: line.lineTotal,
+                  format: rupees,
+                  duration: GuestMotion.base,
+                  textAlign: TextAlign.right,
+                  style: p.price(15),
+                ),
+              ),
+            ],
           ),
-          QtyStepper(
-            qty: line.qty,
-            compact: true,
-            onChanged: (v) => s.setQty(line.itemId, v),
-          ),
-          SizedBox(
-            width: 70,
-            child: Text(
-              rupees(line.lineTotal),
-              textAlign: TextAlign.right,
-              style: p.price(15),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

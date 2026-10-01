@@ -28,6 +28,9 @@ class Routes {
   static const menuCategories = '/menu/categories';
   static String storefrontSection(String key) => '/storefront/section/$key';
   static const about = '/more/about';
+  static const billSettings = '/more/bill';
+  static const team = '/more/team';
+  static const tableCodes = '/more/tables';
 
   // Full screen, above the tabs.
   static String alert(String orderId) => '/alert/$orderId';

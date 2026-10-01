@@ -10,6 +10,8 @@ import '../../domain/guest_catalog.dart';
 import '../../domain/storefront.dart';
 import '../theme/guest_theme.dart';
 import '../widgets/rings.dart';
+import 'look/look.dart';
+import 'look/motion.dart';
 
 /// Gives every guest screen the party's [GuestSession], the staff exit and
 /// where CMS pictures are served from. Lives above the runtime's own
@@ -107,22 +109,34 @@ class GuestPage extends StatelessWidget {
     this.bottom,
     this.background,
     this.safeTop = true,
+    this.stage = 0.5,
+    this.maxWidth = 480,
   });
 
   final Widget child;
   final Widget? bottom;
+
+  /// How wide the content may be. A phone-width column by default; a screen
+  /// that lays out two panes asks for more.
+  final double maxWidth;
   final Color? background;
   final bool safeTop;
+
+  /// How strongly the lit room shows behind the page (0 to 1), or null for a
+  /// flat page. It is a still picture, not an animation, so every page can
+  /// have it at no cost.
+  final double? stage;
 
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
-    return Scaffold(
-      backgroundColor: background ?? p.background,
+    final lit = stage != null && background == null;
+    final scaffold = Scaffold(
+      backgroundColor: lit ? Colors.transparent : (background ?? p.background),
       body: SafeArea(
         top: safeTop,
         bottom: bottom == null,
-        child: GuestColumn(child: child),
+        child: GuestColumn(maxWidth: maxWidth, child: child),
       ),
       bottomNavigationBar: bottom == null
           ? null
@@ -130,6 +144,7 @@ class GuestPage extends StatelessWidget {
               top: false,
               child: GuestColumn(
                 fill: false,
+                maxWidth: maxWidth > 480 ? 480 : maxWidth,
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
                   child: bottom,
@@ -137,13 +152,28 @@ class GuestPage extends StatelessWidget {
               ),
             ),
     );
+    if (!lit) return scaffold;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        GuestStage(intensity: stage!, drift: false),
+        scaffold,
+      ],
+    );
   }
 }
 
-/// Centres content and caps it at 480 px wide.
+/// Centres content and caps it at [maxWidth] (480 px, a phone's width, unless
+/// a screen asks for more).
 class GuestColumn extends StatelessWidget {
-  const GuestColumn({super.key, required this.child, this.fill = true});
+  const GuestColumn({
+    super.key,
+    required this.child,
+    this.fill = true,
+    this.maxWidth = 480,
+  });
   final Widget child;
+  final double maxWidth;
 
   /// False for bars (the bottom button area): take the child's height, not
   /// all the height offered — otherwise the bar would swallow the page.
@@ -154,7 +184,7 @@ class GuestColumn extends StatelessWidget {
     alignment: Alignment.topCenter,
     heightFactor: fill ? null : 1,
     child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 480),
+      constraints: BoxConstraints(maxWidth: maxWidth),
       child: child,
     ),
   );
@@ -209,7 +239,7 @@ class GuestButton extends StatelessWidget {
     final enabled = onTap != null && !busy;
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 200),
-      opacity: onTap == null ? 0.45 : 1,
+      opacity: onTap == null ? 0.6 : 1,
       child: Material(
         color: bg,
         shape: p.buttonShape(
@@ -475,7 +505,9 @@ class GuestLogo extends StatelessWidget {
   }
 }
 
-/// A pill chip for storefront tags: "Bestseller" orange, "Spicy" with chili.
+/// A pill chip for storefront tags: "Bestseller" orange with a flame,
+/// "Spicy" with heat. Icons are drawn, never emoji, so they keep the chip's
+/// weight and colour in every font.
 class TagChip extends StatelessWidget {
   const TagChip(this.tag, {super.key, this.onImage = false});
   final String tag;
@@ -483,15 +515,15 @@ class TagChip extends StatelessWidget {
   /// Over a photo scrim: always light text on a dark glass.
   final bool onImage;
 
-  static String? emojiFor(String tag) => switch (tag.toLowerCase()) {
-    'bestseller' => '🔥',
-    'spicy' => '🌶️',
-    "chef's special" => '👨‍🍳',
-    'seasonal' => '🍂',
-    'new' => '✨',
-    'vegan' => '🌱',
-    'gluten-free' => '🌾',
-    'vegetarian' => '🥬',
+  static IconData? iconFor(String tag) => switch (tag.toLowerCase()) {
+    'bestseller' => Icons.local_fire_department_rounded,
+    'spicy' => Icons.thermostat_rounded,
+    "chef's special" => Icons.workspace_premium_rounded,
+    'seasonal' => Icons.eco_rounded,
+    'new' => Icons.auto_awesome_rounded,
+    'vegan' => Icons.eco_rounded,
+    'gluten-free' => Icons.grass_rounded,
+    'vegetarian' => Icons.spa_rounded,
     _ => null,
   };
 
@@ -500,14 +532,14 @@ class TagChip extends StatelessWidget {
     final p = GuestPalette.of(context);
     final hot = tag.toLowerCase() == 'bestseller';
     final bg = hot
-        ? const Color(0xFFF97316)
+        ? const Color(0xFFC2410C)
         : onImage
         ? Colors.black.withValues(alpha: 0.45)
         : p.surfaceAlt;
     final fg = hot || onImage ? Colors.white : p.ink;
-    final emoji = emojiFor(tag);
+    final icon = iconFor(tag);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: EdgeInsets.fromLTRB(icon == null ? 10 : 8, 5, 10, 5),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(999),
@@ -515,9 +547,18 @@ class TagChip extends StatelessWidget {
             ? Border.all(color: Colors.white.withValues(alpha: 0.18))
             : null,
       ),
-      child: Text(
-        emoji == null ? tag : '$emoji $tag',
-        style: p.body(12, weight: FontWeight.w700, color: fg),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 14, color: fg),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            tag,
+            style: p.body(12, weight: FontWeight.w700, color: fg),
+          ),
+        ],
       ),
     );
   }
@@ -583,6 +624,10 @@ class QtyStepper extends StatelessWidget {
   }
 }
 
+/// The same colour as [budgetColor], safe to use for text on this page.
+Color budgetTextColor(GuestPalette p, BudgetStatus s) =>
+    p.readable(budgetColor(p, s));
+
 /// Green on track, amber when close, red when over.
 Color budgetColor(GuestPalette p, BudgetStatus s) => s.over
     ? p.danger
@@ -592,24 +637,39 @@ Color budgetColor(GuestPalette p, BudgetStatus s) => s.over
 
 /// "₹1,300 / ₹7,000 · 19% used" around a ring.
 class BudgetRing extends StatelessWidget {
-  const BudgetRing({super.key, required this.status, this.size = 64});
+  const BudgetRing({
+    super.key,
+    required this.status,
+    this.size = 64,
+    this.fromZero = false,
+  });
   final BudgetStatus status;
   final double size;
+
+  /// Fills from empty when first shown (the budget overview), instead of
+  /// appearing already filled.
+  final bool fromZero;
 
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     return TweenAnimationBuilder<double>(
-      tween: Tween(end: status.fraction),
-      duration: const Duration(milliseconds: 650),
-      curve: Curves.easeOutBack,
+      tween: Tween(begin: fromZero ? 0 : null, end: status.fraction),
+      duration: fromZero ? GuestMotion.hero : const Duration(milliseconds: 650),
+      curve: fromZero ? GuestMotion.arrive : Curves.easeOutBack,
       builder: (context, v, _) => ProgressRing(
         value: v,
         size: size,
         stroke: size / 9,
         color: budgetColor(p, status),
         trackColor: p.surfaceAlt,
-        child: Text('${status.percentUsed}%', style: p.price(size * 0.24)),
+        child: CountUp(
+          value: status.percentUsed,
+          from: fromZero ? 0 : null,
+          format: (v) => '${v.round()}%',
+          duration: fromZero ? GuestMotion.hero : GuestMotion.slow,
+          style: p.price(size * 0.24),
+        ),
       ),
     );
   }
@@ -670,6 +730,7 @@ class BudgetNote extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final c = budgetColor(p, status);
+    final text = budgetTextColor(p, status);
     final (icon, title) = status.over
         ? (Icons.error_outline_rounded, "You're over your budget")
         : status.close
@@ -694,7 +755,7 @@ class BudgetNote extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title, style: p.body(14, weight: FontWeight.w700)),
-                Text(line, style: p.body(13, color: c)),
+                Text(line, style: p.body(13, color: text)),
               ],
             ),
           ),
@@ -704,7 +765,8 @@ class BudgetNote extends StatelessWidget {
   }
 }
 
-/// A rounded card on the template's surface.
+/// A rounded card on the template's surface, lit from the upper left and
+/// edged with a hairline drawn from the accent (not a grey line).
 class GuestCard extends StatelessWidget {
   const GuestCard({
     super.key,
@@ -724,16 +786,24 @@ class GuestCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
-    return Material(
-      color: color ?? p.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(22),
-        side: BorderSide(color: borderColor ?? p.border),
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(22),
+      side: BorderSide(color: borderColor ?? p.hairline),
+    );
+    return DecoratedBox(
+      decoration: ShapeDecoration(
+        shape: shape,
+        color: color,
+        gradient: color == null ? p.sheen : null,
       ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(padding: padding, child: child),
+      child: Material(
+        type: MaterialType.transparency,
+        shape: shape,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(padding: padding, child: child),
+        ),
       ),
     );
   }

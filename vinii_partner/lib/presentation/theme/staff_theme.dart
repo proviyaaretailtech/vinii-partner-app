@@ -23,6 +23,15 @@ class ViniiColors {
   static const purple = Color(0xFF7C3AED);
 }
 
+/// Where staff layouts change shape. Below [wide] a screen is one column
+/// (phone, narrow tablet); from [wide] up it may show two panes side by side
+/// (menu and ticket, form and preview) for a tablet or a counter computer.
+class Breakpoints {
+  const Breakpoints._();
+
+  static const wide = 840.0;
+}
+
 /// Semantic colours screens use instead of raw hex, so light and dark both
 /// work and a restaurant's brand colour never ends up as text on itself.
 @immutable

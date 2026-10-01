@@ -44,6 +44,12 @@ dependencies:
   qr_flutter: ^4.1.0
   google_fonts: ^8.2.1
   http: ^1.6.0
+  # Table QR codes: a printable A4 sheet of table cards (pdf builds it,
+  # printing opens the print dialog), and `web` for the browser download of a
+  # single card's picture. printing already depends on web.
+  pdf: ^3.13.1
+  printing: ^5.15.1
+  web: ^1.1.1
 
 dev_dependencies:
   flutter_test:

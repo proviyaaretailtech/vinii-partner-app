@@ -130,60 +130,68 @@ class _OrdersScreenState extends State<OrdersScreen>
       appBar: appBar,
       body: ListenableBuilder(
         listenable: _inbox,
-        builder: (context, _) => Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-              child: Column(
-                children: [const OutletBar(), ..._banners(context)],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: t.border)),
-              ),
-              child: TabBar(
-                controller: _tabs,
-                labelPadding: const EdgeInsets.symmetric(horizontal: 4),
-                indicatorColor: t.ink,
-                indicatorWeight: 3,
-                indicatorSize: TabBarIndicatorSize.label,
-                labelColor: t.ink,
-                unselectedLabelColor: t.inkMuted,
-                dividerColor: Colors.transparent,
-                labelStyle: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
+        builder: (context, _) => LayoutBuilder(
+          builder: (context, box) => Column(
+            children: [
+              // The store status and any notices sit above the list. On a
+              // short screen (a phone held sideways) they scroll within
+              // their own band rather than pushing the list off the page.
+              ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: box.maxHeight * 0.6),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                  child: Column(
+                    children: [const OutletBar(), ..._banners(context)],
+                  ),
                 ),
-                unselectedLabelStyle: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
+              ),
+              const SizedBox(height: 8),
+              Container(
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: t.border)),
                 ),
-                tabs: [
-                  for (final tab in InboxTab.values)
-                    Tab(
-                      height: 48,
-                      child: _TabLabel(
-                        label: tab.label,
-                        count: _inbox.lists[tab]?.length,
-                        urgent: tab == InboxTab.fresh,
+                child: TabBar(
+                  controller: _tabs,
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+                  indicatorColor: t.ink,
+                  indicatorWeight: 3,
+                  indicatorSize: TabBarIndicatorSize.label,
+                  labelColor: t.ink,
+                  unselectedLabelColor: t.inkMuted,
+                  dividerColor: Colors.transparent,
+                  labelStyle: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                  tabs: [
+                    for (final tab in InboxTab.values)
+                      Tab(
+                        height: 48,
+                        child: _TabLabel(
+                          label: tab.label,
+                          count: _inbox.lists[tab]?.length,
+                          urgent: tab == InboxTab.fresh,
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            Expanded(
-              child: TabBarView(
-                controller: _tabs,
-                children: [
-                  for (final tab in InboxTab.values) _OrderList(tab: tab),
-                ],
+              Expanded(
+                child: TabBarView(
+                  controller: _tabs,
+                  children: [
+                    for (final tab in InboxTab.values) _OrderList(tab: tab),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

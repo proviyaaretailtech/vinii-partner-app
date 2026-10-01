@@ -303,6 +303,26 @@ class GuestSession extends ChangeNotifier {
 
   PlacedOrder? get latest => placed.isEmpty ? null : placed.last;
 
+  /// "Order the same again": puts the last order's dishes back in the cart,
+  /// skipping any that are no longer on sale. Returns how many portions went
+  /// in (0 when there is nothing to repeat).
+  int repeatLatest() {
+    final order = latest;
+    if (order == null) return 0;
+    var portions = 0;
+    for (final l in order.lines) {
+      final dish = catalog.item(l.itemId);
+      if (dish == null) continue;
+      add(dish, qty: l.qty);
+      portions += l.qty;
+    }
+    return portions;
+  }
+
+  /// Whether the party was told apart: more than one person to feed, with
+  /// splitting turned on, so "for everyone" means something.
+  bool get hasParty => features.splitParty && partySize >= 2;
+
   GuestTrackingStep get step {
     final o = latest;
     if (o == null) return GuestTrackingStep.confirmed;
@@ -336,14 +356,17 @@ class GuestSession extends ChangeNotifier {
         );
   }
 
-  /// Longest prep time of the latest order (fallback 15): "15–20 minutes".
-  int estimatedMinutes(PlacedOrder order) {
+  /// The longest prep time among the order's dishes, as the restaurant set
+  /// it, or null when none of them has one. The screens then say nothing
+  /// about time: a number the restaurant never gave would be a promise the
+  /// kitchen did not make.
+  int? estimatedMinutes(PlacedOrder order) {
     var m = 0;
     for (final l in order.lines) {
       final p = catalog.item(l.itemId)?.item.prepMinutes ?? 0;
       if (p > m) m = p;
     }
-    return m == 0 ? 15 : m;
+    return m == 0 ? null : m;
   }
 
   void _notify() {

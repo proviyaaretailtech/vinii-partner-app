@@ -33,12 +33,57 @@ class FakeBackend implements Backend {
   AppFailure? failSignIn;
   AppFailure? failPlaceOrder;
   AppFailure? failStorefrontPublish;
+  AppFailure? failBillSettingsSave;
+  AppFailure? failAdjustBill;
+  AppFailure? failIssueCode;
+  AppFailure? failTeamChange;
+  AppFailure? failChannelChange;
+  AppFailure? failOutletChange;
+
+  /// Fails the Nth (1-based) payment call, to test a split payment whose
+  /// second part does not go through.
+  final failPaymentOnCall = <int, AppFailure>{};
+  var _paymentCalls = 0;
 
   final deliveries = <DeliveryOrder>[];
   OutletStatus outletStatus = const OutletStatus(accepting: true);
   final placed = <PosOrderDraft>[];
   final payments =
       <({String orderId, PaymentMethod method, double amount, String key})>[];
+
+  /// The organization's rates, as `pos.billCharges()` answers.
+  BillCharges billCharges = BillCharges.defaults;
+
+  /// Today's unpaid orders, as `pos.openOrders()` answers.
+  List<PlacedOrder> openOrderRows = [];
+
+  /// Bill changes asked for on saved orders.
+  final adjustments =
+      <({String orderId, bool waive, String? reason, String version})>[];
+
+  /// `org_bill_settings` as the fake database holds it, with the version
+  /// (`updatedAt`) a save must present. Starts as "no row yet".
+  BillSettings billSettingsRow = BillSettings.defaults;
+  final billSettingsSaves = <BillSettings>[];
+  var _billVersion = 0;
+
+  /// Bumps the stored version, as if someone else saved in the meantime.
+  void saveBillSettingsElsewhere(BillSettings next) {
+    billSettingsRow = next.copyWith(updatedAt: 'v${++_billVersion}');
+  }
+
+  /// The team and the roles table.
+  List<TeamMember> teamMembers = [];
+  List<StaffRole> staffRoles = [];
+  final teamChanges = <String>[];
+
+  /// Tables and their QR codes; [issuedCodes] counts codes handed out.
+  List<TableCode> tableCodeRows = [];
+  var issuedCodes = 0;
+
+  /// Sales channels (`channel_integrations`).
+  List<SalesChannel> channelRows = [];
+
   StorefrontState storefrontState = const StorefrontState();
   Organization? active;
   final signOutCalls = <bool>[];
@@ -55,6 +100,14 @@ class FakeBackend implements Backend {
   late final DeliveryInbox inbox = _Inbox(this);
   @override
   late final StorefrontRepository storefront = _Storefront(this);
+  @override
+  late final BillSettingsRepository billSettings = _BillSettings(this);
+  @override
+  late final TeamRepository team = _Team(this);
+  @override
+  late final TablesRepository tableCodes = _Tables(this);
+  @override
+  late final ChannelsRepository channels = _Channels(this);
 
   @override
   Future<void> start() async {}
@@ -194,13 +247,13 @@ class _Pos implements PosRepository {
   Future<List<DiningTable>> tables() async => b.tables;
 
   @override
-  Future<BillCharges> billCharges() async => BillCharges.defaults;
+  Future<BillCharges> billCharges() async => b.billCharges;
 
   @override
   Future<PlacedOrder> placeOrder(PosOrderDraft draft) async {
     if (b.failPlaceOrder != null) throw b.failPlaceOrder!;
     b.placed.add(draft);
-    return PlacedOrder(
+    final order = PlacedOrder(
       id: 'o-${b.placed.length}',
       version: 'v1',
       displayNo: 'ORD-${b.placed.length}',
@@ -212,6 +265,8 @@ class _Pos implements PosRepository {
       table: draft.table,
       placedBy: draft.placedBy,
     );
+    b.openOrderRows = [order, ...b.openOrderRows];
+    return order;
   }
 
   @override
@@ -222,6 +277,9 @@ class _Pos implements PosRepository {
     required String idempotencyKey,
     String? reference,
   }) async {
+    final call = ++b._paymentCalls;
+    final failure = b.failPaymentOnCall[call];
+    if (failure != null) throw failure;
     b.payments.add((
       orderId: order.id,
       method: method,
@@ -229,18 +287,26 @@ class _Pos implements PosRepository {
       key: idempotencyKey,
     ));
     final paid = order.paidAmount + amount;
-    return order.copyWith(
+    final updated = order.copyWith(
       paidAmount: paid,
       status: paid >= order.bill.payable ? PosStatus.paid : order.status,
     );
+    b.openOrderRows = [
+      for (final o in b.openOrderRows)
+        if (o.id != order.id) o else if (updated.status.isOpen) updated,
+    ];
+    return updated;
   }
 
   @override
-  Future<List<PlacedOrder>> openOrders() async => const [];
+  Future<List<PlacedOrder>> openOrders() async => List.of(b.openOrderRows);
 
   @override
-  Future<PlacedOrder> refresh(String orderId) async =>
-      throw const AppFailure('Order not found.', kind: FailureKind.rejected);
+  Future<PlacedOrder> refresh(String orderId) async {
+    final found = b.openOrderRows.where((o) => o.id == orderId).firstOrNull;
+    if (found != null) return found;
+    throw const AppFailure('Order not found.', kind: FailureKind.rejected);
+  }
 
   @override
   Future<PlacedOrder> setStatus(
@@ -248,6 +314,30 @@ class _Pos implements PosRepository {
     PosStatus status, {
     String? reason,
   }) async => order.copyWith(status: status);
+
+  @override
+  Future<PlacedOrder> adjustBill(
+    PlacedOrder order, {
+    required bool waiveServiceCharge,
+    String? reason,
+  }) async {
+    if (b.failAdjustBill != null) throw b.failAdjustBill!;
+    b.adjustments.add((
+      orderId: order.id,
+      waive: waiveServiceCharge,
+      reason: reason,
+      version: order.version,
+    ));
+    // Like the server: recompute from the order's own lines and the
+    // organization's rates, and hand back a new version.
+    final bill = BillSummary.of(
+      order.lines.map((l) => (unitPrice: l.unitPrice, qty: l.qty)),
+      charges: b.billCharges,
+      discount: order.bill.discount,
+      waiveServiceCharge: waiveServiceCharge,
+    );
+    return order.copyWith(bill: bill, version: '${order.version}+');
+  }
 }
 
 class _Inbox implements DeliveryInbox {
@@ -265,8 +355,10 @@ class _Inbox implements DeliveryInbox {
   Future<OutletStatus> outlet() async => b.outletStatus;
 
   @override
-  Future<OutletStatus> setAccepting(bool accepting, {DateTime? backAt}) async =>
-      b.outletStatus = OutletStatus(accepting: accepting, backAt: backAt);
+  Future<OutletStatus> setAccepting(bool accepting, {DateTime? backAt}) async {
+    if (b.failOutletChange != null) throw b.failOutletChange!;
+    return b.outletStatus = OutletStatus(accepting: accepting, backAt: backAt);
+  }
 
   @override
   Future<List<DeliveryOrder>> list(InboxTab tab) async =>
@@ -368,5 +460,121 @@ class _Storefront implements StorefrontRepository {
       history: [v, ...b.storefrontState.history],
     );
     return v;
+  }
+}
+
+class _BillSettings implements BillSettingsRepository {
+  _BillSettings(this.b);
+  final FakeBackend b;
+
+  @override
+  Future<BillSettings> load() async => b.billSettingsRow;
+
+  @override
+  Future<BillSettings> save(BillSettings settings) async {
+    if (b.failBillSettingsSave != null) throw b.failBillSettingsSave!;
+    if (settings.updatedAt != b.billSettingsRow.updatedAt) {
+      throw const AppFailure(
+        'Someone else saved these settings while you were editing. '
+        'Reload to see their changes, then make yours again.',
+        kind: FailureKind.conflict,
+      );
+    }
+    b.billSettingsSaves.add(settings);
+    b.billSettingsRow = settings.copyWith(updatedAt: 'v${++b._billVersion}');
+    return b.billSettingsRow;
+  }
+}
+
+class _Team implements TeamRepository {
+  _Team(this.b);
+  final FakeBackend b;
+
+  @override
+  Future<List<TeamMember>> members() async => List.of(b.teamMembers);
+
+  @override
+  Future<List<StaffRole>> roles() async => List.of(b.staffRoles);
+
+  Future<TeamMember> _replace(
+    TeamMember was,
+    TeamMember now,
+    String what,
+  ) async {
+    if (b.failTeamChange != null) throw b.failTeamChange!;
+    b.teamChanges.add(what);
+    b.teamMembers = [for (final m in b.teamMembers) m.id == was.id ? now : m];
+    return now;
+  }
+
+  @override
+  Future<TeamMember> setRole(TeamMember member, StaffRole role) => _replace(
+    member,
+    member.copyWith(role: role),
+    '${member.id}:role:${role.slug}',
+  );
+
+  @override
+  Future<TeamMember> setStatus(TeamMember member, {required bool active}) =>
+      _replace(
+        member,
+        member.copyWith(active: active),
+        '${member.id}:${active ? 'active' : 'suspended'}',
+      );
+}
+
+class _Tables implements TablesRepository {
+  _Tables(this.b);
+  final FakeBackend b;
+
+  @override
+  Future<List<TableCode>> list() async => List.of(b.tableCodeRows);
+
+  @override
+  Future<TableCode> issueCode(TableCode table, {bool replace = false}) async {
+    if (b.failIssueCode != null) throw b.failIssueCode!;
+    if (table.hasCode && !replace) {
+      throw const AppFailure(
+        'This table already has a code.',
+        kind: FailureKind.conflict,
+      );
+    }
+    // Ten characters, a-z and 0-9, like the server's.
+    final token = 'issued${(++b.issuedCodes).toString().padLeft(4, '0')}';
+    final issued = TableCode(
+      id: table.id,
+      label: table.label,
+      seats: table.seats,
+      areaId: table.areaId,
+      areaName: table.areaName,
+      isActive: table.isActive,
+      qrToken: token,
+      sortOrder: table.sortOrder,
+    );
+    b.tableCodeRows = [
+      for (final t in b.tableCodeRows) t.id == table.id ? issued : t,
+    ];
+    return issued;
+  }
+}
+
+class _Channels implements ChannelsRepository {
+  _Channels(this.b);
+  final FakeBackend b;
+
+  @override
+  Future<List<SalesChannel>> list() async => List.of(b.channelRows);
+
+  @override
+  Future<SalesChannel> setAccepting(
+    SalesChannel channel,
+    bool accepting,
+  ) async {
+    if (b.failChannelChange != null) throw b.failChannelChange!;
+    final next = channel.copyWith(accepting: accepting);
+    b.channelRows = [
+      for (final c in b.channelRows) c.id == channel.id ? next : c,
+    ];
+    return next;
   }
 }

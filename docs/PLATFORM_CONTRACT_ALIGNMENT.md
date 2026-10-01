@@ -200,6 +200,56 @@ The founder asked for a CMS in the Master to set the guest storefront's colours,
 
 **Who reads what:** the table-QR page (`/t/<token>`) and the phone's guest runtime render the published version. The Master's `/t/preview/<organization_id>` shows the draft, to editors only. `organizations.theme` stays the staff apps' look.
 
+### 4.5 Proposed additions for the founder's migration (staff operations)
+
+**Status:** proposed on 2026-10-02, **not applied**. The staff screens for Bill & GST, the final-order service charge, the store status and sales channels, the Team and the Table QR codes were built against the shapes below. Each function is called through the same pattern as §4.1 (one `jsonb` argument `p`, snake_case keys, errors as `raise exception 'POS_<CODE>: <plain message>'`), and the phone maps a missing function (`PGRST202` / `42883`) to `FailureKind.notReady`, which staff see as "Not available yet" with the reason. Nothing is written around them. Change these only additively, and update this section in the same change.
+
+#### New functions
+
+| Function | `p` | Returns | Who may call it | Does |
+| --- | --- | --- | --- | --- |
+| `pos_adjust_bill` | `order_id`, `expected_updated_at`, `waive_service_charge` (bool), `waive_reason?` (text, at most 120; kept only when waiving) | the order shape of §4.1 plus `service_charge_waived` (bool) and `service_charge_waived_amount` (numeric: what was taken off, 0 when none) | `org_owner`, `org_admin`, `manager` of the order's organization (`has_org_role`, gap G2). A biller or captain gets `POS_FORBIDDEN` | Takes the service charge off a saved order, or puts it back. Checks the version, then that the order is open and **has no payments yet**. Recomputes the bill from the stored lines, the discount and the organization's `org_bill_settings`, with the same maths as §4.1 (items − discount, + service charge unless waived, + SGST + CGST, + round-off). Updates `orders.service_charge`, the GST amounts, `round_off` and `total`. Writes one `order_events` row, `kind = 'bill_adjusted'`, in the same transaction, with the actor and `meta { service_charge_waived, reason, total_before, total_after }`. Because the version moves, a repeated call is refused as stale, never applied twice |
+| `pos_issue_table_qr` | `table_id`, `replace?` (bool, default false) | the table row: `{id, label, area_id, qr_token, is_active, sort_order, seats}` | `org_admin`, `manager` (the Master's `QR_MANAGER_ROLES`) | Gives a table its guest code. The server generates the token (ten characters, `a–z` and `0–9`, from a cryptographic source, at least 40 bits), retries when the global unique rule on `qr_token` is hit, and records who did it. If the table already has a code and `replace` is not true it refuses with `POS_WRONG_STATE: This table already has a code.`, so a stale screen can never replace a code by accident. With `replace = true` the old code stops working: the phone asks first ("Printed stickers will stop working") |
+
+**Errors for both:** `POS_FORBIDDEN`, `POS_STALE` (`pos_adjust_bill`), `POS_WRONG_STATE`, `POS_NOT_FOUND`, `POS_BAD_REQUEST`. The phone's existing mapping (§4.1) applies unchanged: `STALE` and `WRONG_STATE` become a conflict, `FORBIDDEN` becomes forbidden, the rest become rejected.
+
+#### Additions to `pos_place_order`
+
+- `p.waive_service_charge` (bool, default false) and `p.waive_reason` (text, optional). **The phone sends them only when the service charge was removed**, so every older caller is unaffected. Only the roles that may call `pos_adjust_bill` are honoured; for anyone else the function raises `POS_FORBIDDEN`, because the phone's hidden Remove button is not a permission.
+- When waived, the service charge is 0 on the stored order. Record it on `orders` as `service_charge_waived boolean not null default false` (with the amount, so the bill can show it struck through) and in the `placed` event's `meta` (`service_charge_waived`, `reason`, actor).
+- The return shape gains `service_charge_waived` and `service_charge_waived_amount`, exactly as in `pos_adjust_bill`. The phone reads both when present and falls back to working the amount out from the order's own figures when they are not.
+
+#### Writes the phone makes directly today (the same soft role limit as menu editing, gap G2)
+
+| Table | What the phone writes | App limit today | Suggested database rule once `has_org_role` exists |
+| --- | --- | --- | --- |
+| `org_bill_settings` | An upsert on `organization_id`: the first save inserts (nothing in the Master creates this row today); later saves are `update … where updated_at = <the version loaded>`, so two people cannot overwrite each other. A save that changes no row is read back to tell "someone saved first" (conflict) from "not allowed" | `org_owner`, `org_admin` edit; owners, admins, managers (and the other lead roles) and billers may view | write policies limited to `org_owner`, `org_admin`; read stays open to members |
+| `channel_integrations` | `is_accepting` (and `next_open_at = null`) for one row, to switch Swiggy, Zomato and the other channels ON or OFF | `org_owner`, `org_admin`, `manager` | update policy limited to the same three roles |
+| `org_users` | `role_id` and `status` of one member | `org_admin` only, which is exactly what `is_org_admin` allows. An `org_owner` sees the team read-only (the same fact as G5 and Q3) | unchanged |
+
+Invitations are **not** created from the phone: `org_invites` has no policy for signed-in users, so the Team screen says plainly that invitations are sent from the VINII control panel, under Users & Roles.
+
+#### Facts about `org_bill_settings` the phone relies on
+
+- One row per organization, `service_charge_pct = 0` means the service charge is off, and each of `sgst_pct`, `cgst_pct`, `service_charge_pct` is `numeric(5,2)` between 0 and 50. The phone sets SGST and CGST to half of the chosen GST rate (presets 0, 5, 12, 18, or a custom rate in steps of 0.1 so the halves are exact) and writes both.
+- GSTIN is validated on the phone as the standard 15-character shape (state code, PAN, entity number, `Z`, check character) and stored upper-case. FSSAI is 14 digits. Neither is checked by the database.
+- `pos_place_order` and `pos_adjust_bill` must read the rates from this row at the moment of the call (rule R2), never from a number the phone sends.
+
+#### Event registry
+
+When these functions exist, add one row to §4.3: `bill_adjusted` → canonical event `order.bill_adjusted`, written by `pos_adjust_bill`.
+
+#### What the store status control does, and does not, need from the database
+
+Open, Paused and Closed for today use One Local's partner API as it is: `accepting` and `back_at`. There is no third value, so **Closed for today is stored as "not accepting until exactly 9:00 AM"** (today if it is still ahead, otherwise tomorrow), and a pause ends at a time counted from the moment it was set. Every phone reads the same answer the same way. No change is proposed.
+
+#### Questions for the founder
+
+1. May a **biller** remove a service charge? The app says no (owner, admin and manager only); the founder's documents are silent.
+2. Is "Closed for today means off until 9:00 AM" acceptable, or should One Local gain a real closed state?
+3. Does anything other than the Master's Channels page read `channel_integrations.is_accepting`? If Swiggy and Zomato orders are not filtered by it yet, the phone's switch is accurate but has no effect on those orders.
+4. Should every member see the Team list, as the database allows today? The app shows it to every role, read-only.
+
 ---
 
 ## 5. Left for other owners (not changed here)

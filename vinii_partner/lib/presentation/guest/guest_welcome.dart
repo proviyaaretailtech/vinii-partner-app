@@ -1,10 +1,16 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../domain/storefront.dart';
 import '../theme/guest_theme.dart';
+import '../widgets/dish_art.dart';
 import 'guest_effects.dart';
 import 'guest_flow.dart';
 import 'guest_widgets.dart';
+import 'look/look.dart';
+import 'look/motion.dart';
+import 'look/spread.dart';
 
 /// Board 1 #1 / Board 2 #2: the full-bleed welcome. Everything written here
 /// is the merchant's own words; empty brand fields are simply left out.
@@ -36,99 +42,141 @@ class GuestWelcomeScreen extends StatelessWidget {
         ? null
         : t.own('welcome.table_line', {'table': s.tableName!});
 
+    final names = cover == null
+        ? DishSpread.pick([...s.catalog.chefsPicks, ...s.catalog.allItems])
+        : const <String>[];
+
+    // The words and the button, the same on every screen size. On a phone the
+    // dishes fill the space above them; on a wide screen they stand beside.
+    Widget words({required bool wide}) => Padding(
+      padding: EdgeInsets.fromLTRB(24, 12, wide ? 24 : 16, 20),
+      child: Column(
+        crossAxisAlignment: artisan
+            ? CrossAxisAlignment.center
+            : CrossAxisAlignment.start,
+        children: [
+          _BrandRow(artisan: artisan, showName: hasHero || artisan),
+          if (s.languages.length > 1) ...[
+            const SizedBox(height: 14),
+            const _LanguageSwitch(),
+          ],
+          if (wide)
+            const Spacer(flex: 3)
+          else if (cover == null)
+            Expanded(child: _HeroDishes(names: names))
+          else
+            const Spacer(),
+          _Rise(
+            delay: 0,
+            child: hasHero
+                ? _Headline(
+                    text: brand.heroTitle,
+                    artisan: artisan,
+                    size: wide ? 52 : 40,
+                  )
+                : Text(
+                    brand.displayName,
+                    textAlign: artisan ? TextAlign.center : TextAlign.start,
+                    style: p.display(wide ? 54 : 44, color: Colors.white),
+                  ),
+          ),
+          if (brand.heroSubtitle.trim().isNotEmpty) ...[
+            const SizedBox(height: 14),
+            _Rise(
+              delay: 120,
+              child: Text(
+                brand.heroSubtitle,
+                textAlign: artisan ? TextAlign.center : TextAlign.start,
+                style: p.body(
+                  wide ? 18 : 16,
+                  color: Colors.white.withValues(alpha: 0.78),
+                ),
+              ),
+            ),
+          ],
+          if (tableLine != null) ...[
+            const SizedBox(height: 14),
+            _Rise(
+              delay: 160,
+              child: Text(
+                tableLine,
+                textAlign: artisan ? TextAlign.center : TextAlign.start,
+                style: p.body(15, weight: FontWeight.w700, color: Colors.white),
+              ),
+            ),
+          ],
+          const SizedBox(height: 28),
+          _Rise(
+            delay: 220,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: modes.length == 2
+                  ? Column(
+                      children: [
+                        for (final (i, m) in modes.indexed) ...[
+                          if (i > 0) const SizedBox(height: 12),
+                          _ModePill(
+                            key: ValueKey('welcome-mode-${m.name}'),
+                            mode: m,
+                            primary: i == 0,
+                          ),
+                        ],
+                      ],
+                    )
+                  : GuestButton(
+                      key: const ValueKey('welcome-cta'),
+                      label: t('welcome.cta'),
+                      trailingArrow: true,
+                      onImage: true,
+                      onTap: () => GuestFlow.start(context),
+                    ),
+            ),
+          ),
+          if (wide) const Spacer(flex: 2),
+        ],
+      ),
+    );
+
     return Scaffold(
       backgroundColor: p.isDark ? p.background : p.ink,
       body: Stack(
         fit: StackFit.expand,
         children: [
           _HeroBackdrop(url: cover),
-          const PhotoScrim(strength: 0.92, top: true),
+          PhotoScrim(strength: cover == null ? 0.7 : 0.92, top: true),
           SafeArea(
-            child: GuestColumn(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 12, 16, 20),
-                child: Column(
-                  crossAxisAlignment: artisan
-                      ? CrossAxisAlignment.center
-                      : CrossAxisAlignment.start,
+            child: LayoutBuilder(
+              builder: (context, c) {
+                // A wide screen (a tablet on its side, a counter display) puts
+                // the dishes beside the words, not under a phone-width column.
+                if (c.maxWidth < 900) {
+                  return GuestColumn(child: words(wide: false));
+                }
+                return Row(
                   children: [
-                    _BrandRow(artisan: artisan, showName: hasHero || artisan),
-                    if (s.languages.length > 1) ...[
-                      const SizedBox(height: 14),
-                      const _LanguageSwitch(),
-                    ],
-                    const Spacer(),
-                    _Rise(
-                      delay: 0,
-                      child: hasHero
-                          ? _Headline(text: brand.heroTitle, artisan: artisan)
-                          : Text(
-                              brand.displayName,
-                              textAlign: artisan
-                                  ? TextAlign.center
-                                  : TextAlign.start,
-                              style: p.display(44, color: Colors.white),
+                    Expanded(
+                      child: names.isEmpty
+                          ? const SizedBox.shrink()
+                          : Padding(
+                              padding: const EdgeInsets.fromLTRB(48, 32, 8, 48),
+                              // The dishes stay a table's width apart, not the
+                              // width of the screen.
+                              child: Center(
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 640,
+                                    maxHeight: 640,
+                                  ),
+                                  child: _HeroDishes(names: names),
+                                ),
+                              ),
                             ),
                     ),
-                    if (brand.heroSubtitle.trim().isNotEmpty) ...[
-                      const SizedBox(height: 14),
-                      _Rise(
-                        delay: 120,
-                        child: Text(
-                          brand.heroSubtitle,
-                          textAlign: artisan
-                              ? TextAlign.center
-                              : TextAlign.start,
-                          style: p.body(
-                            16,
-                            color: Colors.white.withValues(alpha: 0.78),
-                          ),
-                        ),
-                      ),
-                    ],
-                    if (tableLine != null) ...[
-                      const SizedBox(height: 14),
-                      _Rise(
-                        delay: 160,
-                        child: Text(
-                          tableLine,
-                          textAlign: artisan
-                              ? TextAlign.center
-                              : TextAlign.start,
-                          style: p.body(
-                            15,
-                            weight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 28),
-                    _Rise(
-                      delay: 220,
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: modes.length == 2
-                            ? Column(
-                                children: [
-                                  for (final (i, m) in modes.indexed) ...[
-                                    if (i > 0) const SizedBox(height: 12),
-                                    _ModePill(mode: m, primary: i == 0),
-                                  ],
-                                ],
-                              )
-                            : GuestButton(
-                                key: const ValueKey('welcome-cta'),
-                                label: t('welcome.cta'),
-                                trailingArrow: true,
-                                onImage: true,
-                                onTap: () => GuestFlow.start(context),
-                              ),
-                      ),
-                    ),
+                    SizedBox(width: 540, child: words(wide: true)),
+                    const SizedBox(width: 24),
                   ],
-                ),
-              ),
+                );
+              },
             ),
           ),
         ],
@@ -145,23 +193,14 @@ class _HeroBackdrop extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     // The hero is always night-dark so the white headline reads; light
-    // templates use their own ink (espresso) instead of pure black.
-    final night = p.isDark ? p.background : p.ink;
-    final glow = DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: RadialGradient(
-          center: const Alignment(0.6, -0.5),
-          radius: 1.3,
-          colors: [
-            p.accent.withValues(alpha: 0.55),
-            Color.lerp(night, p.accent, 0.08)!,
-            night,
-          ],
-          stops: const [0, 0.55, 1],
-        ),
-      ),
+    // templates use their own ink (espresso) instead of pure black. Embers
+    // rise in a night room, flour dust in a bakery.
+    final room = GuestStage(
+      night: true,
+      motes: p.isDark ? 16 : 22,
+      spot: const Alignment(-0.6, -0.55),
     );
-    if (url == null) return glow;
+    if (url == null) return room;
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 1.12, end: 1),
       duration: const Duration(seconds: 6),
@@ -170,10 +209,128 @@ class _HeroBackdrop extends StatelessWidget {
       child: Image.network(
         url!,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stack) => glow,
+        errorBuilder: (context, error, stack) => room,
       ),
     );
   }
+}
+
+/// The restaurant's own dishes, set on the lit scene: the first large in the
+/// middle, two more smaller behind it, each rising into place and then
+/// floating on its own slow loop. Shown when the restaurant has no welcome
+/// photograph; with one, the photograph leads instead.
+class _HeroDishes extends StatefulWidget {
+  const _HeroDishes({required this.names});
+  final List<String> names;
+
+  @override
+  State<_HeroDishes> createState() => _HeroDishesState();
+}
+
+class _HeroDishesState extends State<_HeroDishes>
+    with SingleTickerProviderStateMixin {
+  AnimationController? _float;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_float == null && !reducedMotion(context)) {
+      _float = AnimationController(
+        vsync: this,
+        duration: const Duration(seconds: 7),
+      )..repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _float?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.names.isEmpty) return const SizedBox.shrink();
+    final p = GuestPalette.of(context);
+    final names = widget.names;
+    return LayoutBuilder(
+      builder: (context, c) {
+        final side =
+            (c.maxWidth * 0.78 < c.maxHeight * 1.05
+                    ? c.maxWidth * 0.78
+                    : c.maxHeight * 1.05)
+                .clamp(120.0, 380.0);
+        Widget dish(
+          String name,
+          double size,
+          Alignment at,
+          double phase,
+          int order,
+        ) {
+          final art = SizedBox.square(
+            dimension: size,
+            child: DishArt(
+              name: name,
+              light: p.keyLight,
+              onDark: true,
+              animate: size > 150,
+            ),
+          );
+          return Align(
+            alignment: at,
+            child: Reveal(
+              delay: Duration(milliseconds: 120 + order * 120),
+              dy: 36,
+              scaleFrom: 0.86,
+              duration: GuestMotion.hero,
+              child: _float == null
+                  ? art
+                  : AnimatedBuilder(
+                      animation: _float!,
+                      child: art,
+                      builder: (context, child) {
+                        final bob = _sin(_float!.value + phase) * 5;
+                        return Transform.translate(
+                          offset: Offset(0, bob),
+                          child: child,
+                        );
+                      },
+                    ),
+            ),
+          );
+        }
+
+        return SizedBox(
+          width: double.infinity,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              if (names.length > 1)
+                dish(
+                  names[1],
+                  side * 0.5,
+                  const Alignment(-0.95, -0.55),
+                  0.33,
+                  1,
+                ),
+              if (names.length > 2)
+                dish(
+                  names[2],
+                  side * 0.46,
+                  const Alignment(0.98, -0.2),
+                  0.66,
+                  2,
+                ),
+              dish(names[0], side, const Alignment(0, 0.25), 0, 0),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// sin of a 0..1 loop, as a full turn.
+  static double _sin(double turns) => math.sin(turns * 2 * math.pi);
 }
 
 /// Logo + name + location pin (bistro), or the centred serif wordmark
@@ -287,25 +444,35 @@ class _Location extends StatelessWidget {
 /// The giant headline. Bistro: bold sans with the second half in the
 /// accent. Artisan: the handwritten script, centred.
 class _Headline extends StatelessWidget {
-  const _Headline({required this.text, required this.artisan});
+  const _Headline({required this.text, required this.artisan, this.size = 40});
   final String text;
   final bool artisan;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     if (artisan) {
-      return Text(
-        text,
-        textAlign: TextAlign.center,
-        style: p.hero(46, color: Colors.white),
+      // The handwriting is written on, not faded in.
+      return WriteOn(
+        delay: const Duration(milliseconds: 520),
+        child: Text(
+          text,
+          textAlign: TextAlign.center,
+          style: p.hero(size + 6, color: Colors.white),
+        ),
       );
     }
     final words = text.trim().split(RegExp(r'\s+'));
     final cut = words.length < 3 ? words.length : words.length ~/ 2;
     final first = words.take(cut).join(' ');
-    final rest = words.skip(cut).join(' ');
-    final base = p.display(40, color: Colors.white).copyWith(height: 1.05);
+    // The last two words stay together, so a single word never sits alone on
+    // the final line.
+    final restWords = words.skip(cut).toList();
+    final rest = restWords.length < 2
+        ? restWords.join(' ')
+        : '${restWords.take(restWords.length - 1).join(' ')}\u00A0${restWords.last}';
+    final base = p.display(size, color: Colors.white).copyWith(height: 1.05);
     return Text.rich(
       TextSpan(
         style: base,
@@ -324,7 +491,7 @@ class _Headline extends StatelessWidget {
 
 /// "Order now · Dine-in at Table 12" / "Pre-order · Schedule for later".
 class _ModePill extends StatelessWidget {
-  const _ModePill({required this.mode, required this.primary});
+  const _ModePill({super.key, required this.mode, required this.primary});
   final GuestServiceMode mode;
   final bool primary;
 
@@ -354,11 +521,16 @@ class _ModePill extends StatelessWidget {
         : primary
         ? p.onAccent
         : p.ink;
+    // A dark pill on the dark welcome stage needs a fine light edge to read
+    // as a button at all (on the founder's board it sits on a photograph).
+    final darkOnDark = !outline && bg.computeLuminance() < 0.1;
     return Material(
       color: bg,
       shape: p.buttonShape(
         outline
             ? const BorderSide(color: Colors.white, width: 1.8)
+            : darkOnDark
+            ? BorderSide(color: Colors.white.withValues(alpha: 0.28))
             : BorderSide.none,
       ),
       clipBehavior: Clip.antiAlias,
@@ -448,21 +620,18 @@ class _LanguageSwitch extends StatelessWidget {
   }
 }
 
-/// Content rises and fades in, staggered by [delay] ms.
+/// Content rises and fades in, staggered by [delay] ms (the welcome's own
+/// authored sequence, after the dishes have landed).
 class _Rise extends StatelessWidget {
   const _Rise({required this.delay, required this.child});
   final int delay;
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
-    tween: Tween(begin: 0, end: 1),
-    duration: Duration(milliseconds: 700 + delay),
-    curve: Interval(delay / (700 + delay), 1, curve: Curves.easeOutCubic),
-    builder: (context, v, child) => Opacity(
-      opacity: v,
-      child: Transform.translate(offset: Offset(0, 24 * (1 - v)), child: child),
-    ),
+  Widget build(BuildContext context) => Reveal(
+    delay: Duration(milliseconds: 380 + delay),
+    dy: 22,
+    duration: GuestMotion.hero,
     child: child,
   );
 }

@@ -6,6 +6,7 @@ import '../../domain/pos_order.dart';
 import '../theme/guest_theme.dart';
 import 'guest_flow.dart';
 import 'guest_widgets.dart';
+import 'look/motion.dart';
 
 /// Subtotal → service charge → GST → round-off → total, the same order as
 /// the printed bill. [estimated] labels a pre-order preview as such.
@@ -29,7 +30,14 @@ class BillLines extends StatelessWidget {
                   : p.body(14, color: p.inkMuted),
             ),
           ),
-          Text(rupees(v), style: p.price(strong ? 22 : 14.5)),
+          strong
+              ? CountUp(
+                  value: v,
+                  format: rupees,
+                  duration: GuestMotion.slow,
+                  style: p.price(22),
+                )
+              : Text(rupees(v), style: p.price(14.5)),
         ],
       ),
     );
@@ -67,9 +75,10 @@ BillSummary combinedBill(List<PlacedOrder> orders) {
   );
 }
 
-/// Board 1 #16 / Board 2 #16: the bill with the budget verdict. Payment is
-/// taken by staff: "Ask for the bill" only tells the guest someone is
-/// coming — this screen never takes or pretends to take money.
+/// Board 1 #16 / Board 2 #16: the bill with the budget verdict. Money is taken
+/// either online (when the server offers it) or by staff at the table. There
+/// is no way yet to call staff from here, so the screen says what to do
+/// instead of offering a button that does nothing.
 class GuestBillScreen extends StatefulWidget {
   const GuestBillScreen({super.key});
 
@@ -78,7 +87,6 @@ class GuestBillScreen extends StatefulWidget {
 }
 
 class _GuestBillScreenState extends State<GuestBillScreen> {
-  bool _asked = false;
   int? _feedback;
 
   @override
@@ -106,10 +114,26 @@ class _GuestBillScreenState extends State<GuestBillScreen> {
       if (dineIn && s.tableName != null) s.tableName!,
       for (final o in orders) 'Order #${o.displayNo}',
     ].join(' · ');
+    // Online payment, when the server offers it for this restaurant. Paying
+    // staff at the table or the counter always stays possible.
+    final online = s.gateway.payments?.available == true;
+    final payNote = dineIn
+        ? (online
+              ? 'Prefer to pay at the table? Let a member of staff know '
+                    "you're ready for the bill. Calling staff from this "
+                    "screen isn't available yet."
+              : 'To pay at the table, let a member of staff know '
+                    "you're ready for the bill. Calling staff from this "
+                    "screen isn't available yet.")
+        : (online
+              ? 'Prefer to pay at the counter? You can pay when you collect '
+                    'your order.'
+              : 'Please pay at the counter when you collect your order.');
+    final due = orders.fold<double>(0, (a, o) => a + o.due);
     return GuestPage(
       bottom: Row(
         children: [
-          if (s.features.splitBill) ...[
+          if (s.features.splitBill && !online) ...[
             Expanded(
               child: GuestButton(
                 label: t('bill.split'),
@@ -121,12 +145,19 @@ class _GuestBillScreenState extends State<GuestBillScreen> {
           ],
           Expanded(
             flex: 3,
-            child: GuestButton(
-              key: const ValueKey('ask-bill'),
-              label: _asked ? 'Bill requested' : t('bill.ask'),
-              icon: _asked ? Icons.check_rounded : Icons.receipt_long_rounded,
-              onTap: _asked ? null : () => setState(() => _asked = true),
-            ),
+            child: online
+                ? GuestButton(
+                    key: const ValueKey('pay-online'),
+                    label: due <= 0 ? 'Paid' : 'Pay ${rupees(due)}',
+                    icon: Icons.lock_outline_rounded,
+                    onTap: due <= 0 ? null : () => GuestFlow.pay(context),
+                  )
+                : GuestButton(
+                    key: const ValueKey('order-more'),
+                    label: 'Order more',
+                    icon: Icons.add_rounded,
+                    onTap: () => GuestFlow.orderMore(context),
+                  ),
           ),
         ],
       ),
@@ -136,13 +167,15 @@ class _GuestBillScreenState extends State<GuestBillScreen> {
           GuestTopBar(
             title: t('bill.title'),
             trailing: [
-              TextButton(
-                onPressed: () => GuestFlow.orderMore(context),
-                child: Text(
-                  'Order more',
-                  style: p.body(14, weight: FontWeight.w700),
+              // Without online payment "Order more" is the bottom button.
+              if (online)
+                TextButton(
+                  onPressed: () => GuestFlow.orderMore(context),
+                  child: Text(
+                    'Order more',
+                    style: p.body(14, weight: FontWeight.w700),
+                  ),
                 ),
-              ),
             ],
           ),
           const Center(child: PreviewBanner()),
@@ -215,31 +248,36 @@ class _GuestBillScreenState extends State<GuestBillScreen> {
                 ),
               ),
             ),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 300),
-            child: !_asked
-                ? const SizedBox.shrink()
-                : Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-                    child: GuestCard(
-                      child: Row(
-                        children: [
-                          Icon(Icons.room_service_outlined, color: p.success),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              dineIn
-                                  ? 'A staff member will bring the bill to '
-                                        'your ${s.definition.tableLabel.toLowerCase()}.'
-                                  : 'Please pay at the counter when you '
-                                        'collect your order.',
-                              style: p.body(14.5, weight: FontWeight.w600),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+          if (orders.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+              child: GuestButton(
+                key: const ValueKey('repeat-order'),
+                label: 'Order the same again',
+                icon: Icons.replay_rounded,
+                style: GuestButtonStyle.soft,
+                dense: true,
+                onTap: () {
+                  if (s.repeatLatest() > 0) GuestFlow.toOrder(context);
+                },
+              ),
+            ),
+          Padding(
+            key: const ValueKey('pay-at-table'),
+            padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.room_service_outlined, size: 20, color: p.inkMuted),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    payNote,
+                    style: p.body(14, color: p.inkMuted).copyWith(height: 1.4),
                   ),
+                ),
+              ],
+            ),
           ),
           // Only when the gateway can actually store it (none can today).
           if (s.features.feedback && s.gateway.acceptsFeedback)
@@ -307,11 +345,11 @@ class _Feedback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
-    const faces = [
-      ('😍', 'Loved it'),
-      ('🙂', 'Good'),
-      ('😐', 'Okay'),
-      ('🙁', 'Could be better'),
+    final faces = [
+      (Icons.sentiment_very_satisfied_rounded, 'Loved it', p.success),
+      (Icons.sentiment_satisfied_rounded, 'Good', const Color(0xFF84CC16)),
+      (Icons.sentiment_neutral_rounded, 'Okay', const Color(0xFFF59E0B)),
+      (Icons.sentiment_dissatisfied_rounded, 'Could be better', p.danger),
     ];
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
@@ -323,16 +361,29 @@ class _Feedback extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               for (final (i, f) in faces.indexed)
-                GestureDetector(
-                  onTap: () => onPick(i),
-                  child: AnimatedScale(
-                    scale: selected == i ? 1.2 : 1,
-                    duration: const Duration(milliseconds: 200),
-                    child: Column(
-                      children: [
-                        Text(f.$1, style: const TextStyle(fontSize: 32)),
-                        Text(f.$2, style: p.body(11, color: p.inkMuted)),
-                      ],
+                Semantics(
+                  button: true,
+                  selected: selected == i,
+                  label: f.$2,
+                  child: GestureDetector(
+                    onTap: () => onPick(i),
+                    child: AnimatedScale(
+                      scale: selected == i ? 1.18 : 1,
+                      duration: GuestMotion.base,
+                      curve: Curves.easeOutBack,
+                      child: Column(
+                        children: [
+                          Icon(
+                            f.$1,
+                            size: 40,
+                            color: selected == null || selected == i
+                                ? f.$3
+                                : p.inkMuted.withValues(alpha: 0.5),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(f.$2, style: p.body(11, color: p.inkMuted)),
+                        ],
+                      ),
                     ),
                   ),
                 ),

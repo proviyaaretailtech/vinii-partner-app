@@ -4,10 +4,14 @@ import '../../core/money.dart';
 import '../../domain/guest_catalog.dart';
 import '../../domain/storefront.dart';
 import '../theme/guest_theme.dart';
+import '../widgets/dish_art.dart';
 import '../widgets/food_art.dart';
 import 'guest_effects.dart';
 import 'guest_flow.dart';
 import 'guest_widgets.dart';
+import 'look/look.dart';
+import 'look/motion.dart';
+import 'look/spread.dart';
 
 /// Board 1 #3 (photo tile grid) or Board 2 #4 (curved wheel), picked by the
 /// storefront's `categoryStyle`. "All dishes" always comes first; the
@@ -23,7 +27,10 @@ class GuestCategoriesScreen extends StatelessWidget {
     final wheel = s.definition.categoryStyle == CategoryStyle.wheel;
     final hasDiscover =
         s.catalog.chefsPicks.isNotEmpty || s.catalog.limitedToday.isNotEmpty;
+    // A wide screen shows more tiles per row; the wheel stays a carousel.
+    final wide = MediaQuery.sizeOf(context).width >= 900;
     return GuestPage(
+      maxWidth: wide ? (wheel ? 640 : 1040) : 480,
       bottom: s.lines.isEmpty ? null : const CartBar(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -65,13 +72,16 @@ class GuestCategoriesScreen extends StatelessWidget {
 }
 
 /// A category's picture: the one uploaded for it in the CMS, else its first
-/// dish with a photo, else the illustrated fallback with the category's
-/// emoji (also what a picture that fails to load turns into).
+/// dish with a photo, else the glyph the restaurant chose for it, else an
+/// illustration of one of its own dishes ("All dishes" shows a small spread of
+/// three different ones). A picture that fails to load turns back into the
+/// illustration.
 Widget categoryArt(
   BuildContext context,
   GuestCategory? c,
   GuestCatalog catalog, {
   double radius = 0,
+  bool animate = true,
 }) {
   final picture = c == null
       ? null
@@ -82,21 +92,51 @@ Widget categoryArt(
   if (c != null && picture != null) {
     return FoodArt(
       key: ValueKey('category-picture-${c.category.id}'),
-      name: c.category.name,
+      name: _representative(c.items) ?? c.category.name,
       imageUrl: picture,
       emoji: c.emoji,
       radius: radius,
+      animate: animate,
     );
   }
   final items = c?.items ?? catalog.allItems;
   final photo = items.where((i) => i.item.imageUrl != null).firstOrNull;
+  if (photo != null) {
+    return FoodArt(
+      name: photo.item.name,
+      imageUrl: photo.item.imageUrl,
+      radius: radius,
+      animate: animate,
+    );
+  }
+  if (c?.emoji != null) {
+    return FoodArt(
+      name: c!.category.name,
+      emoji: c.emoji,
+      radius: radius,
+      animate: animate,
+    );
+  }
+  if (c == null) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: DishSpread(names: DishSpread.pick(items), animate: animate),
+    );
+  }
   return FoodArt(
-    name: photo?.item.name ?? c?.category.name ?? 'All dishes',
-    imageUrl: photo?.item.imageUrl,
-    emoji: photo == null ? (c?.emoji ?? (c == null ? '🍽️' : null)) : null,
+    name: _representative(items) ?? c.category.name,
     radius: radius,
+    animate: animate,
+    dishScale: 0.92,
+    dishAlign: const Alignment(0, -0.28),
   );
 }
+
+/// The dish that stands for a category: its bestseller, else its first.
+String? _representative(List<GuestItem> items) =>
+    (items.where((i) => i.item.isRecommended).firstOrNull ?? items.firstOrNull)
+        ?.item
+        .name;
 
 class _Grid extends StatelessWidget {
   const _Grid();
@@ -105,16 +145,19 @@ class _Grid extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = GuestScope.of(context);
     final cats = <GuestCategory?>[null, ...s.catalog.categories];
-    return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 14,
-        crossAxisSpacing: 14,
-        childAspectRatio: 0.92,
+    return LayoutBuilder(
+      builder: (context, c) => GridView.builder(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          // Two on a phone; one more for every ~230 px beyond that.
+          crossAxisCount: (c.maxWidth / 230).floor().clamp(2, 5),
+          mainAxisSpacing: 14,
+          crossAxisSpacing: 14,
+          childAspectRatio: 0.92,
+        ),
+        itemCount: cats.length,
+        itemBuilder: (context, i) => _Tile(category: cats[i], index: i),
       ),
-      itemCount: cats.length,
-      itemBuilder: (context, i) => _Tile(category: cats[i], index: i),
     );
   }
 }
@@ -129,59 +172,52 @@ class _Tile extends StatelessWidget {
     final p = GuestPalette.of(context);
     final s = GuestScope.read(context);
     final all = category == null;
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: Duration(milliseconds: 380 + index * 60),
-      curve: Curves.easeOutBack,
-      builder: (context, v, child) => Transform.scale(
-        scale: 0.9 + 0.1 * v,
-        child: Opacity(opacity: v.clamp(0, 1), child: child),
-      ),
-      child: GestureDetector(
-        onTap: () => GuestFlow.browse(context, category),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            border: all ? Border.all(color: p.accent, width: 2.5) : null,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: p.isDark ? 0.4 : 0.1),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(all ? 21.5 : 24),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                categoryArt(context, category, s.catalog),
-                const PhotoScrim(strength: 0.8),
-                Positioned(
-                  left: 14,
-                  right: 14,
-                  bottom: 12,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        all ? 'All dishes' : category!.category.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: p.display(17, color: Colors.white),
-                      ),
-                      Text(
-                        '${(category?.items ?? s.catalog.allItems).length} dishes',
-                        style: p.body(
-                          12,
-                          color: Colors.white.withValues(alpha: 0.75),
+    return Reveal(
+      index: index,
+      dy: 20,
+      scaleFrom: 0.94,
+      child: Pressable(
+        hoverScale: 1.025,
+        child: GestureDetector(
+          onTap: () => GuestFlow.browse(context, category),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              border: all ? Border.all(color: p.accent, width: 2.5) : null,
+              boxShadow: p.lift(0.6),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(all ? 21.5 : 24),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  categoryArt(context, category, s.catalog, animate: false),
+                  const PhotoScrim(strength: 0.82),
+                  Positioned(
+                    left: 14,
+                    right: 14,
+                    bottom: 12,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          all ? 'All dishes' : category!.category.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: p.display(17, color: Colors.white),
                         ),
-                      ),
-                    ],
+                        Text(
+                          '${(category?.items ?? s.catalog.allItems).length} dishes',
+                          style: p.body(
+                            12,
+                            color: Colors.white.withValues(alpha: 0.75),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -305,25 +341,7 @@ class _WheelState extends State<_Wheel> {
                   width: 74,
                   child: Column(
                     children: [
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 250),
-                        width: 50,
-                        height: 50,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: active ? p.accent : p.surface,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: active ? p.accent : p.border,
-                          ),
-                        ),
-                        child: Text(
-                          c == null
-                              ? '🍽️'
-                              : c.emoji ?? FoodArt.emojiFor(c.category.name),
-                          style: const TextStyle(fontSize: 22),
-                        ),
-                      ),
+                      _Glyph(category: c, active: active),
                       const SizedBox(height: 6),
                       Text(
                         c?.category.name ?? 'All',
@@ -343,6 +361,64 @@ class _WheelState extends State<_Wheel> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// The round glyph in the wheel's tab row: the restaurant's own emoji when
+/// it chose one, otherwise a small illustration of the category's dish.
+class _Glyph extends StatelessWidget {
+  const _Glyph({required this.category, required this.active});
+  final GuestCategory? category;
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = GuestPalette.of(context);
+    final s = GuestScope.read(context);
+    final stage = foodStageOf(context);
+    final items = category?.items ?? s.catalog.allItems;
+    final emoji = category?.emoji;
+    return AnimatedContainer(
+      duration: GuestMotion.base,
+      curve: GuestMotion.arrive,
+      width: 52,
+      height: 52,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          center: const Alignment(-0.2, -0.3),
+          colors: [stage.centre, stage.room],
+        ),
+        border: Border.all(
+          color: active ? p.accent : p.hairline,
+          width: active ? 2.4 : 1,
+        ),
+        boxShadow: active
+            ? [
+                BoxShadow(
+                  color: p.accent.withValues(alpha: 0.35),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
+      ),
+      child: emoji != null
+          ? Text(emoji, style: const TextStyle(fontSize: 22))
+          : SizedBox.square(
+              dimension: 38,
+              child: DishArt(
+                name: _representative(items) ?? 'plate',
+                family: category == null && items.isEmpty
+                    ? DishFamily.plate
+                    : null,
+                light: stage.light,
+                onDark: stage.dark,
+                animate: false,
+              ),
+            ),
     );
   }
 }
@@ -378,9 +454,20 @@ class CartBar extends StatelessWidget {
                   color: p.onAccent.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
-                child: Text(
-                  '${s.itemCount}',
-                  style: p.price(16, color: p.onAccent),
+                child: AnimatedSwitcher(
+                  duration: GuestMotion.base,
+                  transitionBuilder: (child, a) => ScaleTransition(
+                    scale: CurvedAnimation(
+                      parent: a,
+                      curve: Curves.easeOutBack,
+                    ),
+                    child: FadeTransition(opacity: a, child: child),
+                  ),
+                  child: Text(
+                    '${s.itemCount}',
+                    key: ValueKey(s.itemCount),
+                    style: p.price(16, color: p.onAccent),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -392,8 +479,10 @@ class CartBar extends StatelessWidget {
                   style: p.body(16, weight: FontWeight.w700, color: p.onAccent),
                 ),
               ),
-              Text(
-                rupees(s.estimate.itemTotal),
+              CountUp(
+                value: s.estimate.itemTotal,
+                format: rupees,
+                duration: GuestMotion.base,
                 style: p.price(16, color: p.onAccent),
               ),
               const SizedBox(width: 6),

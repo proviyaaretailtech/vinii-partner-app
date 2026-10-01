@@ -8,9 +8,13 @@ import '../backend.dart';
 import '../local_prefs.dart';
 import 'caller_client.dart';
 import 'live_auth.dart';
+import 'live_bill_settings.dart';
+import 'live_channels.dart';
 import 'live_menu.dart';
 import 'live_pos.dart';
 import 'live_storefront.dart';
+import 'live_tables.dart';
+import 'live_team.dart';
 import 'live_workspace.dart';
 import 'partner_api_inbox.dart';
 
@@ -18,12 +22,15 @@ import 'partner_api_inbox.dart';
 /// partner API for marketplace delivery orders. The only backend the app
 /// ships with — there is no sample data.
 class LiveBackend implements Backend {
-  LiveBackend(this.config, this.prefs);
+  /// [client] is for tests that check the exact requests the app makes; the
+  /// app itself always uses the one `Supabase.initialize` creates.
+  LiveBackend(this.config, this.prefs, {this._client});
 
   final AppConfig config;
   final LocalPrefs prefs;
+  final SupabaseClient? _client;
 
-  SupabaseClient get client => Supabase.instance.client;
+  SupabaseClient get client => _client ?? Supabase.instance.client;
 
   /// The organization every scoped repository acts on. Reads always filter
   /// by it explicitly, never relying on the database's "your organization".
@@ -59,6 +66,14 @@ class LiveBackend implements Backend {
   late final DeliveryInbox inbox = PartnerApiInbox(this, client: http);
   @override
   late final StorefrontRepository storefront = LiveStorefront(this);
+  @override
+  late final BillSettingsRepository billSettings = LiveBillSettings(this);
+  @override
+  late final TeamRepository team = LiveTeam(this);
+  @override
+  late final TablesRepository tableCodes = LiveTables(this);
+  @override
+  late final ChannelsRepository channels = LiveChannels(this);
 
   var _started = false;
 

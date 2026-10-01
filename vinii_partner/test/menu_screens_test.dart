@@ -107,9 +107,9 @@ void main() {
     final backend = FakeBackend(menu: _menu);
     await _pumpApp(tester, await _services(backend, 'org_owner'));
 
-    expect(find.text('BIRIYANI · 2'), findsOneWidget);
-    expect(find.text('DRINKS · 1'), findsOneWidget);
-    expect(find.text('UNCATEGORISED · 1'), findsOneWidget);
+    expect(find.text('Biriyani · 2'), findsOneWidget);
+    expect(find.text('Drinks · 1'), findsOneWidget);
+    expect(find.text('Uncategorised · 1'), findsOneWidget);
     expect(find.text('Chicken Biriyani'), findsOneWidget);
     expect(find.text('₹280'), findsOneWidget);
     expect(find.text('Bestseller'), findsOneWidget);
@@ -222,7 +222,7 @@ void main() {
     expect(backend.storefrontState.published, isNull);
 
     // Back on the list, with the new dish in its category.
-    expect(find.text('BIRIYANI · 3'), findsOneWidget);
+    expect(find.text('Biriyani · 3'), findsOneWidget);
   });
 
   testWidgets('editing an existing item keeps its id and saves changes', (
@@ -293,7 +293,7 @@ void main() {
     );
     expect(find.text('Item'), findsOneWidget);
     expect(find.text('Save changes'), findsNothing);
-    expect(find.text('On your storefront'.toUpperCase()), findsNothing);
+    expect(find.text('On your storefront'), findsNothing);
     expect(
       find.text('Only owners, admins and managers can change dishes.'),
       findsOneWidget,

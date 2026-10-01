@@ -129,6 +129,8 @@ class PosOrderDraft {
     this.scheduledFor,
     this.fireKitchenTicket = true,
     this.charges = BillCharges.defaults,
+    this.waiveServiceCharge = false,
+    this.waiveReason,
   });
 
   /// False = "Save & hold": the order is saved without a kitchen ticket
@@ -154,10 +156,19 @@ class PosOrderDraft {
   /// The organization's `org_bill_settings`, for the preview bill.
   final BillCharges charges;
 
+  /// A manager removed the service charge from this bill before it was sent.
+  /// Goes to the server as `waive_service_charge` (only when true); the
+  /// server checks the role and records who did it.
+  final bool waiveServiceCharge;
+
+  /// Why, in the manager's words. Optional; sent only with a waiver.
+  final String? waiveReason;
+
   /// Preview only — the server's total is the one that counts.
   BillSummary get bill => BillSummary.of(
     lines.map((l) => (unitPrice: l.unitPrice, qty: l.qty)),
     charges: charges,
+    waiveServiceCharge: waiveServiceCharge,
   );
 
   int get itemCount => lines.fold(0, (n, l) => n + l.qty);
@@ -209,6 +220,7 @@ class PlacedOrder {
     PosStatus? status,
     double? paidAmount,
     String? version,
+    BillSummary? bill,
   }) => PlacedOrder(
     id: id,
     version: version ?? this.version,
@@ -217,7 +229,7 @@ class PlacedOrder {
     serviceType: serviceType,
     createdAt: createdAt,
     lines: lines,
-    bill: bill,
+    bill: bill ?? this.bill,
     table: table,
     paidAmount: paidAmount ?? this.paidAmount,
     scheduledFor: scheduledFor,
@@ -248,4 +260,84 @@ enum GuestTrackingStep {
     PosStatus.paid => GuestTrackingStep.served,
     PosStatus.cancelled => GuestTrackingStep.confirmed,
   };
+}
+
+/// A table as the QR code screen sees it: `dining_tables` with its floor
+/// section and its guest code (`qr_token`). Inactive tables are included,
+/// because a table taken out of service still has a sticker on it.
+class TableCode {
+  const TableCode({
+    required this.id,
+    required this.label,
+    this.seats = 4,
+    this.areaId,
+    this.areaName,
+    this.isActive = true,
+    this.qrToken,
+    this.sortOrder = 0,
+  });
+
+  final String id;
+
+  /// "12" or "T12" — shown as "Table 12".
+  final String label;
+  final int seats;
+  final String? areaId;
+  final String? areaName;
+  final bool isActive;
+
+  /// Ten characters, a–z and 0–9, unique across every restaurant. Null until
+  /// a code has been issued for this table.
+  final String? qrToken;
+  final int sortOrder;
+
+  bool get hasCode => qrToken != null && qrToken!.isNotEmpty;
+
+  String get displayName =>
+      RegExp(r'^\d+$').hasMatch(label) ? 'Table $label' : label;
+
+  /// What the sticker holds: `<storefront address>/t/<code>`.
+  String? link(String storefrontBaseUrl) {
+    if (!hasCode) return null;
+    final base = storefrontBaseUrl.replaceAll(RegExp(r'/+$'), '');
+    return '$base/t/$qrToken';
+  }
+
+  DiningTable toDiningTable() =>
+      DiningTable(id: id, label: label, seats: seats, area: areaName);
+}
+
+/// One row of `channel_integrations`: Swiggy, Zomato and the other places
+/// orders come from, each with its own ON/OFF.
+class SalesChannel {
+  const SalesChannel({
+    required this.id,
+    required this.key,
+    required this.name,
+    required this.connected,
+    required this.accepting,
+  });
+
+  final String id;
+
+  /// `swiggy`, `zomato`, `ondc`, `website`, `whatsapp`, `qr`.
+  final String key;
+
+  /// "Swiggy" (the row's `display_name`).
+  final String name;
+
+  /// `is_connected`: the channel has been set up. Switching an unconnected
+  /// channel does nothing, so the screen does not offer it.
+  final bool connected;
+
+  /// `is_accepting`: this channel is ON.
+  final bool accepting;
+
+  SalesChannel copyWith({bool? accepting}) => SalesChannel(
+    id: id,
+    key: key,
+    name: name,
+    connected: connected,
+    accepting: accepting ?? this.accepting,
+  );
 }

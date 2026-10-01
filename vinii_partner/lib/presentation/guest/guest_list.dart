@@ -7,6 +7,7 @@ import '../widgets/chips.dart';
 import '../widgets/food_art.dart';
 import 'guest_flow.dart';
 import 'guest_widgets.dart';
+import 'look/motion.dart';
 
 /// The deck's alternative when the storefront turns `swipeDeck` off: a calm
 /// scrolling list of photo cards, each with an "Add" pill that turns into a
@@ -21,7 +22,12 @@ class DishList extends StatelessWidget {
     padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
     itemCount: items.length,
     separatorBuilder: (context, i) => const SizedBox(height: 14),
-    itemBuilder: (context, i) => DishRow(item: items[i]),
+    // The first few rows arrive one after another; later rows, met while
+    // scrolling, appear at once.
+    itemBuilder: (context, i) => Reveal(
+      index: i < 6 ? i : 0,
+      child: DishRow(item: items[i]),
+    ),
   );
 }
 

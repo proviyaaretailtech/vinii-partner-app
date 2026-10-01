@@ -70,7 +70,7 @@ void main() {
     await _settle(tester);
 
     expect(find.text('Test Kitchen'), findsOneWidget);
-    expect(find.text('Accepting orders'), findsOneWidget);
+    expect(find.textContaining('Accepting orders'), findsOneWidget);
     expect(find.text('OL-00024'), findsOneWidget);
     expect(find.textContaining('Priya · Ganesh Nagar'), findsOneWidget);
     expect(find.text('2 × Chicken Biryani, 1 × Coke'), findsOneWidget);
@@ -101,6 +101,22 @@ void main() {
     await tester.tap(find.text('Past'));
     await _settle(tester);
     expect(find.text('Orders from the last 3 days show here.'), findsOneWidget);
+  });
+
+  testWidgets('a very short window scrolls the store status, not overflows', (
+    tester,
+  ) async {
+    final services = await _services(tester, FakeBackend());
+    // 640 x 260 logical pixels: well under a phone held sideways.
+    tester.view.physicalSize = const Size(1920, 780);
+
+    await tester.pumpWidget(wrapScreen(services, const OrdersScreen()));
+    await _settle(tester);
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Test Kitchen'), findsOneWidget);
+    expect(find.text('New'), findsWidgets);
+    await services.ring.stop();
   });
 
   testWidgets('without a One Local server the tab explains why', (
@@ -141,7 +157,7 @@ void main() {
     await tester.pumpWidget(wrapScreen(services, const OrdersScreen()));
     await _settle(tester);
 
-    await tester.tap(find.byType(Switch));
+    await tester.tap(find.byKey(const Key('outlet-paused')));
     await _settle(tester);
     expect(find.text('Pause new orders'), findsOneWidget);
 
@@ -161,8 +177,10 @@ void main() {
     await tester.pumpWidget(wrapScreen(services, const OrdersScreen()));
     await _settle(tester);
 
-    expect(find.text('Accepting orders'), findsOneWidget);
+    expect(find.textContaining('Accepting orders'), findsOneWidget);
     expect(find.byType(Switch), findsNothing);
+    expect(find.byKey(const Key('outlet-paused')), findsNothing);
+    expect(find.byIcon(Icons.lock_outline_rounded), findsOneWidget);
   });
 
   testWidgets('an order card opens the order, which moves it on', (

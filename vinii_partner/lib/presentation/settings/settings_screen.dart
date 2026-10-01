@@ -3,11 +3,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/app_scope.dart';
 import '../../app/routes.dart';
+import '../../application/session_controller.dart';
 import '../../core/failure.dart';
 import '../../domain/staff.dart';
 import '../theme/staff_theme.dart';
 import '../widgets/chips.dart';
 import '../widgets/state_views.dart';
+import 'channels_card.dart';
 
 /// More: who is signed in, which organization, alerts, appearance, about,
 /// and the way out (sign out of this phone, or of every device).
@@ -25,138 +27,206 @@ class SettingsScreen extends StatelessWidget {
       appBar: AppBar(title: const Text('More')),
       body: RefreshIndicator(
         onRefresh: s.reload,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-          children: [
-            _Card(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 26,
-                        backgroundColor: t.ink,
-                        child: Text(
-                          user.initials,
-                          style: TextStyle(
-                            color: t.page,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 18,
+        // On a tablet or counter computer the column stays readable instead
+        // of stretching across the screen.
+        child: LayoutBuilder(
+          builder: (context, box) => ListView(
+            padding: EdgeInsets.fromLTRB(
+              box.maxWidth > 720 ? (box.maxWidth - 688) / 2 : 16,
+              4,
+              box.maxWidth > 720 ? (box.maxWidth - 688) / 2 : 16,
+              32,
+            ),
+            children: [
+              _Card(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 26,
+                          backgroundColor: t.ink,
+                          child: Text(
+                            user.initials,
+                            style: TextStyle(
+                              color: t.page,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 18,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              user.displayName,
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              user.email,
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            const _Label('Organization'),
-            _Card(
-              children: [
-                ListTile(
-                  leading: OrgAvatar(m.organization, size: 40),
-                  title: Text(
-                    m.organization.name,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  subtitle: Text(m.roleName),
-                ),
-                if (s.activeMemberships.length > 1) ...[
-                  Divider(height: 1, color: t.border),
-                  ListTile(
-                    leading: const Icon(Icons.swap_horiz_rounded),
-                    title: const Text('Switch organization'),
-                    subtitle: Text(
-                      '${s.activeMemberships.length} restaurants on this login',
-                    ),
-                    onTap: s.switchOrganization,
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 16),
-            if (s.can(Capability.viewOrders)) ...[
-              const _Label('New-order alerts'),
-              _AlertsCard(),
-              const SizedBox(height: 16),
-            ],
-            const _Label('Appearance'),
-            _Card(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: ValueListenableBuilder(
-                    valueListenable: services.themeMode,
-                    builder: (context, mode, _) => SegmentedButton<ThemeMode>(
-                      segments: const [
-                        ButtonSegment(
-                          value: ThemeMode.system,
-                          label: Text('Auto'),
-                          icon: Icon(Icons.brightness_auto_rounded),
-                        ),
-                        ButtonSegment(
-                          value: ThemeMode.light,
-                          label: Text('Light'),
-                          icon: Icon(Icons.light_mode_rounded),
-                        ),
-                        ButtonSegment(
-                          value: ThemeMode.dark,
-                          label: Text('Dark'),
-                          icon: Icon(Icons.dark_mode_rounded),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                user.displayName,
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                user.email,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
                         ),
                       ],
-                      selected: {mode},
-                      showSelectedIcon: false,
-                      onSelectionChanged: (v) => services.setThemeMode(v.first),
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _Card(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.info_outline_rounded),
-                  title: const Text('About this app'),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => context.push(Routes.about),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: t.danger,
-                side: BorderSide(color: t.danger.withValues(alpha: 0.4)),
+                ],
               ),
-              icon: const Icon(Icons.logout_rounded),
-              label: const Text('Sign out'),
-              onPressed: () => _confirmSignOut(context),
-            ),
-          ],
+              const SizedBox(height: 16),
+              const _Label('Organization'),
+              _Card(
+                children: [
+                  ListTile(
+                    leading: OrgAvatar(m.organization, size: 40),
+                    title: Text(
+                      m.organization.name,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    subtitle: Text(m.roleName),
+                  ),
+                  if (s.activeMemberships.length > 1) ...[
+                    Divider(height: 1, color: t.border),
+                    ListTile(
+                      leading: const Icon(Icons.swap_horiz_rounded),
+                      title: const Text('Switch organization'),
+                      subtitle: Text(
+                        '${s.activeMemberships.length} restaurants on this login',
+                      ),
+                      onTap: s.switchOrganization,
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 16),
+              ..._restaurantSection(context, s),
+              if (s.can(Capability.toggleChannels)) ...[
+                const _Label('Sales channels'),
+                const ChannelsCard(),
+                const SizedBox(height: 16),
+              ],
+              if (s.can(Capability.viewOrders)) ...[
+                const _Label('New-order alerts'),
+                _AlertsCard(),
+                const SizedBox(height: 16),
+              ],
+              const _Label('Appearance'),
+              _Card(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: ValueListenableBuilder(
+                      valueListenable: services.themeMode,
+                      builder: (context, mode, _) => SegmentedButton<ThemeMode>(
+                        segments: const [
+                          ButtonSegment(
+                            value: ThemeMode.system,
+                            label: Text('Auto'),
+                            icon: Icon(Icons.brightness_auto_rounded),
+                          ),
+                          ButtonSegment(
+                            value: ThemeMode.light,
+                            label: Text('Light'),
+                            icon: Icon(Icons.light_mode_rounded),
+                          ),
+                          ButtonSegment(
+                            value: ThemeMode.dark,
+                            label: Text('Dark'),
+                            icon: Icon(Icons.dark_mode_rounded),
+                          ),
+                        ],
+                        selected: {mode},
+                        showSelectedIcon: false,
+                        onSelectionChanged: (v) =>
+                            services.setThemeMode(v.first),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _Card(
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.info_outline_rounded),
+                    title: const Text('About this app'),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => context.push(Routes.about),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: t.danger,
+                  side: BorderSide(color: t.danger.withValues(alpha: 0.4)),
+                ),
+                icon: const Icon(Icons.logout_rounded),
+                label: const Text('Sign out'),
+                onPressed: () => _confirmSignOut(context),
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  /// Bill & GST, Team and Table QR codes: each only for the roles that may
+  /// open it. Nothing is listed when a role has none of them.
+  List<Widget> _restaurantSection(BuildContext context, SessionController s) {
+    final t = ViniiTokens.of(context);
+    final entries = <(IconData, String, String, String)>[
+      if (s.can(Capability.viewBillSettings))
+        (
+          Icons.receipt_long_outlined,
+          'Bill & GST',
+          'GST, service charge and what is printed on bills',
+          Routes.billSettings,
+        ),
+      if (s.can(Capability.viewTeam))
+        (
+          Icons.groups_outlined,
+          'Team',
+          'Who works here and what each person can do',
+          Routes.team,
+        ),
+      if (s.can(Capability.viewTableCodes))
+        (
+          Icons.qr_code_2_rounded,
+          'Table QR codes',
+          'One code per table for guests to scan',
+          Routes.tableCodes,
+        ),
+    ];
+    if (entries.isEmpty) return const [];
+    return [
+      const _Label('Your restaurant'),
+      _Card(
+        children: [
+          for (final (i, e) in entries.indexed) ...[
+            if (i > 0) Divider(height: 1, color: t.border),
+            ListTile(
+              minTileHeight: 64,
+              leading: Icon(e.$1),
+              title: Text(
+                e.$2,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              subtitle: Text(e.$3),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => context.push(e.$4),
+            ),
+          ],
+        ],
+      ),
+      const SizedBox(height: 16),
+    ];
   }
 
   Future<void> _confirmSignOut(BuildContext context) async {
@@ -298,12 +368,11 @@ class _Label extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
     child: Text(
-      text.toUpperCase(),
+      text,
       style: TextStyle(
-        fontSize: 12,
+        fontSize: 15,
         fontWeight: FontWeight.w700,
-        letterSpacing: 0.8,
-        color: ViniiTokens.of(context).inkMuted,
+        color: ViniiTokens.of(context).ink,
       ),
     ),
   );

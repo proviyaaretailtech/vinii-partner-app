@@ -312,6 +312,7 @@ class _ItemRow extends StatelessWidget {
                 imageUrl: item.imageUrl,
                 radius: 14,
                 dim: off,
+                animate: false,
               ),
             ),
             const SizedBox(width: 12),

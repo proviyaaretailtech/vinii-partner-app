@@ -23,12 +23,11 @@ class PanelLabel extends StatelessWidget {
         children: [
           Expanded(
             child: Text(
-              text.toUpperCase(),
+              text,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 15,
                 fontWeight: FontWeight.w700,
-                letterSpacing: 0.8,
-                color: t.inkMuted,
+                color: t.ink,
               ),
             ),
           ),

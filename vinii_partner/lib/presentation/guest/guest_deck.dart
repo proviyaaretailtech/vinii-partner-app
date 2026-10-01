@@ -1,24 +1,43 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart';
 
+import '../../application/guest_session.dart';
 import '../../core/money.dart';
 import '../../domain/guest_catalog.dart';
 import '../theme/guest_theme.dart';
 import '../widgets/chips.dart';
+import '../widgets/dish_art.dart';
 import '../widgets/food_art.dart';
 import 'guest_effects.dart';
 import 'guest_flow.dart';
 import 'guest_widgets.dart';
+import 'look/fly.dart';
+import 'look/look.dart';
+import 'look/motion.dart';
 
 /// Board 1 #4–#5, Board 2 #6 & #15: the swipe deck. Right (or the green ♥)
 /// adds one to the order, left (or the red ✕) skips, up opens the details.
 /// Cards already swiped stay out of the deck for this visit.
 class SwipeDeck extends StatefulWidget {
-  const SwipeDeck({super.key, required this.items, required this.categoryName});
+  const SwipeDeck({
+    super.key,
+    required this.items,
+    required this.categoryName,
+    this.budgetTarget,
+    this.onLanded,
+  });
 
   final List<GuestItem> items;
   final String categoryName;
+
+  /// The budget strip, when there is one: an added dish's price flies there.
+  final GlobalKey? budgetTarget;
+
+  /// Called when an added dish's price lands (the strip pulses).
+  final VoidCallback? onLanded;
 
   @override
   State<SwipeDeck> createState() => _SwipeDeckState();
@@ -33,6 +52,7 @@ class _SwipeDeckState extends State<SwipeDeck>
   Size _size = const Size(320, 480);
   String? _toast;
   Timer? _toastTimer;
+  final _areaKey = GlobalKey();
 
   Offset get _offset => _flight?.value ?? _drag;
   bool get _busy => _anim.isAnimating;
@@ -68,11 +88,14 @@ class _SwipeDeckState extends State<SwipeDeck>
     if (add) {
       addWithHaptic(context, item);
       _showToast('Added · ${item.item.name}');
+      unawaited(_flyPrice(item));
+    } else {
+      unawaited(HapticFeedback.selectionClick());
     }
     await _animateTo(
-      Offset((add ? 1 : -1) * _size.width * 1.6, _offset.dy + 80),
+      Offset((add ? 1 : -1) * _size.width * 1.5, _offset.dy + 60),
       Curves.easeInCubic,
-      300,
+      260,
     );
     if (!mounted) return;
     s.markSeen(item.item.id, skippedIt: !add);
@@ -80,6 +103,29 @@ class _SwipeDeckState extends State<SwipeDeck>
       _drag = Offset.zero;
       _flight = null;
     });
+  }
+
+  /// The price leaves the card and lands in the budget (or, with no budget,
+  /// where the order bar is about to appear).
+  Future<void> _flyPrice(GuestItem item) async {
+    final area = _areaKey.currentContext?.findRenderObject();
+    if (area is! RenderBox || !area.hasSize) return;
+    final from = area.localToGlobal(
+      Offset(area.size.width * 0.3, area.size.height * 0.8),
+    );
+    final target = widget.budgetTarget?.currentContext?.findRenderObject();
+    final to = target is RenderBox && target.hasSize
+        ? target.localToGlobal(Offset(48, target.size.height / 2))
+        : area.localToGlobal(
+            Offset(area.size.width / 2, area.size.height + 48),
+          );
+    await flyChip(
+      context,
+      from: from,
+      to: to,
+      label: '+${rupees(item.item.price)}',
+    );
+    if (mounted) widget.onLanded?.call();
   }
 
   void _showToast(String text) {
@@ -118,11 +164,37 @@ class _SwipeDeckState extends State<SwipeDeck>
     // A handwritten hint only when there is a handwritten face.
     final artisan = p.scriptFamily != null;
     final hint = GuestCopy.of(context)('menu.swipe_hint');
+    // At a keyboard the deck answers the arrow keys, as the buttons do.
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+            unawaited(_decide(left.first, add: true)),
+        const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
+            unawaited(_decide(left.first, add: false)),
+        const SingleActivator(LogicalKeyboardKey.arrowUp): () =>
+            unawaited(GuestFlow.openItem(context, left.first)),
+      },
+      child: Focus(
+        autofocus: true,
+        child: _deck(context, p, s, left, artisan, hint),
+      ),
+    );
+  }
+
+  Widget _deck(
+    BuildContext context,
+    GuestPalette p,
+    GuestSession s,
+    List<GuestItem> left,
+    bool artisan,
+    String hint,
+  ) {
     return Column(
       children: [
         Expanded(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 8, 24, 4),
+            key: _areaKey,
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
             child: LayoutBuilder(
               builder: (context, c) {
                 _size = c.biggest;
@@ -203,6 +275,10 @@ class _SwipeDeckState extends State<SwipeDeck>
             ),
           ],
         ),
+        if (MediaQuery.sizeOf(context).width >= 900) ...[
+          const SizedBox(height: 10),
+          const _KeyHints(),
+        ],
         const SizedBox(height: 12),
       ],
     );
@@ -211,27 +287,59 @@ class _SwipeDeckState extends State<SwipeDeck>
   Widget _top(GuestItem item) {
     final o = _offset;
     final angle = o.dx / _size.width * 0.35;
+    // The card rises a touch as it is pulled, and the dish slides against it.
+    final pulled = (o.distance / (_size.width * 0.5)).clamp(0.0, 1.0);
+    final qty = GuestScope.of(context).qtyOf(item.item.id);
     return Positioned.fill(
       key: ValueKey('deck-card-${item.item.id}'),
-      child: GestureDetector(
-        onTap: () => GuestFlow.openItem(context, item),
-        onPanUpdate: _busy ? null : (d) => setState(() => _drag += d.delta),
-        onPanEnd: _busy ? null : (d) => _panEnd(d, item),
-        child: Transform.translate(
-          offset: o,
-          child: Transform.rotate(
-            angle: angle,
-            alignment: const Alignment(0, 0.9),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                DishCard(item: item),
-                if (o.dx.abs() > 16)
-                  _Stamp(
-                    add: o.dx > 0,
-                    strength: (o.dx.abs() / 110).clamp(0, 1),
-                  ),
-              ],
+      child: Semantics(
+        container: true,
+        explicitChildNodes: true,
+        label: [
+          item.item.name,
+          rupees(item.item.price),
+          if (item.item.foodType != null) item.item.foodType!.label,
+          ...item.tags.take(3),
+          if (qty > 0) 'in your order, $qty',
+        ].join(', '),
+        hint: 'Double tap for details',
+        onTap: () => unawaited(GuestFlow.openItem(context, item)),
+        customSemanticsActions: {
+          const CustomSemanticsAction(label: 'Add to order'): () =>
+              unawaited(_decide(item, add: true)),
+          const CustomSemanticsAction(label: 'Skip this dish'): () =>
+              unawaited(_decide(item, add: false)),
+        },
+        child: GestureDetector(
+          // The Semantics above carries the tap for assistive technology.
+          excludeFromSemantics: true,
+          onTap: () => GuestFlow.openItem(context, item),
+          onPanUpdate: _busy ? null : (d) => setState(() => _drag += d.delta),
+          onPanEnd: _busy ? null : (d) => _panEnd(d, item),
+          child: Transform.translate(
+            offset: o,
+            child: Transform.rotate(
+              angle: angle,
+              alignment: const Alignment(0, 0.9),
+              child: Transform.scale(
+                scale: 1 + 0.02 * pulled,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    DishCard(
+                      item: item,
+                      parallax: Offset(-o.dx * 0.07, -o.dy * 0.05),
+                      heroTag: 'dish-${item.item.id}',
+                      labelled: true,
+                    ),
+                    if (o.dx.abs() > 16)
+                      _Stamp(
+                        add: o.dx > 0,
+                        strength: (o.dx.abs() / 110).clamp(0, 1),
+                      ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -239,20 +347,32 @@ class _SwipeDeckState extends State<SwipeDeck>
     );
   }
 
+  /// The cards waiting behind the front one. Each sits lower, turned a few
+  /// degrees and a little darker, so the pile reads as a pile; as the front
+  /// card leaves, the next one comes up to take its place.
   Widget _back(GuestItem item, int depth, double progress) {
+    final p = GuestPalette.of(context);
     final d = depth - progress;
+    final shade = p.isDark ? Colors.black : p.ink;
     return Positioned.fill(
       key: ValueKey('deck-card-${item.item.id}'),
       child: IgnorePointer(
         child: Transform.translate(
-          offset: Offset(0, 18 * d),
+          offset: Offset(0, 24 * d),
           child: Transform.rotate(
-            angle: (depth.isOdd ? -0.045 : 0.05) * d,
+            angle: (depth.isOdd ? -0.055 : 0.065) * d,
             child: Transform.scale(
-              scale: 1 - 0.06 * d,
-              child: Opacity(
-                opacity: (1 - 0.25 * d).clamp(0, 1),
-                child: DishCard(item: item, interactive: false),
+              scale: 1 - 0.055 * d,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  DishCard(item: item, interactive: false, calm: true),
+                  ColoredBox(
+                    color: shade.withValues(
+                      alpha: ((p.isDark ? 0.34 : 0.14) * d).clamp(0, 0.6),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -265,9 +385,31 @@ class _SwipeDeckState extends State<SwipeDeck>
 /// One dish, full-bleed: photo, like heart, name, big price and tag pills
 /// over a gradient scrim.
 class DishCard extends StatelessWidget {
-  const DishCard({super.key, required this.item, this.interactive = true});
+  const DishCard({
+    super.key,
+    required this.item,
+    this.interactive = true,
+    this.parallax = Offset.zero,
+    this.calm = false,
+    this.heroTag,
+    this.labelled = false,
+  });
   final GuestItem item;
   final bool interactive;
+
+  /// The front card describes itself as one label (see the deck); its words
+  /// and veg mark are then kept out of a screen reader's way so nothing is
+  /// read twice. The like heart stays a button of its own.
+  final bool labelled;
+
+  /// Set on the front card only: its picture then flies to the dish page.
+  final Object? heroTag;
+
+  /// How far the dish is slid against its card while the card is dragged.
+  final Offset parallax;
+
+  /// A card waiting in the pile: no ambient motion.
+  final bool calm;
 
   @override
   Widget build(BuildContext context) {
@@ -279,49 +421,71 @@ class DishCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: p.isDark ? 0.5 : 0.16),
-            blurRadius: 28,
-            offset: const Offset(0, 14),
-          ),
-        ],
+        boxShadow: p.lift(),
+      ),
+      foregroundDecoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: p.hairline.withValues(alpha: 0.55)),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
         child: Stack(
           fit: StackFit.expand,
           children: [
-            FoodArt(name: i.name, imageUrl: i.imageUrl, radius: 0),
+            heroTag == null
+                ? FoodArt(
+                    name: i.name,
+                    imageUrl: i.imageUrl,
+                    radius: 0,
+                    parallax: parallax,
+                    animate: !calm,
+                    dishScale: 0.96,
+                    dishAlign: const Alignment(0, -0.34),
+                  )
+                : Hero(
+                    tag: heroTag!,
+                    child: FoodArt(
+                      name: i.name,
+                      imageUrl: i.imageUrl,
+                      radius: 0,
+                      parallax: parallax,
+                      animate: !calm,
+                      dishScale: 0.96,
+                      dishAlign: const Alignment(0, -0.34),
+                    ),
+                  ),
             const PhotoScrim(strength: 0.92, top: true),
             Positioned(
               top: 14,
               left: 14,
-              child: Row(
-                children: [
-                  FoodTypeMark(i.foodType, size: 16),
-                  if (qty > 0) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: p.success,
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                      child: Text(
-                        'In order ×$qty',
-                        style: p.body(
-                          12,
-                          weight: FontWeight.w700,
-                          color: Colors.white,
+              child: ExcludeSemantics(
+                excluding: labelled,
+                child: Row(
+                  children: [
+                    FoodTypeMark(i.foodType, size: 16),
+                    if (qty > 0) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: p.success,
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                        child: Text(
+                          'In order ×$qty',
+                          style: p.body(
+                            12,
+                            weight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
             if (s.features.likes)
@@ -342,66 +506,106 @@ class DishCard extends StatelessWidget {
               left: 20,
               right: 20,
               bottom: 20,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (item.tags.isNotEmpty) ...[
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        for (final t in item.tags.take(3))
-                          TagChip(t, onImage: true),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                  ],
-                  Text(
-                    i.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: p.display(28, color: Colors.white),
-                  ),
-                  if ((i.description ?? '').trim().isNotEmpty) ...[
-                    const SizedBox(height: 4),
+              child: ExcludeSemantics(
+                excluding: labelled,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (item.tags.isNotEmpty) ...[
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          for (final t in item.tags.take(3))
+                            TagChip(t, onImage: true),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                    ],
                     Text(
-                      i.description!,
+                      i.name,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: p.body(
-                        13.5,
-                        color: Colors.white.withValues(alpha: 0.75),
-                      ),
+                      style: p.display(28, color: Colors.white),
                     ),
-                  ],
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
+                    if ((i.description ?? '').trim().isNotEmpty) ...[
+                      const SizedBox(height: 4),
                       Text(
-                        rupees(i.price),
-                        style: p.price(26, color: Colors.white),
-                      ),
-                      const Spacer(),
-                      Icon(
-                        Icons.keyboard_double_arrow_up_rounded,
-                        size: 18,
-                        color: Colors.white.withValues(alpha: 0.7),
-                      ),
-                      Text(
-                        ' Details',
+                        i.description!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: p.body(
-                          12.5,
-                          color: Colors.white.withValues(alpha: 0.7),
+                          13.5,
+                          color: Colors.white.withValues(alpha: 0.75),
                         ),
                       ),
                     ],
-                  ),
-                ],
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Text(
+                          rupees(i.price),
+                          style: p.price(26, color: Colors.white),
+                        ),
+                        const Spacer(),
+                        Icon(
+                          Icons.keyboard_double_arrow_up_rounded,
+                          size: 18,
+                          color: Colors.white.withValues(alpha: 0.7),
+                        ),
+                        Text(
+                          ' Details',
+                          style: p.body(
+                            12.5,
+                            color: Colors.white.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// "← Skip   → Add   ↑ Details": the deck answers the arrow keys.
+class _KeyHints extends StatelessWidget {
+  const _KeyHints();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = GuestPalette.of(context);
+    Widget hint(IconData icon, String label) => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 26,
+          height: 26,
+          decoration: BoxDecoration(
+            color: p.surfaceAlt,
+            borderRadius: BorderRadius.circular(7),
+            border: Border.all(color: p.hairline),
+          ),
+          child: Icon(icon, size: 15, color: p.inkMuted),
+        ),
+        const SizedBox(width: 6),
+        Text(label, style: p.body(12.5, color: p.inkMuted)),
+      ],
+    );
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        hint(Icons.arrow_back_rounded, 'Skip'),
+        const SizedBox(width: 18),
+        hint(Icons.arrow_forward_rounded, 'Add'),
+        const SizedBox(width: 18),
+        hint(Icons.arrow_upward_rounded, 'Details'),
+      ],
     );
   }
 }
@@ -422,16 +626,31 @@ class _Stamp extends StatelessWidget {
       child: Opacity(
         opacity: strength,
         child: Transform.rotate(
-          angle: add ? -0.25 : 0.25,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            decoration: BoxDecoration(
-              border: Border.all(color: c, width: 3.5),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              add ? 'ADD' : 'SKIP',
-              style: p.display(28, color: c).copyWith(letterSpacing: 3),
+          angle: add ? -0.22 : 0.22,
+          child: Transform.scale(
+            scale: 0.9 + 0.1 * strength,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(12, 6, 16, 6),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.38),
+                border: Border.all(color: c, width: 3),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    add ? Icons.check_rounded : Icons.close_rounded,
+                    color: c,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    add ? 'ADD' : 'SKIP',
+                    style: p.display(26, color: c).copyWith(letterSpacing: 3),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -457,17 +676,20 @@ class _BigButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Tooltip(
     message: tooltip,
-    child: Material(
-      color: color,
-      shape: const CircleBorder(),
-      elevation: 8,
-      shadowColor: color.withValues(alpha: 0.5),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: SizedBox.square(
-          dimension: 66,
-          child: Icon(icon, color: Colors.white, size: 32),
+    child: Pressable(
+      scale: 0.9,
+      child: Material(
+        color: color,
+        shape: const CircleBorder(),
+        elevation: 6,
+        shadowColor: Colors.black.withValues(alpha: 0.55),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox.square(
+            dimension: 66,
+            child: Icon(icon, color: Colors.white, size: 32),
+          ),
         ),
       ),
     ),
@@ -524,8 +746,17 @@ class _EndOfDeck extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('🍽️', style: TextStyle(fontSize: 56)),
-            const SizedBox(height: 16),
+            SizedBox(
+              height: 132,
+              child: DishArt(
+                name: categoryName,
+                family: DishFamily.plate,
+                light: p.keyLight,
+                onDark: p.isDark,
+                animate: false,
+              ),
+            ),
+            const SizedBox(height: 12),
             Text(
               "You've seen every dish in $categoryName",
               textAlign: TextAlign.center,

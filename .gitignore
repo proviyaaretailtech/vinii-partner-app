@@ -3,3 +3,8 @@
 **/.env.local
 **/.env.*.local
 **/.env.localdb
+
+# Impeccable working files: review screenshots and comps are evidence, not source.
+.impeccable/review/
+.impeccable/mocks/
+.impeccable/build/

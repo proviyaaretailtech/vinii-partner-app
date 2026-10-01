@@ -1,0 +1,475 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-01T22:00:59+00:00",
+  "title": "Design System: VINII Guest Storefront",
+  "notes": "Source is Flutter (canvas rendering), not HTML/CSS. Tokens live in vinii_partner/lib/presentation/theme/guest_theme.dart and guest/look/*.dart. The html/css in components is an illustrative web translation of the Flutter widgets for the panel, not shipped code. Derived values (key-light, lit surface, gold hairline, tonal ramps) are computed from the default gold accent, not read as constants. Staff app (ViniiTokens, staff_theme.dart) is a separate Operate-mode system and is not documented here.",
+  "extensions": {
+    "colorMeta": {
+      "bistro-gold": {
+        "role": "primary",
+        "displayName": "Bistro Gold",
+        "canonical": "#F5B82E",
+        "tonalRamp": [
+          "#493403",
+          "#815B06",
+          "#B88209",
+          "#F0AA0B",
+          "#F6BE40",
+          "#F9D177",
+          "#FBE4AF",
+          "#FEF7E7"
+        ]
+      },
+      "bistro-night-black": {
+        "role": "neutral",
+        "displayName": "Night Black",
+        "canonical": "#0B0B0C",
+        "tonalRamp": [
+          "#252528",
+          "#404046",
+          "#5C5C65",
+          "#787883",
+          "#96969F",
+          "#B5B5BB",
+          "#D3D3D7",
+          "#F2F2F3"
+        ]
+      },
+      "bistro-umber-surface": {
+        "role": "neutral",
+        "displayName": "Umber Surface",
+        "canonical": "#17171A",
+        "tonalRamp": [
+          "#242429",
+          "#3F3F48",
+          "#5B5B66",
+          "#767685",
+          "#9595A1",
+          "#B4B4BC",
+          "#D3D3D8",
+          "#F1F1F3"
+        ]
+      },
+      "bistro-key-light": {
+        "role": "secondary",
+        "displayName": "Key Light (derived)",
+        "canonical": "#EBB43C",
+        "tonalRamp": [
+          "#453207",
+          "#7A580D",
+          "#AF7E12",
+          "#E4A417",
+          "#ECB949",
+          "#F2CD7E",
+          "#F7E2B3",
+          "#FDF6E8"
+        ]
+      },
+      "bistro-gold-hairline": {
+        "role": "neutral",
+        "displayName": "Gold Hairline (derived)",
+        "canonical": "#564A33",
+        "tonalRamp": [
+          "#30291C",
+          "#554932",
+          "#796848",
+          "#9E885E",
+          "#B4A381",
+          "#CABEA6",
+          "#E0D8CA",
+          "#F6F3EF"
+        ]
+      },
+      "artisan-flour-cream": {
+        "role": "neutral",
+        "displayName": "Flour Cream",
+        "canonical": "#F6F0E7",
+        "tonalRamp": [
+          "#382A15",
+          "#624A25",
+          "#8C6935",
+          "#B78945",
+          "#C8A46D",
+          "#D8BE98",
+          "#E8D9C2",
+          "#F8F3EC"
+        ]
+      },
+      "artisan-espresso-ink": {
+        "role": "neutral",
+        "displayName": "Espresso Ink",
+        "canonical": "#1E1915",
+        "tonalRamp": [
+          "#2D251F",
+          "#4F4238",
+          "#725F4F",
+          "#947B68",
+          "#AC9989",
+          "#C4B7AB",
+          "#DCD4CE",
+          "#F4F2F0"
+        ]
+      },
+      "artisan-espresso-accent": {
+        "role": "primary",
+        "displayName": "Espresso Accent",
+        "canonical": "#2B211B",
+        "tonalRamp": [
+          "#2F241E",
+          "#534034",
+          "#775B4A",
+          "#9A7661",
+          "#B29584",
+          "#C8B4A8",
+          "#DFD3CC",
+          "#F5F2EF"
+        ]
+      },
+      "artisan-daylight": {
+        "role": "secondary",
+        "displayName": "Daylight",
+        "canonical": "#F2C58B",
+        "tonalRamp": [
+          "#452A08",
+          "#794A0E",
+          "#AE6A13",
+          "#E28A19",
+          "#EBA54B",
+          "#F1BF7F",
+          "#F7D9B4",
+          "#FCF4E8"
+        ]
+      },
+      "fresh-leaf-accent": {
+        "role": "primary",
+        "displayName": "Leaf Green",
+        "canonical": "#16A34A",
+        "tonalRamp": [
+          "#09431F",
+          "#107736",
+          "#17AA4D",
+          "#1EDD65",
+          "#4EE787",
+          "#82EEAA",
+          "#B5F5CD",
+          "#E9FCF0"
+        ]
+      },
+      "success-bistro": {
+        "role": "tertiary",
+        "displayName": "Success Green",
+        "canonical": "#22C55E",
+        "tonalRamp": [
+          "#0B411F",
+          "#147337",
+          "#1CA54F",
+          "#25D666",
+          "#54E288",
+          "#86EAAB",
+          "#B8F3CD",
+          "#E9FBF0"
+        ]
+      },
+      "danger-bistro": {
+        "role": "tertiary",
+        "displayName": "Danger Red",
+        "canonical": "#EF4444",
+        "tonalRamp": [
+          "#460606",
+          "#7C0B0B",
+          "#B20F0F",
+          "#E81414",
+          "#EF4646",
+          "#F47C7C",
+          "#F8B2B2",
+          "#FDE8E8"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Screen titles, dish names, stamps. w800, -0.8 tracking (0 for serif or script)."
+      },
+      "hero-script": {
+        "displayName": "Hero Script",
+        "purpose": "Artisan welcome headline only; written on once; one weight."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Descriptions and buttons (700 at 16px)."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Taglines and hints at 12.5px."
+      },
+      "price": {
+        "displayName": "Price",
+        "purpose": "All money; w800 with tabular figures."
+      }
+    },
+    "shadows": [
+      {
+        "name": "lift-1-dark",
+        "value": "0 16px 30px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.35)",
+        "purpose": "Raised cards on dark pages. Offset, blur and alpha scale with level."
+      },
+      {
+        "name": "lift-1-light",
+        "value": "0 16px 30px rgba(58,36,16,.14), 0 2px 6px rgba(58,36,16,.10)",
+        "purpose": "Raised cards on light pages."
+      },
+      {
+        "name": "lift-0.6",
+        "value": "level 0.6 of lift (0 9.6px 18px, 0 1.2px 3.6px)",
+        "purpose": "Category tiles."
+      },
+      {
+        "name": "lift-0.7",
+        "value": "level 0.7 of lift (0 11.2px 21px, 0 1.4px 4.2px)",
+        "purpose": "Mode cards."
+      },
+      {
+        "name": "stage-key-light",
+        "value": "radial from (-0.55,-0.7), radius 0.85 x longest side, key light @ 40% dark / 34% light fading to 0",
+        "purpose": "The room's light, upper left."
+      },
+      {
+        "name": "stage-vignette",
+        "value": "radial, 0 at 55% to black @55% dark / #3A2410 @10% light",
+        "purpose": "Edges fall away."
+      }
+    ],
+    "motion": [
+      {
+        "name": "duration-fast",
+        "value": "140ms",
+        "purpose": "Press scale, small state changes."
+      },
+      {
+        "name": "duration-base",
+        "value": "280ms",
+        "purpose": "Standard transitions."
+      },
+      {
+        "name": "duration-slow",
+        "value": "460ms",
+        "purpose": "Reveal (fade and 14px lift)."
+      },
+      {
+        "name": "duration-hero",
+        "value": "760ms",
+        "purpose": "CountUp and focal sequences."
+      },
+      {
+        "name": "ease-arrive",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Confident arrivals."
+      },
+      {
+        "name": "ease-depart",
+        "value": "cubic-bezier(0.7, 0, 0.84, 0)",
+        "purpose": "Exits, quicker than entrances."
+      },
+      {
+        "name": "stagger",
+        "value": "45ms per item, capped at 270ms",
+        "purpose": "Lists never make anyone wait."
+      },
+      {
+        "name": "press-scale",
+        "value": "0.97",
+        "purpose": "Pressable down state; hover growth only for pointers."
+      },
+      {
+        "name": "pulse",
+        "value": "360ms, 1 -> 1.045 -> 1",
+        "purpose": "Budget ring beat when a price lands."
+      },
+      {
+        "name": "write-on",
+        "value": "400ms delay, 1500ms, easeInOutCubic, 18% soft edge",
+        "purpose": "Handwritten headline, once."
+      },
+      {
+        "name": "stage-drift",
+        "value": "34s loop at about 15 fps",
+        "purpose": "Out-of-focus light; stops under reduced motion."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "MediaQuery.disableAnimations",
+        "purpose": "Loops stop, travel becomes instant, state change remains."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "wide",
+        "value": "900px",
+        "purpose": "Two-pane layout: scene and dish left, ordering column (460px max) right with live order."
+      },
+      {
+        "name": "column",
+        "value": "480px",
+        "purpose": "Phone column cap (GuestColumn default)."
+      },
+      {
+        "name": "categories-wide-grid",
+        "value": "1040px",
+        "purpose": "Max width of tile grid on wide screens."
+      },
+      {
+        "name": "categories-wide-wheel",
+        "value": "640px",
+        "purpose": "Max width of wheel on wide screens."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button (Bistro pill)",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Accent-filled main action; pill on Bistro, 14 radius on Artisan. Flutter: GuestButton(style: primary). Pseudo-snippet: Material(shape: p.buttonShape(), color: p.accent){InkWell{SizedBox(height: 56){Text(label, p.body(16, w700, p.onAccent))}}}; press scales to 0.97.",
+      "html": "<button class=\"ds-btn-primary\">Order now</button>",
+      "css": ".ds-btn-primary{background:#F5B82E;color:#0B0B0C;height:56px;padding:0 28px;border:0;border-radius:999px;font:700 16px 'Plus Jakarta Sans',Inter,sans-serif;transition:transform 140ms cubic-bezier(.16,1,.3,1)}.ds-btn-primary:active{transform:scale(.97)}.ds-btn-primary:focus-visible{outline:2px solid #EBB43C;outline-offset:3px}"
+    },
+    {
+      "name": "Add Button (success)",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Add-to-order on the detail sheet uses success green with white text and the running price.",
+      "html": "<button class=\"ds-btn-add\">Add to order · ₹280</button>",
+      "css": ".ds-btn-add{background:#22C55E;color:#fff;height:56px;padding:0 28px;border:0;border-radius:999px;font:700 16px 'Plus Jakarta Sans',Inter,sans-serif}.ds-btn-add:active{transform:scale(.97)}"
+    },
+    {
+      "name": "Soft Button",
+      "kind": "button",
+      "refersTo": "button-soft",
+      "description": "Secondary action: alt surface, ink text.",
+      "html": "<button class=\"ds-btn-soft\">Pre-order · Schedule for later</button>",
+      "css": ".ds-btn-soft{background:#222226;color:#fff;height:56px;padding:0 28px;border:0;border-radius:999px;font:700 16px 'Plus Jakarta Sans',Inter,sans-serif}"
+    },
+    {
+      "name": "Lit Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Card on a lit surface with an accent-drawn hairline and a two-layer tinted lift. Flutter: GuestCard with surfaceLit, hairline, lift().",
+      "html": "<div class=\"ds-card\"><b>Paneer Tikka</b><span>₹280</span></div>",
+      "css": ".ds-card{background:#211E1C;color:#fff;border:1px solid #564A33;border-radius:18px;padding:20px;display:flex;justify-content:space-between;box-shadow:0 16px 30px rgba(0,0,0,.55),0 2px 6px rgba(0,0,0,.35)}.ds-card span{font-weight:800;font-variant-numeric:tabular-nums}"
+    },
+    {
+      "name": "Item Detail Sheet",
+      "kind": "custom",
+      "refersTo": "detail-sheet",
+      "description": "28px-radius sheet rising over the dish picture, lit (surfaceLit) on a dark page and the page colour on a light one; price in the accent; no drag handle. Flutter: a rounded cap drawn on the picture sliver (guest_item_detail.dart, _sheetRadius) over a SliverFillRemaining sheet.",
+      "html": "<div class=\"ds-sheet\"><h3>Paneer Tikka</h3><b>₹280</b></div>",
+      "css": ".ds-sheet{background:#211E1C;color:#fff;border-radius:28px 28px 0 0;padding:28px 20px;display:flex;justify-content:space-between}.ds-sheet h3{margin:0;font:800 26px 'Plus Jakarta Sans',Inter;letter-spacing:-.8px}.ds-sheet b{color:#F5B82E;font:800 26px Inter;font-variant-numeric:tabular-nums}"
+    },
+    {
+      "name": "Ingredient Chip",
+      "kind": "chip",
+      "refersTo": "card",
+      "description": "Pill chip with a status dot tinted from the accent or green; accent-tinted fill and hairline.",
+      "html": "<span class=\"ds-chip\"><i></i>Paneer</span>",
+      "css": ".ds-chip{display:inline-flex;align-items:center;gap:8px;padding:7px 14px 7px 10px;border-radius:999px;background:#2A2618;border:1px solid #564A33;color:#fff;font:600 13.5px Inter}.ds-chip i{width:8px;height:8px;border-radius:50%;background:#EBB43C}"
+    },
+    {
+      "name": "Budget Ring",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Circular progress with percent inside; the added dish's price flies into it and it pulses 1 to 1.045. Flutter: ring painted in CustomPaint, CountUp for the figure, Pulse on the trigger.",
+      "html": "<div class=\"ds-ring\"><span>4%</span></div>",
+      "css": ".ds-ring{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(#22C55E 4%,#222226 0);color:#fff;font:800 12px Inter}.ds-ring span{background:#17171A;border-radius:50%;width:40px;height:40px;display:grid;place-items:center}"
+    },
+    {
+      "name": "Swipe Deck Card",
+      "kind": "custom",
+      "refersTo": "deck-card",
+      "description": "Front card of three; dragging past 28% of width or a fling above 900px/s commits. ADD green / SKIP red stamp. Flutter: GuestDeck with stacked Transform.",
+      "html": "<article class=\"ds-deck\"><h3>Crispy Corn</h3><b>₹190</b></article>",
+      "css": ".ds-deck{background:#0B0B0C;color:#fff;border:1px solid #564A33;border-radius:24px;padding:24px;box-shadow:0 16px 30px rgba(0,0,0,.55),0 2px 6px rgba(0,0,0,.35)}.ds-deck h3{margin:0;font:800 26px Inter;letter-spacing:-.8px}.ds-deck b{font:800 26px Inter;font-variant-numeric:tabular-nums}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Lit Room",
+    "overview": "Every screen is a room with one light in it: a key light from the upper left, taken from the restaurant's accent, falling on a dish that looks already served. Bistro Night is candle-lit (umber blacks, gold that glints). Artisan Day is a morning bakery (flour cream, espresso ink, window light). Fresh Minimal applies the same rules to white and green. The food leads and the interface recedes; from order review onward, the task and the state outrank expression.",
+    "keyCharacteristics": [
+      "One light source, derived from the accent, upper left, everywhere.",
+      "Surfaces rise lighter and warmer; never dead flat black or neutral grey cards.",
+      "One signature interaction: the three-card swipe deck, where the price flies into the budget ring.",
+      "Food is a photo or authored illustration, never an emoji.",
+      "CMS colours, faces and button shape carry through the same lighting.",
+      "Reduced motion is honoured on every animation."
+    ],
+    "rules": [
+      {
+        "name": "The Light From The Accent Rule",
+        "body": "Every glow, tint and hairline is computed from the accent through keyLight. No hard-coded brand colour enters the guest runtime.",
+        "section": "colors"
+      },
+      {
+        "name": "The Rising Surface Rule",
+        "body": "Surfaces get lighter and warmer as they rise. No flat black cards.",
+        "section": "colors"
+      },
+      {
+        "name": "The Hairline From The Accent Rule",
+        "body": "Borders are the neutral border mixed 22% (dark) or 30% (light) toward the key light.",
+        "section": "colors"
+      },
+      {
+        "name": "The Readable Rule",
+        "body": "Accent used as text goes through readable(): adjusted only until 4.5:1 against the background.",
+        "section": "colors"
+      },
+      {
+        "name": "The Night Hero Rule",
+        "body": "The welcome hero is always set on night so a white headline reads.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Money Rule",
+        "body": "Every rupee amount is w800 with tabular figures.",
+        "section": "typography"
+      },
+      {
+        "name": "The One Weight Script Rule",
+        "body": "A script face is set at w400 only, in headings only.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tinted Shadow Rule",
+        "body": "Shadows have an offset and a soft blur, tinted to the room. Never a glow in place of a shadow.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Quiet Stage Rule",
+        "body": "The stage drifts at about 15 fps, stops under reduced motion, and is a still picture on ordinary pages.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do derive every tint, glow, hairline and shadow from the accent through keyLight; never hard-code a brand colour.",
+      "Do run accent-as-text through readable() (4.5:1 minimum).",
+      "Do keep touch targets at 44px or larger; primary buttons 56px.",
+      "Do use a photo when the dish has one; otherwise the painted dish art.",
+      "Do use the motion vocabulary: 140 / 280 / 460 / 760ms, arrive curve, quicker exits, stagger capped at 270ms.",
+      "Do honour reduced motion on every animation, loop and travel.",
+      "Do set prices bold with tabular figures.",
+      "Do keep one signature interaction and let everything else stay quiet.",
+      "Do go two-pane at 900px and above, with the live order in the right column."
+    ],
+    "donts": [
+      "Don't use emoji as food or as icons.",
+      "Don't add kickers or eyebrow labels over titles.",
+      "Don't nest cards inside cards.",
+      "Don't use glow-only shadows or hard offset shadows.",
+      "Don't use gradient text.",
+      "Don't use rainbow category tiles or dead flat black cards.",
+      "Don't float a phone column in empty space on a wide screen.",
+      "Don't faux-bold a script face or use one as body text.",
+      "Don't make the staff app inherit this look; it is a separate Operate-mode system."
+    ]
+  }
+}

@@ -709,6 +709,7 @@ class _PhotoBlock extends StatelessWidget {
                 name: name.isEmpty ? 'Dish' : name,
                 imageUrl: imageUrl,
                 radius: 0,
+                animate: false,
               ),
             if (uploading)
               ColoredBox(

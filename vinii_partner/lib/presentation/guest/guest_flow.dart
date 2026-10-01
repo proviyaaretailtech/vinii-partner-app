@@ -11,6 +11,7 @@ import 'guest_discover.dart';
 import 'guest_item_detail.dart';
 import 'guest_mode.dart';
 import 'guest_order.dart';
+import 'guest_payment.dart';
 import 'guest_placed.dart';
 import 'guest_preorder.dart';
 import 'guest_tracking.dart';
@@ -103,6 +104,10 @@ class GuestFlow {
 
   static void bill(BuildContext context) =>
       _push<void>(context, const GuestBillScreen());
+
+  /// Pay online. Only reachable when the gateway offers online payment.
+  static void pay(BuildContext context) =>
+      _push<void>(context, const GuestPaymentScreen(), up: true);
 
   /// A new round for the same party: fresh cart, same budget and table.
   static void orderMore(BuildContext context) => _nav(context)

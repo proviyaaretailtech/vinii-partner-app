@@ -12,19 +12,23 @@ class LoadingView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    // Centred when there is room, scrolls instead of overflowing when not
+    // (a phone held sideways leaves a list very little height).
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox.square(
-            dimension: 28,
-            child: CircularProgressIndicator(strokeWidth: 2.5, color: t.ink),
-          ),
-          if (label != null) ...[
-            const SizedBox(height: 14),
-            Text(label!, style: Theme.of(context).textTheme.bodyMedium),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox.square(
+              dimension: 28,
+              child: CircularProgressIndicator(strokeWidth: 2.5, color: t.ink),
+            ),
+            if (label != null) ...[
+              const SizedBox(height: 14),
+              Text(label!, style: Theme.of(context).textTheme.bodyMedium),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

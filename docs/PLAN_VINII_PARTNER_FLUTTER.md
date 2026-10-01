@@ -177,7 +177,8 @@ The two boards differ only in data: template, service modes and features. The ru
 | G14 | Order placed (number, ETA) / pre-order confirmed | 12 | 9, 13 | always |
 | G15 | Live tracking (confirmed → kitchen → ready → on the way → served) | 13 | 10 | liveTracking |
 | G16 | While waiting: discover more | 14 | 14 | discoverWhileWaiting |
-| G17 | Served → Bill (budget summary, split bill, ask for the bill) → feedback | 15, 16 | 16 | splitBill; feedback only once it can be stored |
+| G17 | Served → Bill (budget summary, split bill, how to pay at the table) → feedback | 15, 16 | 16 | splitBill; feedback only once it can be stored; "ask for the bill" returns as a button once a call-staff function exists |
+| G18 | Pay online: the whole bill or "my share", through the payment service (Cashfree), then a receipt | – | – | the gateway offers online payment (not built server-side yet: `docs/PAYMENTS_CASHFREE.md`) |
 
 - **Where it runs:**
   - today, a staff phone handed to a table (`/guest?table=…`, orders marked `placed_by: guest` through the front door);
@@ -197,7 +198,7 @@ The two boards differ only in data: template, service modes and features. The ru
 | POS (`pos`) | service type, tables, catalogue, cart, checkout, hold, payment, open orders, hand to guest | Sell, Checkout, Order | sell: floor staff · payment: owner, admin, managers, biller |
 | Menu (`menu`) | categories, items, photos, availability, guest details | Menu, Item editor, Categories | view: floor, kitchen · edit: owner, admin, manager (R4 until the database checks roles) |
 | Storefront (`menu` → publishing) | look, brand, service, features, categories, highlights, share, versions, preview, publish | Studio, sections, Preview | view and edit: owner, admin, managers, marketing · publish: owner, admin |
-| Guest runtime | G01–G17 | guest | guests (through a staff phone today) |
+| Guest runtime | G01–G18 | guest | guests (through a staff phone today) |
 
 ---
 

@@ -362,12 +362,11 @@ class SectionCard extends StatelessWidget {
         children: [
           if (title != null) ...[
             Text(
-              title!.toUpperCase(),
+              title!,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 15,
                 fontWeight: FontWeight.w700,
-                letterSpacing: 0.8,
-                color: t.inkMuted,
+                color: t.ink,
               ),
             ),
             const SizedBox(height: 10),

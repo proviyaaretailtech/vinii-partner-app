@@ -11,6 +11,7 @@ import '../orders/order_widgets.dart' show AmountRow;
 import '../theme/staff_theme.dart';
 import '../widgets/chips.dart';
 import '../widgets/state_views.dart';
+import 'service_charge.dart';
 
 /// Pieces shared by the Sell, Checkout and POS order screens.
 
@@ -40,22 +41,22 @@ class ServiceTypeSelector extends StatelessWidget {
     return SizedBox(
       width: double.infinity,
       child: SegmentedButton<ServiceType>(
-        segments: const [
-          ButtonSegment(
-            value: ServiceType.dineIn,
-            label: Text('Dine-in'),
-            icon: Icon(Icons.table_restaurant_outlined),
-          ),
-          ButtonSegment(
-            value: ServiceType.takeaway,
-            label: Text('Takeaway'),
-            icon: Icon(Icons.shopping_bag_outlined),
-          ),
-          ButtonSegment(
-            value: ServiceType.delivery,
-            label: Text('Delivery'),
-            icon: Icon(Icons.delivery_dining_outlined),
-          ),
+        // Each label shrinks to fit its segment, so "Takeaway" is never cut
+        // short on a narrow phone or in a half-width ticket pane.
+        segments: [
+          for (final (type, label, icon) in const [
+            (ServiceType.dineIn, 'Dine-in', Icons.table_restaurant_outlined),
+            (ServiceType.takeaway, 'Takeaway', Icons.shopping_bag_outlined),
+            (ServiceType.delivery, 'Delivery', Icons.delivery_dining_outlined),
+          ])
+            ButtonSegment(
+              value: type,
+              label: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(label, maxLines: 1, softWrap: false),
+              ),
+              icon: Icon(icon, size: 16),
+            ),
         ],
         selected: {cart.serviceType},
         showSelectedIcon: false,
@@ -65,10 +66,11 @@ class ServiceTypeSelector extends StatelessWidget {
           foregroundColor: t.ink,
           backgroundColor: t.surface,
           side: BorderSide(color: t.border),
+          padding: const EdgeInsets.symmetric(horizontal: 4),
           textStyle: const TextStyle(
             fontFamily: 'Inter',
             fontWeight: FontWeight.w700,
-            fontSize: 13.5,
+            fontSize: 12.5,
           ),
           visualDensity: const VisualDensity(vertical: 1),
         ),
@@ -102,22 +104,25 @@ class TableChip extends StatelessWidget {
           if (picked != null) cart.setTable(picked);
         },
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 9, 10, 9),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.table_restaurant_rounded,
-                size: 18,
-                color: missing ? t.warning : t.ink,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                missing ? 'Choose table' : table.displayName,
-                style: TextStyle(fontWeight: FontWeight.w700, color: t.ink),
-              ),
-              Icon(Icons.arrow_drop_down_rounded, color: t.inkSecondary),
-            ],
+          padding: const EdgeInsets.fromLTRB(14, 0, 10, 0),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.table_restaurant_rounded,
+                  size: 18,
+                  color: missing ? t.warning : t.ink,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  missing ? 'Choose table' : table.displayName,
+                  style: TextStyle(fontWeight: FontWeight.w700, color: t.ink),
+                ),
+                Icon(Icons.arrow_drop_down_rounded, color: t.inkSecondary),
+              ],
+            ),
           ),
         ),
       ),
@@ -166,6 +171,75 @@ class _TableSheetState extends State<_TableSheet> {
     }
   }
 
+  Widget _tableTile(BuildContext context, DiningTable table) {
+    final t = ViniiTokens.of(context);
+    final chosen = table.id == widget.selected?.id;
+    final bg = chosen
+        ? t.ink
+        : table.occupied
+        ? t.tint(t.warning)
+        : t.surface;
+    final fg = chosen ? t.page : t.ink;
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => Navigator.pop(context, table),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: chosen
+                  ? t.ink
+                  : table.occupied
+                  ? t.warning.withValues(alpha: 0.5)
+                  : t.border,
+            ),
+          ),
+          padding: const EdgeInsets.all(10),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  table.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: fg,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${table.seats} seats',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: chosen ? t.page : t.inkSecondary,
+                  ),
+                ),
+                if (table.occupied) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Occupied',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: chosen ? t.page : t.warning,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
@@ -189,85 +263,49 @@ class _TableSheetState extends State<_TableSheet> {
         ),
       );
     } else {
+      // Sections follow the floor plan when tables belong to one.
+      final groups = <String?, List<DiningTable>>{};
+      for (final table in tables) {
+        (groups[table.area] ??= []).add(table);
+      }
+      final named = groups.length > 1 || groups.keys.first != null;
       body = Flexible(
-        child: GridView.builder(
+        child: CustomScrollView(
           shrinkWrap: true,
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 120,
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            childAspectRatio: 1.05,
-          ),
-          itemCount: tables.length,
-          itemBuilder: (context, i) {
-            final table = tables[i];
-            final chosen = table.id == widget.selected?.id;
-            final bg = chosen
-                ? t.ink
-                : table.occupied
-                ? t.tint(t.warning)
-                : t.surface;
-            final fg = chosen ? t.page : t.ink;
-            return Material(
-              color: bg,
-              borderRadius: BorderRadius.circular(16),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: () => Navigator.pop(context, table),
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: chosen
-                          ? t.ink
-                          : table.occupied
-                          ? t.warning.withValues(alpha: 0.5)
-                          : t.border,
-                    ),
-                  ),
-                  padding: const EdgeInsets.all(10),
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          table.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            color: fg,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${table.seats} seats',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: chosen ? t.page : t.inkSecondary,
-                          ),
-                        ),
-                        if (table.occupied) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            'Occupied',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                              color: chosen ? t.page : t.warning,
-                            ),
-                          ),
-                        ],
-                      ],
+          slivers: [
+            for (final entry in groups.entries) ...[
+              if (named)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+                    child: Text(
+                      entry.key ?? 'Other tables',
+                      style: TextStyle(
+                        color: t.inkSecondary,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                sliver: SliverGrid(
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 120,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 1.05,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, i) => _tableTile(context, entry.value[i]),
+                    childCount: entry.value.length,
+                  ),
+                ),
               ),
-            );
-          },
+            ],
+            const SliverToBoxAdapter(child: SizedBox(height: 20)),
+          ],
         ),
       );
     }
@@ -302,7 +340,7 @@ class _TableSheetState extends State<_TableSheet> {
   }
 }
 
-/// − 2 + — big enough for a thumb in a hurry.
+/// − 2 + — big enough for a thumb in a hurry (each button is 44 pixels).
 class QtyStepper extends StatelessWidget {
   const QtyStepper({
     super.key,
@@ -322,14 +360,15 @@ class QtyStepper extends StatelessWidget {
         Semantics(
           button: true,
           label: label,
-          child: InkWell(
-            customBorder: const CircleBorder(),
+          enabled: onTap != null,
+          child: InkResponse(
+            radius: 24,
             onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.all(8),
+            child: SizedBox.square(
+              dimension: 44,
               child: Icon(
                 icon,
-                size: 20,
+                size: 22,
                 color: onTap == null ? t.inkMuted : t.ink,
               ),
             ),
@@ -351,14 +390,15 @@ class QtyStepper extends StatelessWidget {
             qty > min ? () => onChanged(qty - 1) : null,
           ),
           SizedBox(
-            width: 28,
+            width: 30,
             child: Text(
               '$qty',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontWeight: FontWeight.w800,
-                fontSize: 16,
+                fontSize: 17,
                 color: t.ink,
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
           ),
@@ -372,16 +412,21 @@ class QtyStepper extends StatelessWidget {
 /// The phone's bill preview. Always labelled as an estimate: the POS
 /// prices the order from the menu and its bill settings (contract R2).
 class EstimatedBill extends StatelessWidget {
-  const EstimatedBill({super.key, required this.bill});
+  const EstimatedBill({super.key, required this.bill, this.serviceCharge});
 
   final BillSummary bill;
+  final ServiceChargeLine? serviceCharge;
 
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
     return Column(
       children: [
-        BillLines(bill: bill, totalLabel: 'Estimated total'),
+        BillLines(
+          bill: bill,
+          totalLabel: 'Estimated total',
+          serviceCharge: serviceCharge,
+        ),
         const SizedBox(height: 8),
         Row(
           children: [
@@ -402,23 +447,52 @@ class EstimatedBill extends StatelessWidget {
 
 /// Item total → service charge → SGST → CGST → round-off → total, the order
 /// the OS prints them.
+///
+/// The service charge row shows its percentage. [serviceCharge] adds the
+/// Remove / Add back actions for people who may take the charge off; without
+/// it the row is read-only, and a removed charge still shows struck through.
 class BillLines extends StatelessWidget {
-  const BillLines({super.key, required this.bill, this.totalLabel = 'Total'});
+  const BillLines({
+    super.key,
+    required this.bill,
+    this.totalLabel = 'Total',
+    this.serviceCharge,
+  });
 
   final BillSummary bill;
   final String totalLabel;
+  final ServiceChargeLine? serviceCharge;
+
+  ServiceChargeLine? get _serviceLine {
+    if (serviceCharge != null) return serviceCharge;
+    if (bill.serviceCharge > 0) {
+      return ServiceChargeLine(
+        percent: bill.servicePercent,
+        amount: bill.serviceCharge,
+        waived: false,
+      );
+    }
+    if (bill.serviceChargeWaived && bill.waivedServiceCharge > 0) {
+      return ServiceChargeLine(
+        percent: bill.servicePercent,
+        amount: bill.waivedServiceCharge,
+        waived: true,
+      );
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
     String pct(double p) => '${p % 1 == 0 ? p.toInt() : p}%';
+    final service = _serviceLine;
     return Column(
       children: [
         AmountRow('Items', rupees(bill.itemTotal)),
         if (bill.discount > 0)
           AmountRow('Discount', '− ${rupees(bill.discount)}'),
-        if (bill.serviceCharge > 0)
-          AmountRow('Service charge', rupees(bill.serviceCharge)),
+        if (service != null) ServiceChargeRow(service),
         AmountRow('SGST (${pct(bill.charges.sgstPercent)})', rupees(bill.sgst)),
         AmountRow('CGST (${pct(bill.charges.cgstPercent)})', rupees(bill.cgst)),
         if (bill.roundOff != 0)

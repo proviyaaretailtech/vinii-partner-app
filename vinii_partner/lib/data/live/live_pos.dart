@@ -112,6 +112,12 @@ class LivePos implements PosRepository {
             'scheduled_for': draft.scheduledFor?.toUtc().toIso8601String(),
             'placed_by': draft.placedBy.name,
             'fire_kot': draft.fireKitchenTicket,
+            // Only when a manager removed it; the server checks the role and
+            // records who did it (contract §4.5).
+            if (draft.waiveServiceCharge) ...{
+              'waive_service_charge': true,
+              'waive_reason': ?_blankToNull(draft.waiveReason),
+            },
             // Intent only: ids and quantities. The server prices from the menu.
             'lines': [
               for (final l in draft.lines)
@@ -236,6 +242,36 @@ class LivePos implements PosRepository {
     }
   }
 
+  @override
+  Future<PlacedOrder> adjustBill(
+    PlacedOrder order, {
+    required bool waiveServiceCharge,
+    String? reason,
+  }) async {
+    try {
+      final res = await b.client.rpc(
+        'pos_adjust_bill',
+        params: {
+          'p': {
+            'order_id': order.id,
+            'expected_updated_at': order.version,
+            'waive_service_charge': waiveServiceCharge,
+            'waive_reason': ?(waiveServiceCharge ? _blankToNull(reason) : null),
+          },
+        },
+      );
+      return _order(_asMap(res), fallbackTable: order.table);
+    } catch (e) {
+      throw fromSupabase(
+        e,
+        notReady:
+            'Changing the service charge on a saved order needs a database update '
+            'that is waiting for approval. Until then, remove it before the order '
+            'is sent, or change the bill at the POS counter.',
+      );
+    }
+  }
+
   Map<String, dynamic> _asMap(Object? res) {
     if (res is Map) return Map<String, dynamic>.from(res);
     if (res is List && res.isNotEmpty && res.first is Map) {
@@ -297,6 +333,9 @@ class LivePos implements PosRepository {
         roundOff: n(r['round_off']),
         payable: n(r['total']),
         gstPercent: n(r['gst_pct']),
+        // Present once the database records a removed service charge (§4.5).
+        waivedServiceCharge: n(r['service_charge_waived_amount']),
+        serviceChargeWaived: r['service_charge_waived'] == true,
       ),
       table: table,
       paidAmount: paid,

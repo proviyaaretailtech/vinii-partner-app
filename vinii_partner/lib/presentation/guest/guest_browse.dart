@@ -7,7 +7,9 @@ import 'guest_categories.dart';
 import 'guest_deck.dart';
 import 'guest_flow.dart';
 import 'guest_list.dart';
+import 'guest_order_panel.dart';
 import 'guest_widgets.dart';
+import 'look/motion.dart';
 
 /// Board 1 #4 / Board 2 #6 & #15: the main browsing screen. The header
 /// carries the brand, the current category and the budget ring; the body is
@@ -26,40 +28,75 @@ class GuestBrowseScreen extends StatefulWidget {
 class _GuestBrowseScreenState extends State<GuestBrowseScreen> {
   late GuestCategory? _category = widget.category;
 
+  /// Where an added dish's price lands, and the beat the strip gives when it
+  /// does.
+  final _stripKey = GlobalKey();
+  final _landed = ValueNotifier<int>(0);
+
+  @override
+  void dispose() {
+    _landed.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = GuestScope.of(context);
     final items = _category?.items ?? s.catalog.allItems;
     final label = _category?.category.name ?? 'All dishes';
+    // A wide screen keeps the order in view beside the deck.
+    final wide = MediaQuery.sizeOf(context).width >= 1000;
+    final browse = Column(
+      children: [
+        _Header(categoryName: label),
+        if (s.budgetStatus != null && !wide)
+          KeyedSubtree(
+            key: _stripKey,
+            child: _BudgetStrip(landed: _landed),
+          ),
+        Expanded(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: s.features.swipeDeck
+                ? SwipeDeck(
+                    key: ValueKey('deck-${_category?.category.id}'),
+                    items: items,
+                    categoryName: label,
+                    budgetTarget: _stripKey,
+                    onLanded: () => _landed.value++,
+                  )
+                : DishList(
+                    key: ValueKey('list-${_category?.category.id}'),
+                    items: items,
+                  ),
+          ),
+        ),
+        if (s.lines.isNotEmpty && !wide)
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 4, 20, 8),
+            child: CartBar(),
+          ),
+        _CategoryStrip(
+          selected: _category,
+          onSelect: (c) => setState(() => _category = c),
+        ),
+      ],
+    );
+    if (!wide) return GuestPage(child: browse);
     return GuestPage(
-      child: Column(
+      maxWidth: double.infinity,
+      child: Row(
         children: [
-          _Header(categoryName: label),
-          if (s.budgetStatus != null) const _BudgetStrip(),
           Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              child: s.features.swipeDeck
-                  ? SwipeDeck(
-                      key: ValueKey('deck-${_category?.category.id}'),
-                      items: items,
-                      categoryName: label,
-                    )
-                  : DishList(
-                      key: ValueKey('list-${_category?.category.id}'),
-                      items: items,
-                    ),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 680),
+                child: browse,
+              ),
             ),
           ),
-          if (s.lines.isNotEmpty)
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 4, 20, 8),
-              child: CartBar(),
-            ),
-          _CategoryStrip(
-            selected: _category,
-            onSelect: (c) => setState(() => _category = c),
-          ),
+          GuestOrderPanel(budgetKey: _stripKey, landed: _landed),
         ],
       ),
     );
@@ -134,8 +171,10 @@ class _Header extends StatelessWidget {
 }
 
 /// Ring + "₹1,300 / ₹7,000 · 19% used". Tapping opens the budget overview.
+/// When a dish's price lands the strip gives a short pop.
 class _BudgetStrip extends StatelessWidget {
-  const _BudgetStrip();
+  const _BudgetStrip({required this.landed});
+  final ValueNotifier<int> landed;
 
   @override
   Widget build(BuildContext context) {
@@ -143,31 +182,36 @@ class _BudgetStrip extends StatelessWidget {
     final status = GuestScope.of(context).budgetStatus!;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 2, 20, 6),
-      child: GuestCard(
-        key: const ValueKey('budget-strip'),
-        padding: const EdgeInsets.fromLTRB(10, 8, 16, 8),
-        onTap: () => GuestFlow.budgetOverview(context),
-        child: Row(
-          children: [
-            BudgetRing(status: status, size: 46),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${rupees(status.spent)} / ${rupees(status.budget)}',
-                    style: p.price(15),
-                  ),
-                  Text(
-                    '${status.percentUsed}% used',
-                    style: p.body(12.5, color: budgetColor(p, status)),
-                  ),
-                ],
+      child: Pulse(
+        trigger: landed,
+        child: GuestCard(
+          key: const ValueKey('budget-strip'),
+          padding: const EdgeInsets.fromLTRB(10, 8, 16, 8),
+          onTap: () => GuestFlow.budgetOverview(context),
+          child: Row(
+            children: [
+              BudgetRing(status: status, size: 46),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CountUp(
+                      value: status.spent,
+                      format: (v) => '${rupees(v)} / ${rupees(status.budget)}',
+                      duration: GuestMotion.slow,
+                      style: p.price(15),
+                    ),
+                    Text(
+                      '${status.percentUsed}% used',
+                      style: p.body(12.5, color: budgetTextColor(p, status)),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Icon(Icons.chevron_right_rounded, color: p.inkMuted),
-          ],
+              Icon(Icons.chevron_right_rounded, color: p.inkMuted),
+            ],
+          ),
         ),
       ),
     );

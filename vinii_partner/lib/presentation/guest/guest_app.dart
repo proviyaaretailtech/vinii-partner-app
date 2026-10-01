@@ -8,8 +8,10 @@ import '../../domain/menu.dart';
 import '../../domain/pos_order.dart';
 import '../../domain/storefront.dart';
 import '../theme/guest_theme.dart';
+import '../widgets/dish_art.dart';
 import 'guest_welcome.dart';
 import 'guest_widgets.dart';
+import 'look/look.dart';
 
 /// The guest storefront runtime: the whole swipe-to-order experience from
 /// the two reference boards, rendered from a [StorefrontDefinition] and the
@@ -51,6 +53,10 @@ class GuestApp extends StatefulWidget {
 class _GuestAppState extends State<GuestApp> {
   /// Replaced with the session, so a new visit starts on a fresh stack.
   var _nav = GlobalKey<NavigatorState>();
+
+  /// Lets a dish picture travel between the deck and its page. One per
+  /// Navigator, replaced with it.
+  var _hero = HeroController();
   late GuestSession _session;
   late GuestPalette _palette;
   late ThemeData _theme;
@@ -88,6 +94,7 @@ class _GuestAppState extends State<GuestApp> {
       final previous = _session;
       _session = _newSession();
       _nav = GlobalKey<NavigatorState>();
+      _hero = HeroController();
       _nestedCanPop = false;
       WidgetsBinding.instance.addPostFrameCallback((_) => previous.dispose());
     } else if (old.definition != widget.definition || old.menu != widget.menu) {
@@ -133,7 +140,7 @@ class _GuestAppState extends State<GuestApp> {
               child: ClipRect(
                 child: Navigator(
                   key: _nav,
-                  observers: [_observer],
+                  observers: [_observer, _hero],
                   onGenerateRoute: (settings) =>
                       guestRoute<void>(const _GuestRoot()),
                 ),
@@ -210,7 +217,15 @@ class _MenuPreparing extends StatelessWidget {
                       style: p.display(30),
                     ),
                     const SizedBox(height: 28),
-                    const Text('👩‍🍳', style: TextStyle(fontSize: 52)),
+                    SizedBox(
+                      height: 120,
+                      child: DishArt(
+                        name: 'tea',
+                        family: DishFamily.cup,
+                        light: p.keyLight,
+                        onDark: p.isDark,
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       GuestCopy.of(context)('menu.empty'),

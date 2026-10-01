@@ -4,6 +4,7 @@ import '../core/failure.dart';
 import '../data/backend.dart';
 import '../domain/billing.dart';
 import '../domain/pos_order.dart';
+import 'guest_payments.dart';
 
 /// How the guest storefront runtime reaches the outside world. The runtime
 /// itself (`presentation/guest/`) never touches a repository directly, so
@@ -24,6 +25,13 @@ abstract class GuestOrderGateway {
 
   /// The order again each time the kitchen moves it (live tracking).
   Stream<PlacedOrder> watch(PlacedOrder order);
+
+  /// Online payment of the bill (UPI, cards, netbanking), when the server
+  /// can take it for this restaurant. Null means staff collect the payment,
+  /// and the bill tells the guest to let staff know (there is no way yet to
+  /// call them from the screen). Wired when the payment functions exist (see
+  /// docs/PAYMENTS_CASHFREE.md).
+  GuestPayments? get payments => null;
 
   /// Whether guest feedback can be stored. There is no feedback table or
   /// endpoint yet, so every gateway says no and the guest screens hide the

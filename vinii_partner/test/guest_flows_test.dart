@@ -202,7 +202,18 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('place-order')));
     await settle(tester, ms: 1500);
     await tapText(tester, 'Track order');
+    // The status ring leads the screen, so the discover strip sits below it.
+    await tester.scrollUntilVisible(
+      find.text('Discover more'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('Discover more'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('preview-next')),
+      -300,
+      scrollable: find.byType(Scrollable).first,
+    );
     for (var i = 0; i < 4; i++) {
       await tester.tap(find.byKey(const ValueKey('preview-next')));
       await settle(tester, ms: 600);
@@ -220,10 +231,11 @@ void main() {
     expect(find.text('Split the bill'), findsOneWidget);
     await tester.tapAt(const Offset(20, 20));
     await settle(tester);
-    await tester.tap(find.byKey(const ValueKey('ask-bill')));
-    await settle(tester);
     expect(
-      find.text('A staff member will bring the bill to your table.'),
+      find.text(
+        "To pay at the table, let a member of staff know you're ready for "
+        "the bill. Calling staff from this screen isn't available yet.",
+      ),
       findsOneWidget,
     );
     expect(find.text('How was your experience?'), findsNothing);

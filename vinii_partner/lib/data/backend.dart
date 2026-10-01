@@ -22,6 +22,10 @@ abstract class Backend {
   PosRepository get pos;
   DeliveryInbox get inbox;
   StorefrontRepository get storefront;
+  BillSettingsRepository get billSettings;
+  TeamRepository get team;
+  TablesRepository get tableCodes;
+  ChannelsRepository get channels;
 
   /// Called once at boot before anything else (Supabase init, etc.).
   Future<void> start();
@@ -113,6 +117,17 @@ abstract class PosRepository {
     PosStatus status, {
     String? reason,
   });
+
+  /// Takes the service charge off a saved, unpaid order, or puts it back
+  /// (the final-order prompt). The server checks the role, recomputes the
+  /// bill and records who did it and why; it answers with the order. Calls
+  /// the proposed `pos_adjust_bill` (contract §4.5), so until that exists it
+  /// fails with [FailureKind.notReady].
+  Future<PlacedOrder> adjustBill(
+    PlacedOrder order, {
+    required bool waiveServiceCharge,
+    String? reason,
+  });
 }
 
 /// Marketplace delivery orders (One Local), per the partner API contract.
@@ -145,4 +160,46 @@ abstract class StorefrontRepository {
     StorefrontDefinition definition, {
     required String publishedBy,
   });
+}
+
+/// `org_bill_settings`: the restaurant's GST, service charge, rounding and
+/// what is printed at the top and bottom of a bill.
+abstract class BillSettingsRepository {
+  /// The organization's row, or [BillSettings.defaults] (with no `updatedAt`)
+  /// when it has none yet.
+  Future<BillSettings> load();
+
+  /// Writes every field. [settings] carries the `updatedAt` it was loaded
+  /// with: if someone saved since, this throws [FailureKind.conflict] and
+  /// writes nothing. With no `updatedAt` it creates the row (an upsert on
+  /// `organization_id`) and never replaces one that appeared meanwhile.
+  Future<BillSettings> save(BillSettings settings);
+}
+
+/// The people on this restaurant's team (`org_users` with their `roles`).
+/// Reads are open to every member; the database lets only an organization
+/// admin change anything (`is_org_admin`).
+abstract class TeamRepository {
+  Future<List<TeamMember>> members();
+  Future<List<StaffRole>> roles();
+  Future<TeamMember> setRole(TeamMember member, StaffRole role);
+  Future<TeamMember> setStatus(TeamMember member, {required bool active});
+}
+
+/// Tables and their guest QR codes (`dining_tables`, `dining_areas`).
+abstract class TablesRepository {
+  /// Every table, active or not, in floor order.
+  Future<List<TableCode>> list();
+
+  /// Issues a code for a table that has none, or replaces the one it has
+  /// (the old sticker stops working). Calls the proposed
+  /// `pos_issue_table_qr` (contract §4.5), so until that exists it fails
+  /// with [FailureKind.notReady]. [replace] must be true to replace a code.
+  Future<TableCode> issueCode(TableCode table, {bool replace = false});
+}
+
+/// Swiggy, Zomato and the other sales channels (`channel_integrations`).
+abstract class ChannelsRepository {
+  Future<List<SalesChannel>> list();
+  Future<SalesChannel> setAccepting(SalesChannel channel, bool accepting);
 }

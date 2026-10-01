@@ -6,6 +6,8 @@ import '../widgets/food_art.dart';
 import 'guest_effects.dart';
 import 'guest_flow.dart';
 import 'guest_widgets.dart';
+import 'look/look.dart';
+import 'look/motion.dart';
 
 /// Board 2 #3: "How would you like to enjoy …?" — one tall photo card per
 /// enabled service mode, in the storefront's order. Photos are the
@@ -43,11 +45,18 @@ class GuestModeScreen extends StatelessWidget {
               itemBuilder: (context, i) {
                 final pool = photos.isNotEmpty ? photos : all;
                 final art = pool.isEmpty ? null : pool[i % pool.length];
-                return _ModeCard(
-                  mode: modes[i],
-                  name: art?.item.name ?? modes[i].label,
-                  imageUrl: art?.item.imageUrl,
-                  height: modes.length > 2 ? 170 : 230,
+                return Reveal(
+                  index: i,
+                  dy: 26,
+                  child: Pressable(
+                    hoverScale: 1.015,
+                    child: _ModeCard(
+                      mode: modes[i],
+                      name: art?.item.name ?? modes[i].label,
+                      imageUrl: art?.item.imageUrl,
+                      height: modes.length > 2 ? 170 : 230,
+                    ),
+                  ),
                 );
               },
             ),
@@ -84,63 +93,70 @@ class _ModeCard extends StatelessWidget {
     };
     return SizedBox(
       height: height,
-      child: Material(
-        color: p.surface,
-        borderRadius: BorderRadius.circular(26),
-        clipBehavior: Clip.antiAlias,
-        elevation: 0,
-        child: InkWell(
-          onTap: () {
-            s.update(() => s.mode = mode);
-            GuestFlow.afterMode(context);
-          },
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              FoodArt(name: name, imageUrl: imageUrl, radius: 0),
-              const PhotoScrim(strength: 0.8),
-              Positioned(
-                left: 20,
-                right: 20,
-                bottom: 18,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            mode.label,
-                            style: p.display(26, color: Colors.white),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            subtitle,
-                            style: p.body(
-                              14,
-                              color: Colors.white.withValues(alpha: 0.8),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(26),
+          boxShadow: p.lift(0.7),
+        ),
+        position: DecorationPosition.background,
+        child: Material(
+          color: p.surface,
+          borderRadius: BorderRadius.circular(26),
+          clipBehavior: Clip.antiAlias,
+          elevation: 0,
+          child: InkWell(
+            onTap: () {
+              s.update(() => s.mode = mode);
+              GuestFlow.afterMode(context);
+            },
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                FoodArt(name: name, imageUrl: imageUrl, radius: 0),
+                const PhotoScrim(strength: 0.8),
+                Positioned(
+                  left: 20,
+                  right: 20,
+                  bottom: 18,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              mode.label,
+                              style: p.display(26, color: Colors.white),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 4),
+                            Text(
+                              subtitle,
+                              style: p.body(
+                                14,
+                                color: Colors.white.withValues(alpha: 0.8),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: p.accent,
-                        shape: BoxShape.circle,
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: p.accent,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.arrow_forward_rounded,
+                          color: p.onAccent,
+                        ),
                       ),
-                      child: Icon(
-                        Icons.arrow_forward_rounded,
-                        color: p.onAccent,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

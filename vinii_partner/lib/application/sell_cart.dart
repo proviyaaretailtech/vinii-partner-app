@@ -55,6 +55,17 @@ class SellCart extends ChangeNotifier {
   /// ever used for the estimate.
   BillCharges charges = BillCharges.defaults;
 
+  /// Reads the organization's rates again, so a change made in Bill & GST
+  /// shows on the next review without reloading the menu.
+  Future<void> refreshCharges() async {
+    try {
+      charges = await pos.billCharges();
+      _notify();
+    } on AppFailure {
+      // Keep the rates already on screen; the bill is labelled an estimate.
+    }
+  }
+
   /// Loads the menu and bill settings. Without [force] it does nothing once
   /// a menu is on screen, so switching tabs does not refetch.
   Future<void> load({bool force = false}) async {
@@ -89,6 +100,11 @@ class SellCart extends ChangeNotifier {
   String customerPhone = '';
   String notes = '';
   final _lines = <CartLine>[];
+
+  /// A manager took the service charge off this bill. It goes to the server
+  /// with the order, which checks the role and records who did it.
+  bool waiveServiceCharge = false;
+  String? waiveReason;
 
   /// True while the order is being sent, so both buttons wait.
   bool placing = false;
@@ -207,6 +223,13 @@ class SellCart extends ChangeNotifier {
     notes = v;
   }
 
+  /// Removes the service charge from this bill (or puts it back).
+  void setServiceChargeWaived(bool waived, {String? reason}) {
+    waiveServiceCharge = waived;
+    waiveReason = waived ? _clean(reason) : null;
+    _notify();
+  }
+
   /// Empties the order after it was saved. The service type stays (a
   /// counter doing takeaways keeps doing takeaways); the table does not.
   void clear() {
@@ -216,6 +239,8 @@ class SellCart extends ChangeNotifier {
     customerName = '';
     customerPhone = '';
     notes = '';
+    waiveServiceCharge = false;
+    waiveReason = null;
     _notify();
   }
 
@@ -255,11 +280,30 @@ class SellCart extends ChangeNotifier {
       notes: _clean(notes),
       fireKitchenTicket: fireKitchenTicket,
       charges: charges,
+      // Only meaningful while the restaurant charges a service charge.
+      waiveServiceCharge:
+          waiveServiceCharge && charges.serviceChargePercent > 0,
+      waiveReason: waiveServiceCharge ? waiveReason : null,
     );
   }
 
   /// The estimated bill. The POS confirms the final one.
   BillSummary get estimate => draft(idempotencyKey: '').bill;
+
+  BillSummary _estimateWith({required bool waive}) => BillSummary.of(
+    _lines.map((l) => (unitPrice: l.unitPrice, qty: l.qty)),
+    charges: charges,
+    waiveServiceCharge: waive,
+  );
+
+  /// The bill with the service charge on it, whether or not it was removed:
+  /// what the row shows struck through.
+  BillSummary get estimateWithService => _estimateWith(waive: false);
+
+  /// How much less the guest pays if the service charge is removed: the
+  /// charge and the GST on it.
+  double get serviceChargeSaving =>
+      money(estimateWithService.payable - _estimateWith(waive: true).payable);
 
   /// True when an earlier send from this phone never got an answer; the
   /// next send reuses its key.

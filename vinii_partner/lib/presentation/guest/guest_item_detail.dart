@@ -8,6 +8,8 @@ import '../widgets/food_art.dart';
 import 'guest_effects.dart';
 import 'guest_flow.dart';
 import 'guest_widgets.dart';
+import 'look/look.dart';
+import 'look/motion.dart';
 
 /// Board 1 #6 / Board 2 #5: the immersive dish page. Ingredients, allergens
 /// and nutrition appear only when the storefront shows them AND the merchant
@@ -20,8 +22,18 @@ class GuestItemDetailScreen extends StatefulWidget {
   State<GuestItemDetailScreen> createState() => _GuestItemDetailScreenState();
 }
 
+/// How round the top of the sheet is where it rises over the picture.
+const _sheetRadius = 28.0;
+
 class _GuestItemDetailScreenState extends State<GuestItemDetailScreen> {
   int _qty = 1;
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
 
   void _add() {
     final item = widget.item;
@@ -46,6 +58,9 @@ class _GuestItemDetailScreenState extends State<GuestItemDetailScreen> {
         'Vegetarian',
     ];
     final height = MediaQuery.sizeOf(context).height;
+    // The sheet the words sit on: lit a little on a dark page so it rises off
+    // the picture instead of being a flat black slab.
+    final sheet = p.isDark ? p.surfaceLit : p.background;
     return GuestPage(
       safeTop: false,
       bottom: GestureDetector(
@@ -75,89 +90,146 @@ class _GuestItemDetailScreenState extends State<GuestItemDetailScreen> {
         ),
       ),
       child: CustomScrollView(
+        controller: _scroll,
         slivers: [
           SliverToBoxAdapter(
             child: SizedBox(
-              height: (height * 0.46).clamp(260, 460),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  FoodArt(name: i.name, imageUrl: i.imageUrl, radius: 0),
-                  const PhotoScrim(strength: 0.35, top: true),
-                  Positioned(
-                    top: MediaQuery.paddingOf(context).top + 8,
-                    left: 16,
-                    right: 16,
-                    child: Row(
-                      children: [
-                        RoundIcon(
-                          icon: Icons.close_rounded,
-                          tooltip: 'Close',
-                          color: Colors.white,
-                          background: Colors.black.withValues(alpha: 0.4),
-                          onTap: () => Navigator.of(context).maybePop(),
-                        ),
-                        const Spacer(),
-                        if (f.likes)
-                          RoundIcon(
-                            icon: liked
-                                ? Icons.favorite_rounded
-                                : Icons.favorite_border_rounded,
-                            tooltip: liked
-                                ? 'Saved for later'
-                                : 'Save for later',
-                            color: liked ? p.danger : Colors.white,
-                            background: Colors.black.withValues(alpha: 0.4),
-                            onTap: () => s.toggleLike(i.id),
+              height: (height * 0.46).clamp(260, 460).roundToDouble(),
+              child: ClipRect(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // The picture drifts slower than the page and swells when
+                    // pulled down: it feels set behind the sheet, not on it.
+                    AnimatedBuilder(
+                      animation: _scroll,
+                      builder: (context, child) {
+                        final off = _scroll.hasClients ? _scroll.offset : 0.0;
+                        return Transform.translate(
+                          offset: Offset(0, off > 0 ? off * 0.42 : 0),
+                          child: Transform.scale(
+                            scale: 1 + (off < 0 ? -off / 700 : 0),
+                            child: child,
                           ),
-                      ],
+                        );
+                      },
+                      child: Hero(
+                        tag: 'dish-${i.id}',
+                        child: FoodArt(
+                          name: i.name,
+                          imageUrl: i.imageUrl,
+                          radius: 0,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                    // Only enough behind the two buttons to keep them legible; a
+                    // light page wants far less than a dark one.
+                    PhotoScrim(
+                      strength: 0,
+                      top: true,
+                      topStrength: p.isDark ? 0.45 : 0.14,
+                    ),
+                    Positioned(
+                      top: MediaQuery.paddingOf(context).top + 8,
+                      left: 16,
+                      right: 16,
+                      child: Row(
+                        children: [
+                          RoundIcon(
+                            icon: Icons.close_rounded,
+                            tooltip: 'Close',
+                            color: Colors.white,
+                            background: Colors.black.withValues(alpha: 0.4),
+                            onTap: () => Navigator.of(context).maybePop(),
+                          ),
+                          const Spacer(),
+                          if (f.likes)
+                            RoundIcon(
+                              icon: liked
+                                  ? Icons.favorite_rounded
+                                  : Icons.favorite_border_rounded,
+                              tooltip: liked
+                                  ? 'Saved for later'
+                                  : 'Save for later',
+                              color: liked ? p.danger : Colors.white,
+                              background: Colors.black.withValues(alpha: 0.4),
+                              onTap: () => s.toggleLike(i.id),
+                            ),
+                        ],
+                      ),
+                    ),
+                    // The rounded top of the sheet that carries the words. It is
+                    // drawn here, on the picture's own sliver, because a
+                    // viewport paints the first sliver over the ones after it.
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: _sheetRadius,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: sheet,
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(_sheetRadius),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-          SliverToBoxAdapter(
-            child: Transform.translate(
-              offset: const Offset(0, -28),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: p.background,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(28),
-                  ),
-                ),
-                padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+          // One sliver for the whole sheet, so it always reaches the bottom
+          // bar, whatever the length of the words, with no seam between a
+          // sheet and a filler.
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: ColoredBox(
+              color: sheet,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: Text(i.name, style: p.display(28))),
-                        const SizedBox(width: 12),
-                        Text(
-                          rupees(i.price),
-                          style: p.price(
-                            26,
-                            color: p.isDark ? p.accent : p.ink,
+                    Reveal(
+                      delay: const Duration(milliseconds: 120),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: Text(i.name, style: p.display(28))),
+                          const SizedBox(width: 12),
+                          Text(
+                            rupees(i.price),
+                            style: p.price(
+                              26,
+                              color: p.isDark ? p.accent : p.ink,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                     if ((i.description ?? '').trim().isNotEmpty) ...[
                       const SizedBox(height: 10),
-                      Text(
-                        i.description!,
-                        style: p.body(15, color: p.inkMuted),
+                      Reveal(
+                        delay: const Duration(milliseconds: 120),
+                        index: 1,
+                        child: Text(
+                          i.description!,
+                          style: p.body(15, color: p.inkMuted),
+                        ),
                       ),
                     ],
                     if (pills.isNotEmpty) ...[
                       const SizedBox(height: 14),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [for (final t in pills) TagChip(t)],
+                      Reveal(
+                        delay: const Duration(milliseconds: 120),
+                        index: 2,
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [for (final t in pills) TagChip(t)],
+                        ),
                       ),
                     ],
                     if (f.showIngredients && pres.ingredients.isNotEmpty) ...[
@@ -167,14 +239,19 @@ class _GuestItemDetailScreenState extends State<GuestItemDetailScreen> {
                         style: p.display(18, weight: FontWeight.w700),
                       ),
                       const SizedBox(height: 12),
-                      SizedBox(
-                        height: 88,
-                        child: ListView(
-                          scrollDirection: Axis.horizontal,
-                          children: [
-                            for (final g in pres.ingredients) _Ingredient(g),
-                          ],
-                        ),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final (n, g) in pres.ingredients.indexed)
+                            Reveal(
+                              delay: const Duration(milliseconds: 260),
+                              index: n,
+                              dy: 0,
+                              dx: 12,
+                              child: _Ingredient(g),
+                            ),
+                        ],
                       ),
                     ],
                     if (f.showAllergens && pres.allergens.isNotEmpty)
@@ -223,42 +300,41 @@ class _GuestItemDetailScreenState extends State<GuestItemDetailScreen> {
   }
 }
 
+/// One ingredient as a plain labelled chip, tinted a food-toned hue that
+/// stays the same for the same name. Words, not stand-in pictures.
 class _Ingredient extends StatelessWidget {
   const _Ingredient(this.name);
   final String name;
 
+  Color _tone() {
+    const hues = [8.0, 24.0, 38.0, 52.0, 96.0, 128.0, 16.0, 350.0];
+    final h =
+        hues[name.toLowerCase().codeUnits.fold<int>(0, (a, c) => a + c) %
+            hues.length];
+    return HSLColor.fromAHSL(1, h, 0.62, 0.5).toColor();
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
-    final emoji = FoodArt.emojiFor(name);
-    return SizedBox(
-      width: 72,
-      child: Column(
+    final tone = _tone();
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 7, 14, 7),
+      decoration: BoxDecoration(
+        color: tone.withValues(alpha: p.isDark ? 0.16 : 0.14),
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: tone.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 54,
-            height: 54,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: p.surfaceAlt,
-              shape: BoxShape.circle,
-              border: Border.all(color: p.border),
-            ),
-            child: Text(
-              emoji == '🍽️' ? name.characters.first.toUpperCase() : emoji,
-              style: emoji == '🍽️'
-                  ? p.display(20, color: p.inkMuted)
-                  : const TextStyle(fontSize: 24),
-            ),
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: tone, shape: BoxShape.circle),
           ),
-          const SizedBox(height: 6),
-          Text(
-            name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: p.body(11.5, color: p.inkMuted),
-          ),
+          const SizedBox(width: 8),
+          Text(name, style: p.body(13.5, weight: FontWeight.w600)),
         ],
       ),
     );

@@ -8,6 +8,8 @@ import '../theme/guest_theme.dart';
 import 'guest_flow.dart';
 import 'guest_preorder.dart';
 import 'guest_widgets.dart';
+import 'look/motion.dart';
+import 'look/tray.dart';
 
 /// Board 1 #11 / Board 2 #8: how the food reaches the party (only the
 /// storefront's enabled modes, in its order), the table or pickup slot,
@@ -70,7 +72,9 @@ class GuestConfirmScreen extends StatelessWidget {
           GuestTopBar(
             title: modes.length > 1 ? 'Select dining mode' : 'Checkout',
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
+          if (s.lines.isNotEmpty) DishTray(lines: s.lines),
+          const SizedBox(height: 14),
           if (modes.length > 1)
             for (final m in modes)
               Padding(
@@ -101,7 +105,12 @@ class GuestConfirmScreen extends StatelessWidget {
                     ),
                   ),
                   Text('Estimated ', style: p.body(12.5, color: p.inkMuted)),
-                  Text(rupees(s.estimate.payable), style: p.price(20)),
+                  CountUp(
+                    value: s.estimate.payable,
+                    format: rupees,
+                    duration: GuestMotion.base,
+                    style: p.price(20),
+                  ),
                 ],
               ),
             ),

@@ -17,6 +17,7 @@ Future<void> showOpenOrders(BuildContext context) async {
   final picked = await showModalBottomSheet<PlacedOrder>(
     context: context,
     isScrollControlled: true,
+    constraints: const BoxConstraints(maxWidth: 640),
     builder: (context) => const _OpenOrdersSheet(),
   );
   if (picked != null && context.mounted) {
@@ -123,7 +124,7 @@ class _OpenOrdersSheetState extends State<_OpenOrdersSheet> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '$where · ${clockTime(o.createdAt)}',
+                              '$where · ${timeAgo(o.createdAt)}',
                               style: TextStyle(
                                 color: t.inkSecondary,
                                 fontSize: 13.5,
@@ -132,13 +133,31 @@ class _OpenOrdersSheetState extends State<_OpenOrdersSheet> {
                           ],
                         ),
                       ),
-                      Text(
-                        rupees(o.bill.payable),
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 18,
-                          color: t.ink,
-                        ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            rupees(o.bill.payable),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 18,
+                              color: t.ink,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
+                          ),
+                          if (o.paidAmount > 0.009)
+                            Text(
+                              'Due ${rupees(o.due)}',
+                              style: TextStyle(
+                                color: t.warning,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12.5,
+                              ),
+                            ),
+                        ],
                       ),
                     ],
                   ),

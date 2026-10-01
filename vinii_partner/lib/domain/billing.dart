@@ -64,12 +64,18 @@ class BillSummary {
     required this.roundOff,
     required this.payable,
     required this.charges,
+    this.waivedServiceCharge = 0,
+    this.serviceChargeWaived = false,
   });
 
+  /// [waiveServiceCharge] takes the service charge off this bill (a manager
+  /// removing it at the final order). The amount that was taken off is kept
+  /// in [waivedServiceCharge] so the screen can show it struck through.
   factory BillSummary.of(
     Iterable<({num unitPrice, int qty})> lines, {
     BillCharges charges = BillCharges.defaults,
     num discount = 0,
+    bool waiveServiceCharge = false,
   }) {
     final itemTotal = money(
       lines.fold<num>(0, (sum, l) => sum + l.qty * l.unitPrice),
@@ -77,7 +83,8 @@ class BillSummary {
     // A discount can never exceed the food: a negative bill is a refund.
     final disc = money(discount.clamp(0, itemTotal));
     final net = money(itemTotal - disc);
-    final serviceCharge = money(net * charges.serviceChargePercent / 100);
+    final fullServiceCharge = money(net * charges.serviceChargePercent / 100);
+    final serviceCharge = waiveServiceCharge ? 0.0 : fullServiceCharge;
     final taxable = money(net + serviceCharge);
     final sgst = money(taxable * charges.sgstPercent / 100);
     final cgst = money(taxable * charges.cgstPercent / 100);
@@ -94,6 +101,8 @@ class BillSummary {
       roundOff: roundOff,
       payable: money(gross + roundOff),
       charges: charges,
+      waivedServiceCharge: waiveServiceCharge ? fullServiceCharge : 0,
+      serviceChargeWaived: waiveServiceCharge && fullServiceCharge > 0,
     );
   }
 
@@ -109,6 +118,8 @@ class BillSummary {
     num roundOff = 0,
     required num payable,
     required double gstPercent,
+    num waivedServiceCharge = 0,
+    bool serviceChargeWaived = false,
   }) {
     final sgst = money(gst / 2);
     final taxable = money(itemTotal - discount + serviceCharge);
@@ -126,6 +137,8 @@ class BillSummary {
         sgstPercent: gstPercent / 2,
         cgstPercent: gstPercent / 2,
       ),
+      waivedServiceCharge: money(waivedServiceCharge),
+      serviceChargeWaived: serviceChargeWaived || waivedServiceCharge > 0,
     );
   }
 
@@ -140,7 +153,23 @@ class BillSummary {
   final double payable;
   final BillCharges charges;
 
+  /// The service charge that was taken off this bill, or 0 when none was or
+  /// when the server did not say how much.
+  final double waivedServiceCharge;
+
+  /// True when the service charge was removed from this bill.
+  final bool serviceChargeWaived;
+
   double get gst => money(sgst + cgst);
+
+  /// The service charge percentage this bill carries. A saved order does not
+  /// keep the percentage, so it is worked back from the amounts.
+  double get servicePercent {
+    if (charges.serviceChargePercent > 0) return charges.serviceChargePercent;
+    final base = money(itemTotal - discount);
+    if (serviceCharge <= 0 || base <= 0) return 0;
+    return (serviceCharge / base * 10000).round() / 100;
+  }
 
   /// "GST (5%)"
   String get gstLabel {
@@ -167,4 +196,175 @@ class BudgetStatus {
   bool get close => !over && fraction >= 0.85;
 
   double perPerson(int people) => people <= 0 ? budget : budget / people;
+}
+
+/// The whole `org_bill_settings` row: the tax and charge rates that
+/// [BillCharges] carries, plus what is printed at the top and bottom of a
+/// bill. This is what the Bill & GST screen edits.
+class BillSettings {
+  const BillSettings({
+    this.legalName = '',
+    this.address = '',
+    this.gstin = '',
+    this.fssai = '',
+    this.phone = '',
+    this.sgstPercent = 2.5,
+    this.cgstPercent = 2.5,
+    this.serviceChargePercent = 0,
+    this.roundOff = true,
+    this.footerNote = '',
+    this.updatedAt,
+  });
+
+  /// What a restaurant has before anyone saves: the OS's own defaults.
+  static const defaults = BillSettings();
+
+  final String legalName;
+  final String address;
+  final String gstin;
+  final String fssai;
+  final String phone;
+  final double sgstPercent;
+  final double cgstPercent;
+
+  /// 0 means no service charge.
+  final double serviceChargePercent;
+  final bool roundOff;
+  final String footerNote;
+
+  /// `updated_at` exactly as the server sent it; null when the organization
+  /// has no settings row yet. It goes back with a save, so a screen that has
+  /// gone stale cannot overwrite what someone else saved meanwhile.
+  final String? updatedAt;
+
+  /// False until the first save creates the row.
+  bool get exists => updatedAt != null;
+
+  double get gstPercent => sgstPercent + cgstPercent;
+
+  BillCharges get charges => BillCharges(
+    sgstPercent: sgstPercent,
+    cgstPercent: cgstPercent,
+    serviceChargePercent: serviceChargePercent,
+    roundOff: roundOff,
+  );
+
+  factory BillSettings.fromRow(Map<String, dynamic>? row) {
+    if (row == null) return defaults;
+    String text(Object? v) => v == null ? '' : '$v'.trim();
+    double n(Object? v, double fallback) =>
+        v == null ? fallback : double.tryParse('$v') ?? fallback;
+    return BillSettings(
+      legalName: text(row['legal_name']),
+      address: text(row['address']),
+      gstin: text(row['gstin']).toUpperCase(),
+      fssai: text(row['fssai']),
+      phone: text(row['phone']),
+      sgstPercent: n(row['sgst_pct'], 2.5),
+      cgstPercent: n(row['cgst_pct'], 2.5),
+      serviceChargePercent: n(row['service_charge_pct'], 0),
+      roundOff: row['round_off_enabled'] != false,
+      footerNote: text(row['footer_note']),
+      updatedAt: row['updated_at'] == null ? null : '${row['updated_at']}',
+    );
+  }
+
+  /// The row to write. Empty text is stored as null, never as blank spaces.
+  /// `updated_at` is left to the database trigger.
+  Map<String, dynamic> toRow(String organizationId) {
+    String? orNull(String v) => v.trim().isEmpty ? null : v.trim();
+    return {
+      'organization_id': organizationId,
+      'legal_name': orNull(legalName),
+      'address': orNull(address),
+      'gstin': orNull(gstin.toUpperCase()),
+      'fssai': orNull(fssai),
+      'phone': orNull(phone),
+      'sgst_pct': sgstPercent,
+      'cgst_pct': cgstPercent,
+      'service_charge_pct': serviceChargePercent,
+      'round_off_enabled': roundOff,
+      'footer_note': orNull(footerNote),
+    };
+  }
+
+  BillSettings copyWith({
+    String? legalName,
+    String? address,
+    String? gstin,
+    String? fssai,
+    String? phone,
+    double? sgstPercent,
+    double? cgstPercent,
+    double? serviceChargePercent,
+    bool? roundOff,
+    String? footerNote,
+    String? updatedAt,
+  }) => BillSettings(
+    legalName: legalName ?? this.legalName,
+    address: address ?? this.address,
+    gstin: gstin ?? this.gstin,
+    fssai: fssai ?? this.fssai,
+    phone: phone ?? this.phone,
+    sgstPercent: sgstPercent ?? this.sgstPercent,
+    cgstPercent: cgstPercent ?? this.cgstPercent,
+    serviceChargePercent: serviceChargePercent ?? this.serviceChargePercent,
+    roundOff: roundOff ?? this.roundOff,
+    footerNote: footerNote ?? this.footerNote,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+
+  /// Same values, ignoring which version of the row they came from.
+  bool sameValuesAs(BillSettings o) =>
+      legalName.trim() == o.legalName.trim() &&
+      address.trim() == o.address.trim() &&
+      gstin.trim().toUpperCase() == o.gstin.trim().toUpperCase() &&
+      fssai.trim() == o.fssai.trim() &&
+      phone.trim() == o.phone.trim() &&
+      toPaiseOf(sgstPercent) == toPaiseOf(o.sgstPercent) &&
+      toPaiseOf(cgstPercent) == toPaiseOf(o.cgstPercent) &&
+      toPaiseOf(serviceChargePercent) == toPaiseOf(o.serviceChargePercent) &&
+      roundOff == o.roundOff &&
+      footerNote.trim() == o.footerNote.trim();
+
+  /// Two decimals are all `numeric(5, 2)` keeps, so compare that way.
+  static int toPaiseOf(double percent) => (percent * 100).round();
+}
+
+final _gstinShape = RegExp(r'^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$');
+
+/// Why a GSTIN cannot be saved, or null when it is fine (or left empty). The
+/// standard 15-character shape: state code, PAN, entity number, "Z", check
+/// character. Letters are upper-cased before the check.
+String? gstinProblem(String raw) {
+  final v = raw.trim().toUpperCase();
+  if (v.isEmpty) return null;
+  return _gstinShape.hasMatch(v)
+      ? null
+      : 'A GSTIN has 15 letters and numbers, like 22AAAAA0000A1Z5.';
+}
+
+/// An FSSAI licence number is 14 digits.
+String? fssaiProblem(String raw) {
+  final v = raw.trim();
+  if (v.isEmpty) return null;
+  return RegExp(r'^\d{14}$').hasMatch(v)
+      ? null
+      : 'An FSSAI number has 14 digits.';
+}
+
+/// A phone for the bill header: 10 to 13 digits (with or without +91).
+String? billPhoneProblem(String raw) {
+  if (raw.trim().isEmpty) return null;
+  final digits = raw.replaceAll(RegExp(r'\D'), '').length;
+  return digits >= 10 && digits <= 13
+      ? null
+      : 'Enter a phone number with at least 10 digits.';
+}
+
+/// "2.5", "5", "7.5" — a percentage without trailing zeros (never "5.0").
+String formatPercent(double p) {
+  final fixed = p.toStringAsFixed(2);
+  final trimmed = fixed.replaceFirst(RegExp(r'\.?0+$'), '');
+  return trimmed.isEmpty ? '0' : trimmed;
 }
