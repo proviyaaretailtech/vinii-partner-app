@@ -36,8 +36,8 @@ The only SQL in the repository is local-development tooling:
 | `payments` | [ledger] 0010 · [snapshot] | read only (embedded `amount`) | `live_pos.dart:24` |
 | `org_bill_settings` | [ledger] 0010 · [snapshot] | read; **upsert** (ignore duplicates); **update** guarded by `updated_at` | `live_pos.dart:69-73`, `live_bill_settings.dart:26-67` |
 | `channel_integrations` | [ledger] 0010 | read; **update** `is_accepting`, `next_open_at` | `live_channels.dart:24-51` |
-| `vinii_storefronts` | **no migration in any ledger** | read; **upsert** `draft`, `updated_by`; **update** `draft = null` | `live_storefront.dart:28-32,81-85,99-102` |
-| `vinii_storefront_versions` | **no migration in any ledger** | read | `live_storefront.dart:33-38` |
+| `vinii_storefronts` | **draft only, not applied**: Repo-1- branch `feat/experience-cms`, `0021_vinii_storefronts.sql` | read; **upsert** `draft`, `updated_by`; **update** `draft = null` | `live_storefront.dart:28-32,81-85,99-102` |
+| `vinii_storefront_versions` | **draft only, not applied**: Repo-1- branch `feat/experience-cms`, `0021_vinii_storefronts.sql` | read | `live_storefront.dart:33-38` |
 
 **Storage:** bucket `item-images` ([ledger] 0006; [snapshot] "Storage bucket: item-images (public)").
 - The app uploads to `<organization_id>/<itemId>-<epoch ms>.<ext>` with `upsert: false` and stores the public URL in `menu_items.image_url` (`live_menu.dart:213-222`).
@@ -179,9 +179,11 @@ There are **no business triggers**:
 | `pos_set_order_status(p)` | **none** | defined in `live_pos.dart:225` but **no screen calls it** |
 | `pos_adjust_bill(p)` | **none** | **yes**, `live_pos.dart:254` |
 | `pos_issue_table_qr(p)` | **none** | **yes**, `live_tables.dart:76` |
-| `vinii_publish_storefront(p)` | **none** | **yes**, `live_storefront.dart:117` |
+| `vinii_publish_storefront(p)` | **draft only, not applied** (Repo-1- branch `feat/experience-cms`, `0021_vinii_storefronts.sql`) | **yes**, `live_storefront.dart:117` |
 
-**No migration in Repo-1-, OL-ui or proviyaa-pos defines any of the six `pos_*` / `vinii_*` names.** This was confirmed with a full-text search of all `.sql` files.
+**No migration on any branch of Repo-1-, OL-ui or proviyaa-pos defines the five `pos_*` functions.** This was confirmed by searching every `.sql` file on every branch (corrected 2026-10-02).
+
+`vinii_publish_storefront` and the two storefront tables are defined in **one draft migration that is not applied**: `Repo-1-/supabase/migrations/0021_vinii_storefronts.sql`, on branch `feat/experience-cms` (worktree `Repo-1--experience-cms`). Its header says "DRAFT, NOT APPLIED". The first version of this audit missed it, because it searched only the checked-out branches. The full register is in `15_MIGRATIONS_NOT_APPLIED.md`.
 
 Against a database built from these ledgers, each call fails with PostgREST `PGRST202` or Postgres `42883`. The app maps that to `FailureKind.notReady` and shows the "Not available yet" dialog (`live/errors.dart:33-41`). [unverified] Production's function list after 2026-09-22: the snapshot reports 29 functions but does not name them.
 

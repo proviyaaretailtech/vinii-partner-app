@@ -4,8 +4,8 @@
 
 ## Production database
 1. **Whether production matches the ledgers.** The only production evidence is the column-list snapshot of 2026-09-22 (`OL-ui/docs/CENTRAL_DB_MAP.md`). It matches the ledger columns for `orders`, `order_items`, `kot_tickets`, `order_events`, `payments`, `org_bill_settings`, `org_users`, `roles`, `role_module_access` and `org_modules`. It gives policy **counts** only, not policy text.
-2. **Production functions after 2026-09-22.** The snapshot reports 29 functions without naming them. No migration defines `pos_place_order`, `pos_record_payment`, `pos_set_order_status`, `pos_adjust_bill`, `pos_issue_table_qr` or `vinii_publish_storefront`. Whether someone created them by hand in production is unknown.
-3. **Whether `vinii_storefronts` and `vinii_storefront_versions` exist in production.** No migration creates them.
+2. **Production functions after 2026-09-22.** The snapshot reports 29 functions without naming them. No migration on any branch defines `pos_place_order`, `pos_record_payment`, `pos_set_order_status`, `pos_adjust_bill` or `pos_issue_table_qr`. `vinii_publish_storefront` exists only in the unapplied draft (item 3). Whether someone created any of them by hand in production is unknown.
+3. **Whether `vinii_storefronts` and `vinii_storefront_versions` exist in production.** Only the unapplied draft `0021_vinii_storefronts.sql` (Repo-1- branch `feat/experience-cms`) creates them.
 4. **Which One Local migrations (OL-ui 0021–0029) are applied in production.**
    - Earlier documents say 0021–0024 are live and 0028 was pending.
    - 0025–0027 and 0029 (dispatch, `delivery_jobs`) are unknown.

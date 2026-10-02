@@ -28,7 +28,7 @@
 | `kot_tickets` | member | member | member | **member** | **no** |
 | `dining_areas`, `order_events`, `payments`, `org_bill_settings`, `channel_integrations`, `item_channel_status` (`apply_org_rls`, 0010) | member | member | member | **no policy, so denied** (delete is granted, but no policy allows it) | **no** |
 | `org_counters` | member | no policy | no policy | — | writes only through `next_org_seq` |
-| `vinii_storefronts`, `vinii_storefront_versions` | **tables do not exist** | | | | |
+| `vinii_storefronts`, `vinii_storefront_versions` | **not applied.** The draft `0021_vinii_storefronts.sql` defines member select, editor insert and update, versions written only by the publish function | | | | draft checks roles (`vinii_can_edit_storefront`, `vinii_can_publish_storefront`) |
 
 "Member" means `organization_id = current_org_id()`. Platform admins have an `… for all` policy on every one of these tables.
 
@@ -46,7 +46,7 @@
 ## 4. Functions
 - `next_org_seq(org, kind)` is **security definer and executable by `authenticated`** (0006). It does **not** check that the caller belongs to `org`, so any signed-in user can advance any organization's order or KOT counter. [ledger]; whether this has been exploited is [unverified].
 - `ol_create_restaurant_order`, `ol_partner_act` and `ol_expire_unanswered` are `revoke all … from public, anon, authenticated` and granted to `service_role` only (OL-ui 0023). The phone can reach them only through One Local's API.
-- The `pos_*` and `vinii_publish_storefront` functions the app calls do not exist, so their checks cannot be audited.
+- The `pos_*` functions the app calls do not exist on any branch, so their checks cannot be audited. `vinii_publish_storefront` exists only in the unapplied draft (Repo-1- `feat/experience-cms` 0021).
 
 ## 5. Storage: `item-images` ([ledger] Repo-1- 0006)
 - Public read.

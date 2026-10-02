@@ -12,7 +12,7 @@
 
 **Shape in one paragraph.** The app is an **online-only client** of the shared Supabase database. It has no local database, outbox, realtime subscription, edge function or hardware driver.
 - It **writes directly** only to configuration-type tables: menu, bill settings, channel switches, team roles and status. It also uploads photos to storage.
-- **Every transactional write** (create order, take payment, change status, adjust bill, issue a table code, publish the storefront) goes to a database function **that no migration defines**. Those actions currently end in "Not available yet".
+- **Every transactional write** (create order, take payment, change status, adjust bill, issue a table code, publish the storefront) goes to a database function **that no applied migration defines**. The five `pos_*` functions are not written anywhere; the storefront publish function is in an unapplied draft. Those actions currently end in "Not available yet".
 - **The only working transaction path is One Local delivery orders.** The phone calls One Local's partner API, whose server runs the existing `ol_partner_act` with the service role.
 
 ---
@@ -88,7 +88,7 @@ All entity ids, through `gen_random_uuid()` defaults: organizations, memberships
   - `org_bill_settings` (upsert, update)
   - `channel_integrations` (update)
   - `org_users` (update role and status)
-  - `vinii_storefronts` (upsert and update, but the table is missing)
+  - `vinii_storefronts` (upsert and update; the table is only in an unapplied draft)
   - the storage bucket `item-images`
 - **Indirectly, through One Local's API:**
   - `orders`, `order_items`, `kot_tickets`, `order_events`, `payments`
@@ -102,7 +102,7 @@ All entity ids, through `gen_random_uuid()` defaults: organizations, memberships
   - `dining_tables`, `dining_areas`
   - `orders`, `order_items`, `payments`
   - `org_bill_settings`, `channel_integrations`
-  - `vinii_storefronts` and `vinii_storefront_versions` (both missing)
+  - `vinii_storefronts` and `vinii_storefront_versions` (both only in an unapplied draft)
 - **Through One Local's API:** `ol_orders`, `orders`, `order_items`, `order_events`, `ol_merchant_channels`, `org_users`.
 
 **What events are emitted?**

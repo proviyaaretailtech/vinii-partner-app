@@ -34,7 +34,7 @@
 | Sales channel switch | `channel_integrations` | No | **Yes**: `is_accepting`, `next_open_at = null` | Yes | Database | The Repo-1- control panel writes the same columns |
 | One Local outlet switch | `ol_merchant_channels` | No | via API (`PATCH /outlet`); auto-pause by server | via API (`GET /me`) | Database (One Local) | — |
 | Delivery dispatch job | `delivery_jobs` | No | indirectly (accept or reject hooks on One Local's server) | No | Database (One Local 0029) | [unverified] whether applied in production |
-| Storefront (draft and published versions) | `vinii_storefronts`, `vinii_storefront_versions` | **Yes** (upsert), if the table existed | **Yes** (draft); publish via RPC (missing) | Yes, if the table existed | **The phone's SharedPreferences, while the tables are missing** | Tables are not in any migration |
+| Storefront (draft and published versions) | `vinii_storefronts`, `vinii_storefront_versions` | **Yes** (upsert), if the table existed | **Yes** (draft); publish via RPC (missing) | Yes, if the table existed | **The phone's SharedPreferences, while the tables are missing** | Tables exist only in the unapplied draft `0021_vinii_storefronts.sql` (Repo-1- branch `feat/experience-cms`) |
 | Customer | **none** | No | No | No | **None.** Free-text `customer_name` and `customer_phone` on the order | No customer table or id. One Local has `ol_orders.customer_hash` and `user_id` on its side |
 | Device | **none** | No | No | No | — | No device id is generated or sent. `x-platform` and `x-runtime` headers only. The app never registers in `ol_partner_devices` |
 | Idempotency key | SharedPreferences `pending_key:*` | **Yes** (UUID v4) | cleared on a definite answer | Yes | The phone | Never stored in the database: no column exists |

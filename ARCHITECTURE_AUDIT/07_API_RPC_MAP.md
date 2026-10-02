@@ -43,7 +43,7 @@ Both go through `CallerClient` (`data/live/caller_client.dart`), which adds thes
 | `LiveChannels` | `list` / `setAccepting` | `GET channel_integrations`; `PATCH channel_integrations {is_accepting, next_open_at: null}` |
 | `LiveTeam` | `members` / `roles` / `setRole` / `setStatus` | `GET org_users` (+ `roles`); `GET roles`; `PATCH org_users {role_id}` or `{status}` |
 | `LiveTables` | `list` | `GET dining_tables` (+ `dining_areas`) |
-| `LiveStorefront` | `load` / `saveDraft` / `discardDraft` | `GET vinii_storefronts`, `GET vinii_storefront_versions` (limit 20); `POST vinii_storefronts on_conflict=organization_id`; `PATCH vinii_storefronts {draft:null}` (**both tables missing**) |
+| `LiveStorefront` | `load` / `saveDraft` / `discardDraft` | `GET vinii_storefronts`, `GET vinii_storefront_versions` (limit 20); `POST vinii_storefronts on_conflict=organization_id`; `PATCH vinii_storefronts {draft:null}` (**both tables exist only in an unapplied draft migration**, see 15) |
 
 ## 3. RPC (PostgREST `/rpc/<name>`)
 
@@ -54,7 +54,7 @@ Both go through `CallerClient` (`data/live/caller_client.dart`), which adds thes
 | `pos_set_order_status` | `LivePos.setStatus` (no caller) | `order_id, to, expected_updated_at, reason?` | **No** |
 | `pos_adjust_bill` | `LivePos.adjustBill` ← `PosOrderScreen._adjust` | `order_id, expected_updated_at, waive_service_charge, waive_reason?` | **No** |
 | `pos_issue_table_qr` | `LiveTables.issueCode` ← table codes screen | `table_id, replace?` | **No** |
-| `vinii_publish_storefront` | `LiveStorefront.publish` ← Studio | `organization_id, definition, expected_version` | **No** |
+| `vinii_publish_storefront` | `LiveStorefront.publish` ← Studio | `organization_id, definition, expected_version` | **Draft only, not applied** (Repo-1- `feat/experience-cms` 0021) |
 
 The call shapes are documented as a proposal in `docs/PLATFORM_CONTRACT_ALIGNMENT.md` §4.1, §4.4 and §4.5.
 

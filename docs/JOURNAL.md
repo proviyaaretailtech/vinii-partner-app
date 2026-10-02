@@ -1,5 +1,26 @@
 # Proviyaa (workspace) — Development Journal
 
+## 2026-10-02 — VINII Partner: Audit as a PDF, with every unapplied database change listed
+
+**The audit is now one 42-page PDF. It lists every database change that is written but not applied, and every one that is needed but not yet written.** No code, database or data was changed.
+
+- **Why:** the founder asked for the report as a PDF, with the full list of migrations that are not applied.
+- **Structural decisions:** none. One correction to this morning's audit: the storefront tables and the "publish" function **do** have a draft migration. It is in the OS repository, on a side branch, and not applied. The first search had looked only at the branches that were checked out. This time every branch of every repository was searched.
+- **What works now:**
+  - The report: `ARCHITECTURE_AUDIT/VINII_Partner_Architecture_Audit_2026-10-02.pdf`, with the register also kept as `ARCHITECTURE_AUDIT/15_MIGRATIONS_NOT_APPLIED.md`.
+  - **Written but not applied: seven migration files.**
+    - One storefront file in the OS repository.
+    - Five One Local files: payments, checkouts, privacy, marketplace listings and rider dispatch.
+    - One Windows POS file, which must not be applied as written because it lets anyone read and change orders.
+  - **Applied but not recorded:** One Local's first four migrations are live but missing from the shared ledger.
+  - **Not written at all:** the five order, payment and table functions the phone calls, plus a sixth that One Local's server needs; the duplicate-protection columns; and the access-rule fixes.
+- **Left undone:**
+  - The live database was not queried. "Applied" means what each repository records.
+  - No SQL was written, per the standing instruction.
+- **Open questions for the founder:**
+  - Which of these should be applied first?
+  - Numbers 0021 to 0029 are used twice (the OS repository and One Local). Who gives them their final numbers in the shared ledger?
+
 ## 2026-10-02 — VINII Partner: Forensic map of how the phone POS handles orders today
 
 **Wrote a 14-part, read-only map of exactly how VINII Partner creates and processes orders, kitchen tickets and payments today. No code, database or data was changed.**
