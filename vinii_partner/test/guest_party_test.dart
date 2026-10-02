@@ -33,8 +33,9 @@ void main() {
     expect(find.text('For all 2'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('repeat-i-paneer')));
     await settle(tester);
-    // Two portions of a ₹600 dish; the chip is gone because it is done.
-    expect(find.text('₹1,200'), findsOneWidget);
+    // Two portions of a ₹600 dish: on the line and in the bill's subtotal;
+    // the chip is gone because it is done.
+    expect(find.text('₹1,200'), findsNWidgets(2));
     expect(find.text('For all 2'), findsNothing);
   });
 
@@ -59,6 +60,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('repeat-order')));
     await settle(tester);
     expect(find.text('Paneer Tikka'), findsWidgets);
-    expect(find.text('Continue to review'), findsOneWidget);
+    // Straight onto the one order screen, ready to place.
+    expect(find.byKey(const ValueKey('place-order')), findsOneWidget);
   });
 }

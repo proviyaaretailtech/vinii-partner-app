@@ -143,10 +143,9 @@ Future<void> openAllDishes(WidgetTester tester) async {
   await tapText(tester, 'All dishes');
 }
 
+/// "Your order" is one screen: review, notes, bill and Place order.
 Future<void> goToCheckout(WidgetTester tester) async {
   await tapText(tester, 'View order (1)');
-  await tapText(tester, 'Continue to review');
-  await tapText(tester, 'Proceed to checkout');
 }
 
 void main() {
@@ -259,7 +258,8 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('deck-add')));
     await settle(tester, ms: 1600);
     await goToCheckout(tester);
-    expect(find.text('Table 12'), findsOneWidget);
+    // The table comes from the QR code: it is said once, never asked.
+    expect(find.text('Table 12 • Dine-in'), findsOneWidget);
 
     gateway.failNext = const AppFailure(
       'You are offline. Check the connection and try again.',
@@ -292,7 +292,7 @@ void main() {
     await settle(tester, ms: 3000);
   });
 
-  testWidgets('a real dine-in order without a table asks for staff', (
+  testWidgets('a real dine-in order without a table says to scan the QR', (
     tester,
   ) async {
     final gateway = RecordingGateway();
@@ -305,7 +305,8 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('deck-add')));
     await settle(tester, ms: 1600);
     await goToCheckout(tester);
-    expect(find.textContaining('Please call a staff member'), findsWidgets);
+    expect(find.byKey(const ValueKey('qr-hint')), findsOneWidget);
+    expect(find.textContaining('Scan the QR code on your table'), findsWidgets);
     await tester.tap(find.byKey(const ValueKey('place-order')));
     await settle(tester);
     expect(gateway.drafts, isEmpty);
@@ -323,7 +324,12 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('deck-add')));
     await settle(tester, ms: 1600);
     await goToCheckout(tester);
-    expect(find.text('Table will be confirmed by our staff.'), findsOneWidget);
+    expect(
+      find.text(
+        'In the live storefront, your table comes from the QR code on it.',
+      ),
+      findsOneWidget,
+    );
     await tester.tap(find.byKey(const ValueKey('place-order')));
     await settle(tester, ms: 1500);
 

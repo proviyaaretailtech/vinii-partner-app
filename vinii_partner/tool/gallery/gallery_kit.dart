@@ -8,14 +8,19 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:vinii_partner/application/guest_coupons.dart';
 import 'package:vinii_partner/application/guest_gateway.dart';
 import 'package:vinii_partner/application/guest_payments.dart';
+import 'package:vinii_partner/application/guest_social.dart';
 import 'package:vinii_partner/data/payments/cashfree_checkout.dart';
 import 'package:vinii_partner/domain/billing.dart';
 import 'package:vinii_partner/domain/menu.dart';
 import 'package:vinii_partner/domain/pos_order.dart';
 import 'package:vinii_partner/domain/storefront.dart';
 import 'package:vinii_partner/presentation/guest/guest_app.dart';
+
+import 'gallery_nearby.dart';
+import 'gallery_similar.dart';
 
 class GalleryApp extends StatelessWidget {
   const GalleryApp({super.key});
@@ -37,7 +42,7 @@ class GalleryApp extends StatelessWidget {
       home: GuestApp(
         definition: fixture.definition,
         menu: fixture.menu,
-        gateway: GalleryGateway(),
+        gateway: GalleryGateway.forFixture(fixture),
         table: table ?? const DiningTable(id: 'gallery-t12', label: '12'),
       ),
     );
@@ -48,9 +53,29 @@ class GalleryApp extends StatelessWidget {
 /// the kitchen "moves" them on a timer so live tracking can be reviewed.
 class GalleryGateway extends GuestOrderGateway {
   /// [online] false stands for a restaurant with no online payment.
-  GalleryGateway({this.online = true});
+  GalleryGateway({this.online = true}) : _nearby = null, _similar = null;
+
+  /// The gallery restaurant [f]: invented activity at "the tables around"
+  /// and three invented "tables like yours", built from its own dishes.
+  /// Switch them off in the address with ?nearby=0 and ?similar=0.
+  GalleryGateway.forFixture(
+    Fixture f, {
+    this.online = true,
+    Duration nearbyEvery = const Duration(seconds: 14),
+  }) : _nearby = GalleryNearby(f.itemIds, every: nearbyEvery),
+       _similar = GallerySimilarTables(f.baskets());
 
   final bool online;
+  final GalleryNearby? _nearby;
+  final GallerySimilarTables? _similar;
+
+  @override
+  GuestNearby? get nearby =>
+      Uri.base.queryParameters['nearby'] == '0' ? null : _nearby;
+
+  @override
+  GuestSimilarTables? get similarTables =>
+      Uri.base.queryParameters['similar'] == '0' ? null : _similar;
 
   var _n = 1252;
 
@@ -62,6 +87,13 @@ class GalleryGateway extends GuestOrderGateway {
   GuestPayments? get payments =>
       !online || Uri.base.queryParameters['pay'] == '0' ? null : _payments;
   final _payments = GalleryPayments();
+
+  /// Coupon codes are on unless ?coupons=0 (or [online] is false for a
+  /// restaurant that takes nothing online): SAVE10, FLAT50 and WELCOME.
+  @override
+  GuestCoupons? get coupons =>
+      !online || Uri.base.queryParameters['coupons'] == '0' ? null : _coupons;
+  final _coupons = GalleryCoupons();
 
   @override
   Future<BillCharges> charges() async => BillCharges.defaults;
@@ -91,6 +123,59 @@ class GalleryGateway extends GuestOrderGateway {
     for (final s in const [PosStatus.ready, PosStatus.delivered]) {
       await Future<void>.delayed(const Duration(seconds: 8));
       yield order.copyWith(status: s, version: 'v-${s.dbValue}');
+    }
+  }
+}
+
+/// A pretend coupon service for the gallery. Three invented codes; the real
+/// server decides everything itself (docs/GUEST_SERVER_CONTRACT.md).
+///   SAVE10  10% off the food, up to ₹100, on orders from ₹300
+///   FLAT50  ₹50 off orders from ₹250
+///   WELCOME ₹30 off any order
+class GalleryCoupons extends GuestCoupons {
+  GalleryCoupons();
+
+  @override
+  Future<CouponResult> check({
+    required String code,
+    required List<CartLine> lines,
+    required ServiceType serviceType,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    final food = lines.fold<double>(0, (s, l) => s + l.lineTotal);
+    CouponResult tooSmall(String code, double min) => CouponResult.invalid(
+      code: code,
+      message:
+          'Add ₹${(min - food).ceil()} more to use $code '
+          '(minimum order ₹${min.toInt()}).',
+    );
+    switch (code.toUpperCase()) {
+      case 'SAVE10':
+        if (food < 300) return tooSmall('SAVE10', 300);
+        final off = (food * 0.10).clamp(0, 100).toDouble();
+        return CouponResult.valid(
+          code: 'SAVE10',
+          discount: off,
+          label: '10% off, up to ₹100',
+        );
+      case 'FLAT50':
+        if (food < 250) return tooSmall('FLAT50', 250);
+        return const CouponResult.valid(
+          code: 'FLAT50',
+          discount: 50,
+          label: '₹50 off',
+        );
+      case 'WELCOME':
+        return const CouponResult.valid(
+          code: 'WELCOME',
+          discount: 30,
+          label: '₹30 off your first order',
+        );
+      default:
+        return CouponResult.invalid(
+          code: code,
+          message: "That code isn't valid. Check it and try again.",
+        );
     }
   }
 }
@@ -183,10 +268,39 @@ class Fixture {
   final MenuSnapshot menu;
   final StorefrontDefinition definition;
 
+  /// Every dish id, in menu order.
+  List<String> get itemIds => [for (final i in menu.items) i.id];
+
+  /// Three invented orders of other tables, from this menu's own dishes: a
+  /// starter and a main for a party of four, a lighter one, a sharing one.
+  List<List<({String itemId, int qty})>> baskets() {
+    final ids = itemIds;
+    if (ids.length < 3) return const [];
+    String at(int i) => ids[i % ids.length];
+    return [
+      [
+        (itemId: at(0), qty: 2),
+        (itemId: at(3), qty: 2),
+        (itemId: at(ids.length - 1), qty: 4),
+      ],
+      [
+        (itemId: at(1), qty: 1),
+        (itemId: at(4), qty: 2),
+        (itemId: at(6), qty: 1),
+      ],
+      [
+        (itemId: at(2), qty: 2),
+        (itemId: at(5), qty: 3),
+        (itemId: at(ids.length - 2), qty: 2),
+        (itemId: at(7), qty: 1),
+      ],
+    ];
+  }
+
   static String _endsToday() {
     final now = DateTime.now();
     final h = (now.hour + 2).clamp(0, 23);
-    return '${'$h'.padLeft(2, '0')}:59:00';
+    return '${'$h'.padLeft(2, '0')}:59';
   }
 
   /// Board 1, "Vinii Bistro": dark and gold, dine-in with a table budget.

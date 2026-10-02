@@ -11,9 +11,17 @@ import 'look/motion.dart';
 /// Subtotal → service charge → GST → round-off → total, the same order as
 /// the printed bill. [estimated] labels a pre-order preview as such.
 class BillLines extends StatelessWidget {
-  const BillLines({super.key, required this.bill, this.estimated = false});
+  const BillLines({
+    super.key,
+    required this.bill,
+    this.estimated = false,
+    this.discountLabel,
+  });
   final BillSummary bill;
   final bool estimated;
+
+  /// What the discount line says when it is a named coupon ("Coupon SAVE10").
+  final String? discountLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +52,7 @@ class BillLines extends StatelessWidget {
     return Column(
       children: [
         row('Subtotal', bill.itemTotal),
-        if (bill.discount > 0) row('Discount', -bill.discount),
+        if (bill.discount > 0) row(discountLabel ?? 'Discount', -bill.discount),
         if (bill.serviceCharge > 0) row('Service charge', bill.serviceCharge),
         if (bill.gst > 0) row(bill.gstLabel, bill.gst),
         if (bill.roundOff != 0) row('Round off', bill.roundOff),

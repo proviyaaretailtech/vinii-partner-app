@@ -310,6 +310,20 @@ void main() {
       expect(c.chefsPicks.map((i) => i.item.id), ['1']);
       expect(c.limitedToday.map((o) => o.item.item.id), ['1']);
     });
+
+    test('an offer end time that is not exactly HH:mm never crashes', () {
+      final day = DateTime(2026, 9, 28, 12);
+      DateTime ends(String at) =>
+          LimitedOffer(itemId: 'x', endsAt: at).endsOn(day);
+      expect(ends('21:30'), DateTime(2026, 9, 28, 21, 30));
+      // A stray seconds part reads as the hour and minute.
+      expect(ends('05:59:00'), DateTime(2026, 9, 28, 5, 59));
+      expect(ends('9:05'), DateTime(2026, 9, 28, 9, 5));
+      // Anything else reads as the default closing time, not an exception.
+      expect(ends('soon'), DateTime(2026, 9, 28, 18));
+      expect(ends(''), DateTime(2026, 9, 28, 18));
+      expect(ends('99:99'), DateTime(2026, 9, 28, 23, 59));
+    });
   });
 
   group('partner API contract (R6)', () {

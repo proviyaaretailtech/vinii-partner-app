@@ -4,25 +4,46 @@
     {
       "name": "vinii-partner-web",
       "runtimeExecutable": "bash",
-      "runtimeArgs": ["-c", "cd vinii_partner && ./tool/run_local.sh -d web-server --web-port 8090 --web-hostname 127.0.0.1"],
+      "runtimeArgs": [
+        "-c",
+        "cd vinii_partner && ./tool/run_local.sh -d web-server --web-port 8090 --web-hostname 127.0.0.1"
+      ],
       "port": 8090
+    },
+    {
+      "name": "vinii-partner-local",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd vinii_partner && VINII_ENV_FILE=.env.localdb ./tool/run_local.sh -d web-server --web-port 8094 --web-hostname 127.0.0.1"
+      ],
+      "port": 8094
     },
     {
       "name": "vinii-design-gallery",
       "runtimeExecutable": "bash",
-      "runtimeArgs": ["-c", "cd vinii_partner && flutter run -d web-server --web-port 8091 --web-hostname 127.0.0.1 -t tool/gallery/main.dart"],
+      "runtimeArgs": [
+        "-c",
+        "cd vinii_partner && flutter run -d web-server --web-port 8091 --web-hostname 127.0.0.1 -t tool/gallery/main.dart"
+      ],
       "port": 8091
     },
     {
       "name": "vinii-dish-sheet",
       "runtimeExecutable": "bash",
-      "runtimeArgs": ["-c", "cd vinii_partner && flutter run -d web-server --web-port 8092 --web-hostname 127.0.0.1 -t tool/gallery/dish_sheet.dart"],
+      "runtimeArgs": [
+        "-c",
+        "cd vinii_partner && flutter run -d web-server --web-port 8092 --web-hostname 127.0.0.1 -t tool/gallery/dish_sheet.dart"
+      ],
       "port": 8092
     },
     {
       "name": "vinii-staff-gallery",
       "runtimeExecutable": "bash",
-      "runtimeArgs": ["-c", "cd vinii_partner && flutter run -d web-server --web-port 8093 --web-hostname 127.0.0.1 -t tool/gallery/staff.dart"],
+      "runtimeArgs": [
+        "-c",
+        "cd vinii_partner && flutter run -d web-server --web-port 8093 --web-hostname 127.0.0.1 -t tool/gallery/staff.dart"
+      ],
       "port": 8093
     }
   ]

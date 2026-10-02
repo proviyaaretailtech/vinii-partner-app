@@ -10,6 +10,7 @@ import '../../domain/guest_catalog.dart';
 import '../../domain/storefront.dart';
 import '../theme/guest_theme.dart';
 import '../widgets/rings.dart';
+import 'guest_nearby.dart';
 import 'look/look.dart';
 import 'look/motion.dart';
 
@@ -111,10 +112,23 @@ class GuestPage extends StatelessWidget {
     this.safeTop = true,
     this.stage = 0.5,
     this.maxWidth = 480,
+    this.alerts = false,
+    this.alertsTop = 58,
+    this.alertsEndInset = 0,
   });
 
   final Widget child;
   final Widget? bottom;
+
+  /// Floats the "what the tables around you are ordering" alert over this
+  /// page (menu-browsing pages only; never checkout or tracking).
+  final bool alerts;
+
+  /// How far down the alert floats, to clear this page's own header.
+  final double alertsTop;
+
+  /// Width of a side panel the alert must not centre across (the wide order panel).
+  final double alertsEndInset;
 
   /// How wide the content may be. A phone-width column by default; a screen
   /// that lays out two panes asks for more.
@@ -152,14 +166,22 @@ class GuestPage extends StatelessWidget {
               ),
             ),
     );
-    if (!lit) return scaffold;
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        GuestStage(intensity: stage!, drift: false),
-        scaffold,
-      ],
-    );
+    final page = lit
+        ? Stack(
+            fit: StackFit.expand,
+            children: [
+              GuestStage(intensity: stage!, drift: false),
+              scaffold,
+            ],
+          )
+        : scaffold;
+    return alerts
+        ? NearbyAlertHost(
+            topOffset: alertsTop,
+            endInset: alertsEndInset,
+            child: page,
+          )
+        : page;
   }
 }
 

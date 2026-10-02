@@ -252,6 +252,10 @@ Open, Paused and Closed for today use One Local's partner API as it is: `accepti
 
 ---
 
+### 4.6 Guest additions (nearby orders, tables like yours, coupon codes)
+
+**Status:** proposed on 2026-10-02, **not applied**. The guest storefront gained three things that need the server: a quick-add alert for what the tables around are ordering (`guest_nearby_orders`), a preview you can copy of a similar table's order (`guest_similar_table_orders`), and coupon codes at checkout (`guest_validate_coupon`, plus an optional `coupon_code` on `pos_place_order`). Their exact shapes, the privacy rules (nothing about a person ever leaves the server) and the suggested `coupons` and `coupon_redemptions` tables are in [`GUEST_SERVER_CONTRACT.md`](GUEST_SERVER_CONTRACT.md). Until the functions exist the phone shows none of the three. The only change to a function that already exists is the optional `coupon_code` in the `pos_place_order` payload, which the phone sends only when a guest applied a code.
+
 ## 5. Left for other owners (not changed here)
 
 - **Master (Repo-1-):**

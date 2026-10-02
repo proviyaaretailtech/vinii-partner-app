@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../../application/guest_session.dart';
 import '../../core/money.dart';
 import '../../domain/guest_catalog.dart';
 import '../theme/guest_theme.dart';
@@ -57,7 +59,7 @@ class _GuestBrowseScreenState extends State<GuestBrowseScreen> {
         Expanded(
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 300),
-            child: s.features.swipeDeck
+            child: s.browseView == GuestBrowseView.swipe
                 ? SwipeDeck(
                     key: ValueKey('deck-${_category?.category.id}'),
                     items: items,
@@ -82,8 +84,10 @@ class _GuestBrowseScreenState extends State<GuestBrowseScreen> {
         ),
       ],
     );
-    if (!wide) return GuestPage(child: browse);
+    if (!wide) return GuestPage(alerts: true, child: browse);
     return GuestPage(
+      alerts: true,
+      alertsEndInset: 380,
       maxWidth: double.infinity,
       child: Row(
         children: [
@@ -218,6 +222,65 @@ class _BudgetStrip extends StatelessWidget {
   }
 }
 
+/// The quick switch between swiping through dishes and the traditional menu
+/// of blocks. Two icons in one pill, the chosen one filled; it sits at the
+/// end of the category strip, under the thumb, and remembers the choice for
+/// the visit.
+class _ViewSwitch extends StatelessWidget {
+  const _ViewSwitch();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = GuestPalette.of(context);
+    final s = GuestScope.of(context);
+    Widget option(GuestBrowseView v, IconData icon, String label) {
+      final on = s.browseView == v;
+      return Semantics(
+        button: true,
+        selected: on,
+        label: label,
+        child: Tooltip(
+          message: label,
+          child: GestureDetector(
+            key: ValueKey('view-${v.name}'),
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              HapticFeedback.selectionClick();
+              s.setBrowseView(v);
+            },
+            child: AnimatedContainer(
+              duration: GuestMotion.base,
+              curve: GuestMotion.arrive,
+              width: 44,
+              height: 36,
+              decoration: BoxDecoration(
+                color: on ? p.accent : Colors.transparent,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Icon(icon, size: 20, color: on ? p.onAccent : p.inkMuted),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: p.surfaceAlt,
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          option(GuestBrowseView.swipe, Icons.style_rounded, 'Swipe dishes'),
+          option(GuestBrowseView.menu, Icons.view_agenda_rounded, 'Menu view'),
+        ],
+      ),
+    );
+  }
+}
+
 /// "All · Starters · Mains · Pizza" with an accent dot under the active one.
 class _CategoryStrip extends StatelessWidget {
   const _CategoryStrip({required this.selected, required this.onSelect});
@@ -229,51 +292,62 @@ class _CategoryStrip extends StatelessWidget {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
     final cats = <GuestCategory?>[null, ...s.catalog.categories];
+    final list = ListView.builder(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      itemCount: cats.length,
+      itemBuilder: (context, i) {
+        final c = cats[i];
+        final active = c?.category.id == selected?.category.id;
+        return InkWell(
+          onTap: () => onSelect(c),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  c?.category.name ?? 'All',
+                  style: p.body(
+                    14,
+                    weight: active ? FontWeight.w800 : FontWeight.w500,
+                    color: active ? p.ink : p.inkMuted,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOutCubic,
+                  width: active ? 18 : 0,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: p.accent,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
     return Container(
       height: 52,
       decoration: BoxDecoration(
         border: Border(top: BorderSide(color: p.border)),
       ),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        itemCount: cats.length,
-        itemBuilder: (context, i) {
-          final c = cats[i];
-          final active = c?.category.id == selected?.category.id;
-          return InkWell(
-            onTap: () => onSelect(c),
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    c?.category.name ?? 'All',
-                    style: p.body(
-                      14,
-                      weight: active ? FontWeight.w800 : FontWeight.w500,
-                      color: active ? p.ink : p.inkMuted,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    curve: Curves.easeOutCubic,
-                    width: active ? 18 : 0,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: p.accent,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+      child: s.canSwitchView
+          ? Row(
+              children: [
+                Expanded(child: list),
+                const Padding(
+                  padding: EdgeInsets.only(left: 4, right: 12),
+                  child: _ViewSwitch(),
+                ),
+              ],
+            )
+          : list,
     );
   }
 }

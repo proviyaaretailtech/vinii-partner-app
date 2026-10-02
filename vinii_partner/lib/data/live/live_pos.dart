@@ -118,6 +118,8 @@ class LivePos implements PosRepository {
               'waive_service_charge': true,
               'waive_reason': ?_blankToNull(draft.waiveReason),
             },
+            // A coupon is a request: the server decides (docs/GUEST_SERVER_CONTRACT.md).
+            if (draft.couponCode != null) 'coupon_code': draft.couponCode,
             // Intent only: ids and quantities. The server prices from the menu.
             'lines': [
               for (final l in draft.lines)

@@ -1,5 +1,34 @@
 # Proviyaa (workspace) — Development Journal
 
+## 2026-10-02 — VINII Partner: One order screen, a swipe/menu switch, coupon codes, nearby-order alerts and copy-a-table's-order
+
+**The guest's three near-identical order screens are now one "Your order" screen; guests can flip between swiping and the traditional menu with one tap; coupon codes, "what the tables around you are ordering" alerts and "tables like yours" (preview and copy) are built and shown on pretend data until the server exists. The Specials crash is fixed, and every internal staff login was tested.**
+
+- **Why:** After trying the gallery the founder reported a crash on Specials, asked for a quick switch between the swipe deck and the traditional menu, said Order, Review and Checkout were "all the same screens", that Table 12 must come from the QR code, and asked again for the live-table ideas from the original brief (alerts of what others order, copying a similar table's order) and coupon codes at checkout.
+- **Structural decisions:**
+  - **One screen instead of three.** Order, review and checkout showed the same dishes and totals three times, costing two taps. The alternative, keeping the boards' separate screens, lost for that reason. The ways of ordering are a switch at the top, and Place order shows the total.
+  - **The table is never asked.** It comes from the QR code (or the table staff handed the phone to); without one the guest is told to scan. The old "Table number" row is gone.
+  - **Coupons are the server's decision.** The phone sends the code and the cart, the server says what it takes off; the order is checked again when placed. The row appears only when the server offers coupons.
+  - **The two table-to-table features show nothing until the server shares anonymous data** (a dish, a quantity, a time, a label the server chose; never a name, phone, note or total). The alternative, the phone reading other tables' orders itself, lost on privacy and security.
+  - **No new storefront switches were added**, because the Master's CMS would drop keys it does not know; availability follows the server functions.
+  - **The Specials crash** came from the gallery's invented end time ("HH:59:00" instead of "HH:mm"); the parser is now tolerant too.
+- **What works now (pretend data in the design gallery; 494 automated checks pass):**
+  - A switch at the end of the category strip flips swipe and menu, remembered for the visit.
+  - One order screen with the switch of ways to order, notes, coupon, bill, budget and Place order. The traditional menu row no longer overflows with long descriptions.
+  - Coupons SAVE10, FLAT50, WELCOME in the gallery: refused with a reason, applied with its own bill line, taken off, re-checked when the cart changes.
+  - "Table 7 just ordered Paneer Tikka ×2 · Add" alert on browsing pages; "Tables like yours" cards (round dish pictures, table, total) opening a preview where each dish can be ticked, its quantity set, or added alone.
+  - Internal logins tested on the local test database: owner, admin, manager, cashier, captain, kitchen, viewer, no-restaurant, wrong password. Each sees the tabs and items its role allows.
+- **Left undone:**
+  - **Server pieces (yours):** `guest_nearby_orders`, `guest_similar_table_orders`, `guest_validate_coupon`, and `coupon_code` on `pos_place_order`; shapes and privacy rules are in `docs/GUEST_SERVER_CONTRACT.md`. The Master needs a Coupons page and per-feature switches.
+  - Studio's preview shows none of the three.
+  - Bill & GST and Table QR codes could only be checked for who can open them: the local test database has no such tables.
+  - New texts are English only; real fonts, touch and screen readers were not tried on a device.
+- **Open questions for the founder:**
+  1. Approve the three server functions, and who writes them?
+  2. In alerts, show "Table 7" or "A table near you"?
+  3. Should an owner be able to manage the team (today only an admin can)?
+  4. Should Studio's preview show these three with a clearly labelled example?
+
 ## 2026-10-02 — VINII Partner: Guest ordering redesigned with painted dishes, a payments page and wide-screen layouts
 
 **The guest's swipe-to-order experience now feels alive: every dish is a painted picture lit in a warm room (no more emoji), the swipe deck has depth and the price flies into the budget, success moments celebrate, and it fits a phone, a tablet and a counter screen. A payments page for Cashfree is built and tested against a pretend gateway; it cannot take real money until the server pieces exist.**

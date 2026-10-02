@@ -75,75 +75,86 @@ class DishRow extends StatelessWidget {
           ),
           const SizedBox(width: 14),
           Expanded(
-            child: SizedBox(
-              height: 116,
+            // At least as tall as the picture, taller when the words need it
+            // (a long description and tags): it grows, it never overflows.
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 116),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      FoodTypeMark(i.foodType, size: 13),
-                      if (i.foodType != null) const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          i.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: p.display(16.5, weight: FontWeight.w700),
-                        ),
+                      Row(
+                        children: [
+                          FoodTypeMark(i.foodType, size: 13),
+                          if (i.foodType != null) const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              i.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: p.display(16.5, weight: FontWeight.w700),
+                            ),
+                          ),
+                        ],
                       ),
+                      if ((i.description ?? '').trim().isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 3),
+                          child: Text(
+                            i.description!,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: p.body(12.5, color: p.inkMuted),
+                          ),
+                        ),
+                      if (item.tags.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: SizedBox(
+                            height: 24,
+                            child: ListView(
+                              scrollDirection: Axis.horizontal,
+                              children: [
+                                for (final t in item.tags)
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 6),
+                                    child: TagChip(t),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
                     ],
                   ),
-                  if ((i.description ?? '').trim().isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 3),
-                      child: Text(
-                        i.description!,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: p.body(12.5, color: p.inkMuted),
-                      ),
-                    ),
-                  if (item.tags.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: SizedBox(
-                        height: 24,
-                        child: ListView(
-                          scrollDirection: Axis.horizontal,
-                          children: [
-                            for (final t in item.tags)
-                              Padding(
-                                padding: const EdgeInsets.only(right: 6),
-                                child: TagChip(t),
-                              ),
-                          ],
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(rupees(i.price), style: p.price(18)),
                         ),
-                      ),
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 220),
+                          transitionBuilder: (child, a) =>
+                              ScaleTransition(scale: a, child: child),
+                          child: qty == 0
+                              ? _AddPill(
+                                  key: ValueKey('list-add-${i.id}'),
+                                  onTap: () => addWithHaptic(context, item),
+                                )
+                              : QtyStepper(
+                                  key: ValueKey('list-qty-${i.id}'),
+                                  qty: qty,
+                                  compact: true,
+                                  onChanged: (v) => s.setQty(i.id, v),
+                                ),
+                        ),
+                      ],
                     ),
-                  const Spacer(),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(rupees(i.price), style: p.price(18)),
-                      ),
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 220),
-                        transitionBuilder: (child, a) =>
-                            ScaleTransition(scale: a, child: child),
-                        child: qty == 0
-                            ? _AddPill(
-                                key: ValueKey('list-add-${i.id}'),
-                                onTap: () => addWithHaptic(context, item),
-                              )
-                            : QtyStepper(
-                                key: ValueKey('list-qty-${i.id}'),
-                                qty: qty,
-                                compact: true,
-                                onChanged: (v) => s.setQty(i.id, v),
-                              ),
-                      ),
-                    ],
                   ),
                 ],
               ),

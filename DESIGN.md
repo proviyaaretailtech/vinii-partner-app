@@ -252,6 +252,21 @@ Rounded and soft; nothing sharp except at the owner's request. Button shape is a
 ### Swipe deck (signature)
 Three cards with depth; the next card rises as the front card leaves. Dragging past 28% of width or a fling above 900px/s commits. ADD (green) or SKIP (red) stamps appear on the card at 26px with 3px tracking. The card carries photo or painted dish, badges (Bestseller, Chef Special), name, a short description, price, and a Details handle. On add the price flies into the budget ring (`fly.dart`), which pulses (1 to 1.045 over 360ms) and counts up.
 
+### Browse switch
+Two icons in one pill at the end of the category strip: swipe cards and menu rows. The chosen one is filled with the accent; each icon is a 44 × 36 target in a pill with 3px padding and radius 22. The choice lasts the visit. It is absent when the restaurant has turned the deck off (the menu is then the only view).
+
+### Traditional menu (block menu)
+A picture block 104 × 116 on the left; on the right the name with its veg mark, two lines of description, tag pills, the price and an Add pill that becomes a stepper. A row is at least as tall as its picture and grows with its words, so a long description never overflows it.
+
+### Your order (one screen)
+Order, review and checkout are one screen, in this order: a switch for the ways of ordering (only those the restaurant offers), the dishes with steppers, the table as a quiet line, a note for the kitchen, a coupon row when the server takes coupons, the estimated bill, the table budget, and the Place order button with the total in its label. The table is never asked: it comes from the QR code, and without one the guest is told to scan it.
+
+### Mode switch
+A segmented control with 4px padding and radius 18; its segments are 44px high with radius 14, the chosen one filled with the accent.
+
+### Coupon row
+One card, three states: a quiet "Have a coupon code?" row; a field with an Apply button (the server's reason in the danger colour underneath when a code does not apply); and "CODE applied" with what it saves and a Remove button. The bill gives the discount its own line, named "Coupon CODE". The phone never works the discount out: the server does.
+
 ### Item detail sheet
 A 28px-radius sheet rising over the picture, lit (`surfaceLit`) on a dark page and the page colour on a light one, so it rises off the picture instead of sitting as a flat slab. Its rounded top is drawn on the picture's own sliver (a viewport paints the first sliver over the next), the picture is clipped so its parallax never covers the title, and the sheet runs to the bottom bar however short the words are. Price in the accent, badges, ingredient chips (a tone dot and the name, never letters standing in for pictures), collapsible allergen and nutrition rows, and a pinned bar with a quantity stepper and the add button showing the running price.
 
@@ -273,6 +288,7 @@ A circular progress with the percent inside, "used" caption in success green unt
 - **Do** set prices bold with tabular figures.
 - **Do** keep one signature interaction (the swipe deck and the price flying into the budget) and let everything else stay quiet.
 - **Do** go two-pane at 900px and above, with the live order in the right column.
+- **Do** take what the QR code already knows (the table) from the QR code, and say it once as a quiet line.
 
 ### Don't:
 - **Don't** use emoji as food or as icons; use photos, painted art and the Material icon set.
@@ -282,6 +298,7 @@ A circular progress with the percent inside, "used" caption in success green unt
 - **Don't** use gradient text.
 - **Don't** use rainbow category tiles or dead flat black cards.
 - **Don't** float a phone column in empty space on a wide screen.
+- **Don't** ask the guest to type or pick a table, or to confirm the same order on three screens in a row.
 - **Don't** faux-bold a script face or use one as body text.
 - **Don't** make the staff app inherit this look: the staff app (`staff_theme.dart`, `ViniiTokens`) is a separate, plainer Operate-mode system with its own tokens and the VINII green (#76EC00) accepting state. It is not documented here.
 

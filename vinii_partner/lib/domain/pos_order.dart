@@ -131,6 +131,8 @@ class PosOrderDraft {
     this.charges = BillCharges.defaults,
     this.waiveServiceCharge = false,
     this.waiveReason,
+    this.couponCode,
+    this.couponDiscount = 0,
   });
 
   /// False = "Save & hold": the order is saved without a kitchen ticket
@@ -164,10 +166,19 @@ class PosOrderDraft {
   /// Why, in the manager's words. Optional; sent only with a waiver.
   final String? waiveReason;
 
+  /// A coupon code the guest asked to use. Intent only: the server checks it
+  /// again when it prices the order (it goes as `coupon_code`, only when set).
+  final String? couponCode;
+
+  /// What the server said that code takes off when the guest applied it, so
+  /// the preview bill matches. The server's own figure on the order wins.
+  final num couponDiscount;
+
   /// Preview only — the server's total is the one that counts.
   BillSummary get bill => BillSummary.of(
     lines.map((l) => (unitPrice: l.unitPrice, qty: l.qty)),
     charges: charges,
+    discount: couponDiscount,
     waiveServiceCharge: waiveServiceCharge,
   );
 

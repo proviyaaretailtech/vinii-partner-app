@@ -59,7 +59,7 @@ void main() {
     await settle(tester);
     expect(find.text('Nothing here yet'), findsNothing);
     expect(find.text('Paneer Tikka'), findsWidgets);
-    expect(find.text('Continue to review'), findsOneWidget);
+    expect(find.text('Review and place order'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

@@ -69,6 +69,7 @@ Future<void> _boot(
   Fixture fixture, {
   Size size = _phone,
   bool online = true,
+  Duration nearbyEvery = const Duration(hours: 1),
 }) async {
   GuestPalette.remoteFonts = false;
   tester.view.physicalSize = size * 2;
@@ -86,7 +87,11 @@ Future<void> _boot(
         home: GuestApp(
           definition: fixture.definition,
           menu: fixture.menu,
-          gateway: GalleryGateway(online: online),
+          gateway: GalleryGateway.forFixture(
+            fixture,
+            online: online,
+            nearbyEvery: nearbyEvery,
+          ),
           table: const DiningTable(id: 'gallery-t12', label: '12'),
         ),
       ),
@@ -161,9 +166,23 @@ void main() {
     await _start(tester);
     await _shot(tester, 'g-budget');
     await _tapText(tester, 'Save & continue');
+    await _settle(tester, 800);
     await _shot(tester, 'g-categories');
+
+    // Specials: chef's picks and the offers that end today.
+    await tester.tap(find.byTooltip('Specials'));
+    await _settle(tester, 1800);
+    await _shot(tester, 'g-specials');
+    await _back(tester);
+
     await _tapText(tester, 'All dishes');
     await _shot(tester, 'g-deck');
+    // The quick switch to the traditional menu, and back.
+    await _tapKey(tester, 'view-menu');
+    await _settle(tester, 600);
+    await _shot(tester, 'g-menu');
+    await _tapKey(tester, 'view-swipe');
+    await _settle(tester, 600);
 
     // The top card opens the dish: ingredients are plain words now.
     final card = find.byWidgetPredicate(
@@ -183,9 +202,27 @@ void main() {
     await _settle(tester, 1600);
     await _tapText(tester, 'View order (1)');
     await _shot(tester, 'g-order');
-    await _tapText(tester, 'Continue to review');
-    await _tapText(tester, 'Proceed to checkout');
-    await _shot(tester, 'g-checkout');
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -420));
+    await _settle(tester, 600);
+    await _shot(tester, 'g-order-2');
+
+    // A coupon: one the server refuses (the food is under the minimum),
+    // then one that applies.
+    await _tapKey(tester, 'coupon-open');
+    await tester.enterText(
+      find.byKey(const ValueKey('coupon-field')),
+      'SAVE10',
+    );
+    await _tapKey(tester, 'coupon-apply');
+    await _settle(tester, 900);
+    await _shot(tester, 'g-order-coupon-refused');
+    await tester.enterText(
+      find.byKey(const ValueKey('coupon-field')),
+      'FLAT50',
+    );
+    await _tapKey(tester, 'coupon-apply');
+    await _settle(tester, 900);
+    await _shot(tester, 'g-order-coupon-applied');
     await _drain(tester);
   }, skip: skip);
 
@@ -196,8 +233,6 @@ void main() {
     await _tapKey(tester, 'deck-add');
     await _settle(tester, 1600);
     await _tapText(tester, 'View order (1)');
-    await _tapText(tester, 'Continue to review');
-    await _tapText(tester, 'Proceed to checkout');
     await _tapKey(tester, 'place-order');
     await _settle(tester, 900);
     await _shot(tester, 'g-placed');
@@ -245,12 +280,23 @@ void main() {
     await _tapKey(tester, 'deck-add');
     await _settle(tester, 1600);
     await _tapText(tester, 'View order (1)');
-    await _tapText(tester, 'Continue to review');
-    await _tapText(tester, 'Proceed to checkout');
     await _tapKey(tester, 'place-order');
     await _settle(tester, 2400);
     await _toBill(tester);
     await _shot(tester, 'g-bill-offline');
+    await _drain(tester);
+  }, skip: skip);
+
+  testWidgets('bistro: an empty order and a narrow phone', (tester) async {
+    await _boot(tester, Fixture.bistro());
+    await _intoDeck(tester);
+    await _tapText(tester, 'All dishes');
+    await _tapKey(tester, 'deck-add');
+    await _settle(tester, 1600);
+    await _tapText(tester, 'View order (1)');
+    await _tapText(tester, 'Clear all');
+    await _settle(tester, 800);
+    await _shot(tester, 'g-order-empty');
     await _drain(tester);
   }, skip: skip);
 
@@ -273,8 +319,12 @@ void main() {
     await _tapKey(tester, 'deck-add');
     await _settle(tester, 1600);
     await _tapText(tester, 'View order (1)');
-    await _tapText(tester, 'Continue to review');
-    await _tapText(tester, 'Proceed to checkout');
+    await _shot(tester, 'c-order');
+    // The bakery also takes pre-orders: the ways of ordering are a switch.
+    await _tapKey(tester, 'mode-preOrder');
+    await _settle(tester, 500);
+    await _shot(tester, 'c-order-preorder');
+    await _tapKey(tester, 'mode-dineIn');
     await _tapKey(tester, 'place-order');
     await _settle(tester, 2400);
     await _shot(tester, 'c-placed');

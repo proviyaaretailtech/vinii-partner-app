@@ -174,9 +174,10 @@ class GuestOrderPanel extends StatelessWidget {
                     ),
                     const SizedBox(height: 14),
                     GuestButton(
-                      label: 'Continue to review',
+                      key: const ValueKey('panel-review'),
+                      label: 'Review and place order',
                       trailingArrow: true,
-                      onTap: () => GuestFlow.toReview(context),
+                      onTap: () => GuestFlow.toOrder(context),
                     ),
                   ],
                 ),

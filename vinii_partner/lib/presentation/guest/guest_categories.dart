@@ -8,6 +8,7 @@ import '../widgets/dish_art.dart';
 import '../widgets/food_art.dart';
 import 'guest_effects.dart';
 import 'guest_flow.dart';
+import 'guest_similar.dart';
 import 'guest_widgets.dart';
 import 'look/look.dart';
 import 'look/motion.dart';
@@ -30,6 +31,8 @@ class GuestCategoriesScreen extends StatelessWidget {
     // A wide screen shows more tiles per row; the wheel stays a carousel.
     final wide = MediaQuery.sizeOf(context).width >= 900;
     return GuestPage(
+      alerts: true,
+      alertsTop: 56,
       maxWidth: wide ? (wheel ? 640 : 1040) : 480,
       bottom: s.lines.isEmpty ? null : const CartBar(),
       child: Column(
@@ -64,6 +67,8 @@ class GuestCategoriesScreen extends StatelessWidget {
               style: wheel ? p.hero(30) : p.display(28),
             ),
           ),
+          // What tables like yours had, when the restaurant shares it.
+          const SimilarTablesStrip(),
           Expanded(child: wheel ? const _Wheel() : const _Grid()),
         ],
       ),

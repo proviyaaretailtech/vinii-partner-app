@@ -1099,13 +1099,22 @@ class LimitedOffer {
   /// "HH:mm" local time, every day.
   final String endsAt;
 
-  DateTime endsOn(DateTime day) => DateTime(
-    day.year,
-    day.month,
-    day.day,
-    int.parse(endsAt.substring(0, 2)),
-    int.parse(endsAt.substring(3)),
-  );
+  /// When the offer ends on [day]. A stored value that is not "HH:mm" (a
+  /// stray "HH:mm:ss", or text from another writer) reads as far as it can
+  /// and otherwise as 18:00, as [fromJson] does: it must never crash the
+  /// guest's specials page.
+  DateTime endsOn(DateTime day) {
+    final m = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(endsAt.trim());
+    final h = int.tryParse(m?.group(1) ?? '') ?? 18;
+    final min = int.tryParse(m?.group(2) ?? '') ?? 0;
+    return DateTime(
+      day.year,
+      day.month,
+      day.day,
+      h.clamp(0, 23),
+      min.clamp(0, 59),
+    );
+  }
 
   Map<String, dynamic> toJson() => {'item_id': itemId, 'ends_at': endsAt};
 

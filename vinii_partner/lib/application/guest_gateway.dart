@@ -4,7 +4,9 @@ import '../core/failure.dart';
 import '../data/backend.dart';
 import '../domain/billing.dart';
 import '../domain/pos_order.dart';
+import 'guest_coupons.dart';
 import 'guest_payments.dart';
+import 'guest_social.dart';
 
 /// How the guest storefront runtime reaches the outside world. The runtime
 /// itself (`presentation/guest/`) never touches a repository directly, so
@@ -32,6 +34,19 @@ abstract class GuestOrderGateway {
   /// call them from the screen). Wired when the payment functions exist (see
   /// docs/PAYMENTS_CASHFREE.md).
   GuestPayments? get payments => null;
+
+  /// Orders as they happen at the tables around this one, for the quick-add
+  /// alerts. Null (nothing is shown) until the server function exists
+  /// (docs/GUEST_SERVER_CONTRACT.md).
+  GuestNearby? get nearby => null;
+
+  /// Recent orders of tables with a similar party, to preview and copy. Null
+  /// until the server function exists.
+  GuestSimilarTables? get similarTables => null;
+
+  /// Coupon codes at checkout. Null until the server function exists; the
+  /// coupon row is then not shown.
+  GuestCoupons? get coupons => null;
 
   /// Whether guest feedback can be stored. There is no feedback table or
   /// endpoint yet, so every gateway says no and the guest screens hide the

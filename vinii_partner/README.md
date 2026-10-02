@@ -13,7 +13,7 @@ cp .env.local.example .env.local   # fill SUPABASE_URL and SUPABASE_PUBLISHABLE_
 
 The launcher passes only whitelisted keys as `--dart-define` and refuses anything else, so a service-role key can never be compiled into the app. There is no sample data: the app shows only what is in the Supabase project it points at.
 
-Against the local One Local dev database (docker): `VINII_ENV_FILE=.env.localdb ./tool/run_local.sh`. That replica has no row-level-security policies; `tool/local_db/emulate_production_rls.sql` copies production's member policies onto it (local only; undo script alongside).
+Against the local One Local dev database (docker; start OrbStack, then the One Local stack): `VINII_ENV_FILE=.env.localdb ./tool/run_local.sh`, or the `vinii-partner-local` entry in `.claude/launch.json` (port 8094). `python3 tool/local_db/seed_test_logins.py` creates one login per staff role there (owner, admin, manager, cashier, captain, kitchen, viewer, and one with no restaurant); the shared test password is `TEST_PASSWORD` in that file. The default `.env.local` points at the live database: do not use the test logins there. That replica has no row-level-security policies; `tool/local_db/emulate_production_rls.sql` copies production's member policies onto it (local only; undo script alongside).
 
 ## Design gallery
 
@@ -23,7 +23,7 @@ Against the local One Local dev database (docker): `VINII_ENV_FILE=.env.localdb 
 flutter run -d web-server --web-port 8091 -t tool/gallery/main.dart
 ```
 
-Open `http://localhost:8091/?t=bistro` (also `artisan`, `fresh`). Optional: `table=12`, `pay=0` (hide online payment), `fakecf=1` (run the real web checkout code against a pretend Cashfree script instead of the simulated dialog).
+Open `http://localhost:8091/?t=bistro` (also `artisan`, `fresh`). Optional: `table=12` (stands for scanning that table's QR code), `pay=0` (hide online payment), `coupons=0`, `nearby=0` and `similar=0` (hide those three), `fakecf=1` (run the real web checkout code against a pretend Cashfree script instead of the simulated dialog). The gallery's pretend coupon codes are `SAVE10` (10% off from ₹300), `FLAT50` (₹50 off from ₹250) and `WELCOME` (₹30 off).
 
 The invented restaurants and the stand-in order and payment services live in `tool/gallery/gallery_kit.dart` (plain Dart, so the test runner can load it too); `main.dart` only adds the browser-only part.
 

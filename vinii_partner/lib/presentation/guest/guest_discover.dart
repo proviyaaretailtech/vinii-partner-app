@@ -33,6 +33,8 @@ class GuestDiscoverScreen extends StatelessWidget {
         if (i.tags.contains('Bestseller') && !shown.contains(i.item.id)) i,
     ];
     return GuestPage(
+      alerts: !waiting,
+      alertsTop: 64,
       bottom: s.lines.isEmpty ? null : const CartBar(),
       child: ListView(
         padding: const EdgeInsets.only(bottom: 24),

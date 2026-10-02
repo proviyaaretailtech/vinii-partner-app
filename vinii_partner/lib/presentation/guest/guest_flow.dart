@@ -6,7 +6,6 @@ import 'guest_bill.dart';
 import 'guest_browse.dart';
 import 'guest_budget.dart';
 import 'guest_categories.dart';
-import 'guest_confirm.dart';
 import 'guest_discover.dart';
 import 'guest_item_detail.dart';
 import 'guest_mode.dart';
@@ -21,8 +20,8 @@ import 'guest_widgets.dart';
 /// "what comes next?" here instead of knowing the storefront's settings:
 ///
 /// Welcome → [mode] → [pre-order slot] → [party & budget] → categories →
-/// deck ↔ detail ↔ budget ↔ discover → order → review → confirm → placed →
-/// tracking → served → bill → order more.
+/// deck or menu ↔ detail ↔ budget ↔ discover → order (one screen: review and
+/// place) → placed → tracking → served → bill → order more.
 class GuestFlow {
   const GuestFlow._();
 
@@ -82,12 +81,6 @@ class GuestFlow {
 
   static void toOrder(BuildContext context) =>
       _push<void>(context, const GuestOrderScreen());
-
-  static void toReview(BuildContext context) =>
-      _push<void>(context, const GuestReviewScreen());
-
-  static void toConfirm(BuildContext context) =>
-      _push<void>(context, const GuestConfirmScreen());
 
   /// After a successful place: the history behind is dropped, so "back"
   /// never returns to a cart that was already sent.

@@ -169,9 +169,9 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('deck-add')));
     await settle(tester, ms: 1600);
     await tapText(tester, 'View order (1)');
-    await tapText(tester, 'Add to pre-order');
-    await tapText(tester, 'Proceed to checkout');
-    expect(find.text('Select dining mode'), findsOneWidget);
+    // One screen: the ways of ordering sit at the top, Place order at the bottom.
+    expect(find.byKey(const ValueKey('mode-preOrder')), findsOneWidget);
+    expect(find.byKey(const ValueKey('mode-dineIn')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('place-order')));
     await settle(tester, ms: 1500);
 
@@ -197,8 +197,6 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('deck-add')));
     await settle(tester, ms: 1600);
     await tapText(tester, 'View order (1)');
-    await tapText(tester, 'Continue to review');
-    await tapText(tester, 'Proceed to checkout');
     await tester.tap(find.byKey(const ValueKey('place-order')));
     await settle(tester, ms: 1500);
     await tapText(tester, 'Track order');
@@ -260,8 +258,6 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('deck-add')));
     await settle(tester, ms: 1600);
     await tapText(tester, 'View order (1)');
-    await tapText(tester, 'Continue to review');
-    await tapText(tester, 'Proceed to checkout');
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Your name'),
       'Asha',
@@ -343,8 +339,6 @@ void main() {
       });
       await step(() => tapText(tester, 'Keep exploring'));
       await step(() => tapText(tester, 'View order (1)'));
-      await step(() => tapText(tester, 'Continue to review'));
-      await step(() => tapText(tester, 'Proceed to checkout'));
       await step(() async {
         await tester.tap(find.byKey(const ValueKey('place-order')));
         await settle(tester, ms: 1500);
