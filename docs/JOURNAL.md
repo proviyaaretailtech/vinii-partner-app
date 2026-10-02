@@ -1,5 +1,37 @@
 # Proviyaa (workspace) — Development Journal
 
+## 2026-10-02 — VINII Partner: Forensic map of how the phone POS handles orders today
+
+**Wrote a 14-part, read-only map of exactly how VINII Partner creates and processes orders, kitchen tickets and payments today. No code, database or data was changed.**
+
+- **Why:** before the POS is connected to anything else, the founder needs the true current state rather than the intended design.
+- **Structural decisions:** none; this was an audit only. The findings that matter:
+  - **The phone cannot create an order, take a payment or change an order today.** Each of those buttons calls a database function that no migration defines, so it shows "Not available yet".
+  - **The only working order path is One Local delivery orders.** The phone accepts, rejects, readies and delivers them through One Local's server.
+  - **The app has none of the following:**
+    - offline mode or sync
+    - live updates (screens refresh by checking every few seconds)
+    - stock or inventory
+    - printer, scanner, cash drawer or card terminal (the only printing is table QR sheets)
+  - **Duplicates:**
+    - One Local orders also appear in the Sell tab's "Open orders", and stay there all day after delivery.
+    - There are two pricing rules: a fixed 5% GST plus the delivery fee, against the restaurant's own bill settings.
+    - There are two item on/off switches.
+    - The delivery fee is counted inside the restaurant's cash payment record.
+  - **Security:**
+    - The database lets any staff member change prices, orders and payments directly; only the app's hidden buttons stop them.
+    - Any signed-in person can advance another restaurant's order counter and replace another restaurant's menu photos.
+- **What works now:** `ARCHITECTURE_AUDIT/01_DATABASE.md` to `14_APPLICATION_SUMMARY.md`, with file and line references for every claim. The summary answers the sixteen questions asked.
+- **Left undone:**
+  - The live database was not queried; only the 22 Sep column snapshot was used.
+  - The Windows POS and the web console were not audited, although they write the same tables.
+  - The app's tests were not run.
+  - Nothing was fixed, as instructed.
+- **Open questions for the founder:**
+  - Should a delivered One Local order end as "paid", so it leaves the counter's open list?
+  - Should the restaurant's payment record exclude One Local's delivery fee?
+  - May someone run a read-only check of production's functions and access rules to confirm the gaps?
+
 ## 2026-10-02 — VINII Partner: Veg, non-veg and Jain filters on the guest menu
 
 **The guest menu now has All / Veg / Non-veg / Jain chips under the header, so a party can see only what they eat.**
