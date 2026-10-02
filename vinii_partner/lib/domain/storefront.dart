@@ -1026,6 +1026,7 @@ const storefrontTags = [
   'Seasonal',
   'New',
   'Vegan',
+  'Jain',
   'Gluten-free',
 ];
 

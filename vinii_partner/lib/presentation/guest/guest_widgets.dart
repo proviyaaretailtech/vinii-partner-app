@@ -544,6 +544,7 @@ class TagChip extends StatelessWidget {
     'seasonal' => Icons.eco_rounded,
     'new' => Icons.auto_awesome_rounded,
     'vegan' => Icons.eco_rounded,
+    'jain' => Icons.spa_rounded,
     'gluten-free' => Icons.grass_rounded,
     'vegetarian' => Icons.spa_rounded,
     _ => null,

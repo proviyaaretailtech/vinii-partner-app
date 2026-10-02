@@ -4,7 +4,9 @@ import 'package:flutter/services.dart';
 import '../../application/guest_session.dart';
 import '../../core/money.dart';
 import '../../domain/guest_catalog.dart';
+import '../../domain/menu.dart';
 import '../theme/guest_theme.dart';
+import '../widgets/chips.dart';
 import 'guest_categories.dart';
 import 'guest_deck.dart';
 import 'guest_flow.dart';
@@ -44,7 +46,10 @@ class _GuestBrowseScreenState extends State<GuestBrowseScreen> {
   @override
   Widget build(BuildContext context) {
     final s = GuestScope.of(context);
-    final items = _category?.items ?? s.catalog.allItems;
+    final items = [
+      for (final i in _category?.items ?? s.catalog.allItems)
+        if (s.diet.allows(i)) i,
+    ];
     final label = _category?.category.name ?? 'All dishes';
     // A wide screen keeps the order in view beside the deck.
     final wide = MediaQuery.sizeOf(context).width >= 1000;
@@ -56,22 +61,29 @@ class _GuestBrowseScreenState extends State<GuestBrowseScreen> {
             key: _stripKey,
             child: _BudgetStrip(landed: _landed),
           ),
+        if (s.dietOptions.length > 1) const _DietBar(),
         Expanded(
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 300),
-            child: s.browseView == GuestBrowseView.swipe
-                ? SwipeDeck(
-                    key: ValueKey('deck-${_category?.category.id}'),
-                    items: items,
-                    categoryName: label,
-                    budgetTarget: _stripKey,
-                    onLanded: () => _landed.value++,
-                  )
-                : DishList(
-                    key: ValueKey('list-${_category?.category.id}'),
-                    items: items,
-                  ),
-          ),
+          child: items.isEmpty
+              ? const _NoMatch()
+              : AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: s.browseView == GuestBrowseView.swipe
+                      ? SwipeDeck(
+                          key: ValueKey(
+                            'deck-${_category?.category.id}-${s.diet.name}',
+                          ),
+                          items: items,
+                          categoryName: label,
+                          budgetTarget: _stripKey,
+                          onLanded: () => _landed.value++,
+                        )
+                      : DishList(
+                          key: ValueKey(
+                            'list-${_category?.category.id}-${s.diet.name}',
+                          ),
+                          items: items,
+                        ),
+                ),
         ),
         if (s.lines.isNotEmpty && !wide)
           const Padding(
@@ -216,6 +228,111 @@ class _BudgetStrip extends StatelessWidget {
               Icon(Icons.chevron_right_rounded, color: p.inkMuted),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "All · Veg · Non-veg · Jain": a row of chips under the header, only for
+/// the diets that actually split this menu. The marks match the dish marks
+/// (green dot veg, red triangle non-veg).
+class _DietBar extends StatelessWidget {
+  const _DietBar();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = GuestPalette.of(context);
+    final s = GuestScope.of(context);
+    Widget mark(GuestDiet d) => switch (d) {
+      GuestDiet.veg => const FoodTypeMark(FoodType.veg, size: 14),
+      GuestDiet.nonVeg => const FoodTypeMark(FoodType.nonVeg, size: 14),
+      GuestDiet.jain => Icon(Icons.spa_rounded, size: 16, color: p.success),
+      GuestDiet.all => const SizedBox.shrink(),
+    };
+    return SizedBox(
+      height: 48,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        children: [
+          for (final d in s.dietOptions)
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: Semantics(
+                button: true,
+                selected: s.diet == d,
+                label: d.label,
+                child: GestureDetector(
+                  key: ValueKey('diet-${d.name}'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    s.setDiet(d);
+                  },
+                  child: AnimatedContainer(
+                    duration: GuestMotion.base,
+                    curve: GuestMotion.arrive,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: s.diet == d ? p.accent : p.surfaceAlt,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (d != GuestDiet.all) ...[
+                          mark(d),
+                          const SizedBox(width: 6),
+                        ],
+                        Text(
+                          d.label,
+                          style: p.body(
+                            13.5,
+                            weight: FontWeight.w700,
+                            color: s.diet == d ? p.onAccent : p.ink,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NoMatch extends StatelessWidget {
+  const _NoMatch();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = GuestPalette.of(context);
+    final s = GuestScope.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Nothing ${s.diet.label.toLowerCase()} here',
+              style: p.display(20),
+            ),
+            const SizedBox(height: 12),
+            TextButton(
+              key: const ValueKey('diet-clear'),
+              onPressed: () => s.setDiet(GuestDiet.all),
+              child: Text(
+                'Show everything',
+                style: p.body(15, weight: FontWeight.w700),
+              ),
+            ),
+          ],
         ),
       ),
     );

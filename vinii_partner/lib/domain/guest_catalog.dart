@@ -109,4 +109,8 @@ class GuestItem {
 
   /// Chips on the card: "Bestseller" (from the POS flag) plus Studio's tags.
   final List<String> tags;
+
+  /// Marked "Jain" by the restaurant (a Studio/CMS tag; the POS has no field
+  /// for it).
+  bool get isJain => tags.any((t) => t.trim().toLowerCase() == 'jain');
 }

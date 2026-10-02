@@ -469,11 +469,12 @@ class Fixture {
           ),
           'i-penne': ItemPresentation(
             itemId: 'i-penne',
-            tags: ['Chef Special'],
+            tags: ['Chef Special', 'Jain'],
             ingredients: ['Tomato', 'Basil', 'Garlic', 'Pasta'],
             allergens: ['Gluten'],
             kcal: 410,
           ),
+          'i-corn': ItemPresentation(itemId: 'i-corn', tags: ['Jain']),
           'i-biryani': ItemPresentation(
             itemId: 'i-biryani',
             tags: ['Spicy'],

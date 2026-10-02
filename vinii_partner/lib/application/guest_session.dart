@@ -18,6 +18,27 @@ import 'guest_similar.dart';
 /// traditional menu of blocks. The guest can switch at any time.
 enum GuestBrowseView { swipe, menu }
 
+/// What the guest eats: filters the menu. Jain comes from the restaurant's
+/// "Jain" tag; veg and non-veg from each dish's food type (eggs count as
+/// non-veg here).
+enum GuestDiet {
+  all('All'),
+  veg('Veg'),
+  nonVeg('Non-veg'),
+  jain('Jain');
+
+  const GuestDiet(this.label);
+  final String label;
+
+  bool allows(GuestItem i) => switch (this) {
+    GuestDiet.all => true,
+    GuestDiet.veg => i.item.foodType == FoodType.veg,
+    GuestDiet.nonVeg =>
+      i.item.foodType == FoodType.nonVeg || i.item.foodType == FoodType.egg,
+    GuestDiet.jain => i.isJain,
+  };
+}
+
 /// One guest party's visit, from "Start exploring" to the bill: what they
 /// chose, their budget, their cart and the orders they placed. Screens of the
 /// guest runtime read and change only this; it reaches the outside world only
@@ -85,6 +106,25 @@ class GuestSession extends ChangeNotifier {
 
   // ── Choices ───────────────────────────────────────────────────────────
   GuestServiceMode mode;
+
+  GuestDiet _diet = GuestDiet.all;
+  GuestDiet get diet => _diet;
+  void setDiet(GuestDiet d) {
+    if (_diet == d) return;
+    _diet = d;
+    _notify();
+  }
+
+  /// The diets worth offering: only those that split this menu.
+  List<GuestDiet> get dietOptions {
+    final all = catalog.allItems;
+    return [
+      for (final d in GuestDiet.values)
+        if (d == GuestDiet.all ||
+            (all.any(d.allows) && all.any((i) => !d.allows(i))))
+          d,
+    ];
+  }
 
   GuestBrowseView? _browseView;
 

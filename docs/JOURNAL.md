@@ -1,5 +1,15 @@
 # Proviyaa (workspace) — Development Journal
 
+## 2026-10-02 — VINII Partner: Veg, non-veg and Jain filters on the guest menu
+
+**The guest menu now has All / Veg / Non-veg / Jain chips under the header, so a party can see only what they eat.**
+
+- **Why:** The founder asked for clear veg / non-veg differentiators and a Jain option, and for the CMS to stay in step.
+- **Structural decisions:** Veg and non-veg come from each dish's food type, which the POS already stores (eggs count as non-veg here). The POS has no Jain field, and adding one is a database change, so Jain is a **"Jain" tag** on the dish in the storefront record that Studio and the Master's CMS already share. Alternative, a new database column, lost because migrations are yours and a tag works today. A chip only appears when it actually splits the menu (no Jain chip if no dish is tagged).
+- **What works now:** the chips on the menu and the swipe deck, a "Show everything" way out when a filter matches nothing, and a Jain tag chip on dishes. "Jain" is now a suggested tag in the phone's dish editor. The gallery has two dishes tagged Jain.
+- **Left undone:** the Master's website must offer "Jain" in its own tag list for owners to pick it (typed tags already work). Dishes are only as Jain as the restaurant says; the app does not check ingredients. Filter text is English only.
+- **Open questions for the founder:** should Jain also hide dishes with onion/garlic ingredients automatically, or stay a restaurant decision? Do you want a real food-type value for Jain in the POS later?
+
 ## 2026-10-02 — VINII Partner: One order screen, a swipe/menu switch, coupon codes, nearby-order alerts and copy-a-table's-order
 
 **The guest's three near-identical order screens are now one "Your order" screen; guests can flip between swiping and the traditional menu with one tap; coupon codes, "what the tables around you are ordering" alerts and "tables like yours" (preview and copy) are built and shown on pretend data until the server exists. The Specials crash is fixed, and every internal staff login was tested.**

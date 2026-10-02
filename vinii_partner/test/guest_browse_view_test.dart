@@ -155,4 +155,74 @@ void main() {
     session.setBrowseView(GuestBrowseView.swipe);
     expect(session.browseView, GuestBrowseView.menu);
   });
+
+  group('diet', () {
+    // Paneer Tikka (veg), Chicken Biryani (non-veg), Brownie (no type).
+    testWidgets('veg and non-veg chips narrow the menu; clearing restores it', (
+      tester,
+    ) async {
+      await pumpGuest(
+        tester,
+        definition: storefront(features: noBudget.copyWith(swipeDeck: false)),
+        gateway: RecordingGateway(),
+        table: table12,
+      );
+      await openAllDishes(tester);
+      expect(find.byKey(const ValueKey('diet-veg')), findsOneWidget);
+      expect(find.byKey(const ValueKey('diet-nonVeg')), findsOneWidget);
+      // No dish is marked Jain here, so there is no Jain chip.
+      expect(find.byKey(const ValueKey('diet-jain')), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('diet-veg')));
+      await settle(tester);
+      expect(find.text('Paneer Tikka'), findsOneWidget);
+      expect(find.text('Chicken Biryani'), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('diet-nonVeg')));
+      await settle(tester);
+      expect(find.text('Chicken Biryani'), findsOneWidget);
+      expect(find.text('Paneer Tikka'), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('diet-all')));
+      await settle(tester);
+      expect(find.text('Paneer Tikka'), findsOneWidget);
+      expect(find.text('Chicken Biryani'), findsOneWidget);
+    });
+
+    testWidgets('a dish tagged Jain gets a Jain chip and filter', (
+      tester,
+    ) async {
+      final def = storefront(features: noBudget.copyWith(swipeDeck: false))
+          .copyWith(
+            items: const {
+              'i-paneer': ItemPresentation(itemId: 'i-paneer', tags: ['Jain']),
+            },
+          );
+      await pumpGuest(
+        tester,
+        definition: def,
+        gateway: RecordingGateway(),
+        table: table12,
+      );
+      await openAllDishes(tester);
+      await tester.tap(find.byKey(const ValueKey('diet-jain')));
+      await settle(tester);
+      expect(find.text('Paneer Tikka'), findsOneWidget);
+      expect(find.text('Chicken Biryani'), findsNothing);
+      expect(find.text('Jain'), findsWidgets);
+    });
+
+    testWidgets('a filter that matches nothing offers to show everything', (
+      tester,
+    ) async {
+      final session = GuestSession(
+        definition: storefront(features: noBudget),
+        menu: menu,
+        gateway: RecordingGateway(),
+      );
+      addTearDown(session.dispose);
+      expect(session.dietOptions, contains(GuestDiet.veg));
+      expect(session.dietOptions, isNot(contains(GuestDiet.jain)));
+    });
+  });
 }
