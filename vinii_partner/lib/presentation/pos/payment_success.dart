@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/money.dart';
+import '../../l10n/l10n.dart';
 import '../theme/staff_theme.dart';
 
 /// The moment after the last rupee is taken. Calm on purpose: a check mark
@@ -97,7 +98,7 @@ class PaymentSuccess extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        'Give back change',
+                        context.l10n.paySuccessGiveBackChange,
                         style: TextStyle(
                           color: t.ink,
                           fontWeight: FontWeight.w600,
@@ -128,7 +129,7 @@ class PaymentSuccess extends StatelessWidget {
                 minimumSize: const Size(64, 56),
               ),
               onPressed: onNewOrder,
-              child: const Text('New order'),
+              child: Text(context.l10n.paySuccessNewOrder),
             ),
           ],
         ),

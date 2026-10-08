@@ -13,6 +13,7 @@ class LiveTables implements TablesRepository {
   LiveTables(this.b);
   final LiveBackend b;
 
+  // i18n-ignore: English fallback of AppFailure table_issue_not_ready
   static const _notReady =
       'Issuing table codes from the phone needs a database update that is '
       'waiting for approval. Until then, issue codes from the VINII control '
@@ -66,6 +67,7 @@ class LiveTables implements TablesRepository {
       throw fromSupabase(
         e,
         notReady: 'Tables are not set up in this database yet.',
+        notReadyCode: 'table_list_not_ready',
       );
     }
   }
@@ -83,12 +85,14 @@ class LiveTables implements TablesRepository {
       if (row is! Map) {
         throw const AppFailure(
           'The server sent a table in a shape this app does not understand.',
+          code: 'table_bad_shape',
         );
       }
       final token = _token(row['qr_token']);
       if (token == null) {
         throw const AppFailure(
           'The server did not send back a code. Try again.',
+          code: 'table_no_code_returned',
         );
       }
       return TableCode(
@@ -102,7 +106,11 @@ class LiveTables implements TablesRepository {
         sortOrder: table.sortOrder,
       );
     } catch (e) {
-      throw fromSupabase(e, notReady: _notReady);
+      throw fromSupabase(
+        e,
+        notReady: _notReady,
+        notReadyCode: 'table_issue_not_ready',
+      );
     }
   }
 

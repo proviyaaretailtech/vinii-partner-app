@@ -28,6 +28,7 @@ class Routes {
   static const menuCategories = '/menu/categories';
   static String storefrontSection(String key) => '/storefront/section/$key';
   static const about = '/more/about';
+  static const language = '/more/language';
   static const billSettings = '/more/bill';
   static const team = '/more/team';
   static const tableCodes = '/more/tables';

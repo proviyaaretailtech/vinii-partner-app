@@ -7,6 +7,7 @@ import '../../core/money.dart';
 import '../../core/time_format.dart';
 import '../../domain/delivery_order.dart';
 import '../../domain/staff.dart';
+import '../../l10n/l10n.dart';
 import '../theme/staff_theme.dart';
 import '../widgets/chips.dart';
 import '../widgets/slide_to_confirm.dart';
@@ -89,18 +90,19 @@ class _DeliveryOrderScreenState extends State<DeliveryOrderScreen> {
     final reason = await showRejectSheet(context);
     if (reason == null || !mounted) return;
     final inbox = AppScope.of(context).inbox;
-    await _act((o) => inbox.reject(o, reason), 'Order rejected.');
+    await _act((o) => inbox.reject(o, reason), context.l10n.ordersRejectedDone);
   }
 
   @override
   Widget build(BuildContext context) {
     final o = _order;
+    final l = context.l10n;
     return Scaffold(
       appBar: AppBar(
-        title: Text(o?.displayNo ?? 'Order'),
+        title: Text(o?.displayNo ?? l.commonOrder),
         actions: [
           IconButton(
-            tooltip: 'Refresh',
+            tooltip: l.commonRefresh,
             onPressed: _loading ? null : _load,
             icon: const Icon(Icons.refresh_rounded),
           ),
@@ -109,7 +111,7 @@ class _DeliveryOrderScreenState extends State<DeliveryOrderScreen> {
       body: o == null
           ? (_failure != null && !_loading
                 ? FailureView(failure: _failure!, onRetry: _load)
-                : const LoadingView(label: 'Loading order…'))
+                : LoadingView(label: l.ordersLoadingOrder))
           : RefreshIndicator(
               onRefresh: _load,
               child: _Body(order: o),
@@ -129,6 +131,7 @@ class _DeliveryOrderScreenState extends State<DeliveryOrderScreen> {
     final inbox = services.inbox;
     final s = services.session;
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final busy = inbox.busy.contains(o.id);
 
     Widget? child;
@@ -141,7 +144,7 @@ class _DeliveryOrderScreenState extends State<DeliveryOrderScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Ready in',
+                l.ordersReadyIn,
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
                   color: t.inkSecondary,
@@ -153,46 +156,49 @@ class _DeliveryOrderScreenState extends State<DeliveryOrderScreen> {
                 onChanged: (m) => setState(() => _prep = m),
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: t.danger,
-                        side: BorderSide(
-                          color: t.danger.withValues(alpha: 0.4),
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: t.danger,
+                          side: BorderSide(
+                            color: t.danger.withValues(alpha: 0.4),
+                          ),
                         ),
+                        onPressed: busy ? null : _reject,
+                        child: Text(l.ordersReject),
                       ),
-                      onPressed: busy ? null : _reject,
-                      child: const Text('Reject'),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: ViniiColors.brandGreen,
-                        foregroundColor: ViniiColors.ink,
-                      ),
-                      onPressed: busy
-                          ? null
-                          : () => _act(
-                              (x) => inbox.accept(x, prep),
-                              'Accepted. Ready in $prep min.',
-                            ),
-                      child: busy
-                          ? const SizedBox.square(
-                              dimension: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: ViniiColors.ink,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: ViniiColors.brandGreen,
+                          foregroundColor: ViniiColors.ink,
+                        ),
+                        onPressed: busy
+                            ? null
+                            : () => _act(
+                                (x) => inbox.accept(x, prep),
+                                l.ordersAcceptedDone(minutes: prep),
                               ),
-                            )
-                          : Text('Accept · $prep min'),
+                        child: busy
+                            ? const SizedBox.square(
+                                dimension: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: ViniiColors.ink,
+                                ),
+                              )
+                            : Text(l.ordersAcceptWithPrep(minutes: prep)),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           );
@@ -200,31 +206,30 @@ class _DeliveryOrderScreenState extends State<DeliveryOrderScreen> {
       case DeliveryStatus.accepted:
         if (s.can(Capability.markReady)) {
           child = SlideToConfirm(
-            label: 'Mark ready',
+            label: l.ordersMarkReady,
             color: t.success,
             busy: busy,
-            onConfirmed: () =>
-                _act(inbox.markReady, 'Marked ready for pickup.'),
+            onConfirmed: () => _act(inbox.markReady, l.ordersMarkedReadyDone),
           );
         }
       case DeliveryStatus.packed:
         if (s.can(Capability.dispatchOrders)) {
           child = SlideToConfirm(
-            label: 'Out for delivery',
+            label: l.ordersSlideOut,
             color: ViniiColors.purple,
             busy: busy,
-            onConfirmed: () => _act(inbox.markOut, 'On the way.'),
+            onConfirmed: () => _act(inbox.markOut, l.ordersOnTheWayDone),
           );
         }
       case DeliveryStatus.out:
         if (s.can(Capability.dispatchOrders)) {
           child = SlideToConfirm(
-            label: 'Delivered · cash ${rupees(o.total)} collected',
+            label: l.ordersSlideDelivered(amount: rupees(o.total)),
             color: ViniiColors.brandGreen,
             busy: busy,
             onConfirmed: () => _act(
               inbox.markDelivered,
-              'Delivered. ${rupees(o.total)} cash recorded.',
+              l.ordersDeliveredDone(amount: rupees(o.total)),
             ),
           );
         }
@@ -234,7 +239,7 @@ class _DeliveryOrderScreenState extends State<DeliveryOrderScreen> {
     }
 
     child ??= Text(
-      'Your role can view this order. A manager or biller moves it on.',
+      l.ordersViewOnlyRole,
       textAlign: TextAlign.center,
       style: TextStyle(color: t.inkMuted, fontSize: 13.5),
     );
@@ -263,6 +268,7 @@ class _Body extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final o = order;
     final notes = o.notes?.trim();
     return ListView(
@@ -275,7 +281,9 @@ class _Body extends StatelessWidget {
           NoticeBanner(
             icon: Icons.cancel_outlined,
             tone: t.danger,
-            message: 'Cancelled: ${o.cancelReason}',
+            message: l.ordersCancelledBanner(
+              reason: cancelReasonLabel(l, o.cancelReason!),
+            ),
           ),
         ],
         if (o.prepMinutes != null &&
@@ -285,8 +293,7 @@ class _Body extends StatelessWidget {
           NoticeBanner(
             icon: Icons.timer_outlined,
             tone: t.warning,
-            message:
-                'Prep time: ${o.prepMinutes} min (the customer sees this).',
+            message: l.ordersPrepTimeBanner(minutes: o.prepMinutes!),
           ),
         ],
         const SizedBox(height: 12),
@@ -294,7 +301,7 @@ class _Body extends StatelessWidget {
         if (notes != null && notes.isNotEmpty) ...[
           const SizedBox(height: 12),
           SectionCard(
-            title: 'Customer note',
+            title: l.ordersCustomerNote,
             color: t.tint(t.warning),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -318,31 +325,33 @@ class _Body extends StatelessWidget {
         ],
         const SizedBox(height: 12),
         SectionCard(
-          title: itemCountLabel(o.itemCount),
+          title: itemCountLabel(l, o.itemCount),
           child: Column(
             children: [for (final l in o.items) DeliveryLineRow(l)],
           ),
         ),
         const SizedBox(height: 12),
         SectionCard(
-          title: 'Bill',
+          title: l.commonBill,
           child: Column(
             children: [
-              AmountRow('Subtotal', rupees(o.subtotal)),
-              AmountRow('GST', rupees(o.gst)),
-              AmountRow('Delivery fee', rupees(o.deliveryFee)),
+              AmountRow(l.commonSubtotal, rupees(o.subtotal)),
+              AmountRow(l.ordersGst, rupees(o.gst)),
+              AmountRow(l.ordersDeliveryFee, rupees(o.deliveryFee)),
               Divider(height: 18, color: t.border),
-              AmountRow('Total', rupees(o.total), strong: true),
+              AmountRow(l.commonTotal, rupees(o.total), strong: true),
               const SizedBox(height: 6),
               Row(
                 children: [
                   Icon(Icons.payments_outlined, size: 18, color: t.success),
                   const SizedBox(width: 8),
-                  Text(
-                    o.payment,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: t.success,
+                  Expanded(
+                    child: Text(
+                      orderPaymentLabel(l, o.payment),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: t.success,
+                      ),
                     ),
                   ),
                 ],
@@ -353,7 +362,7 @@ class _Body extends StatelessWidget {
         if (o.events.isNotEmpty) ...[
           const SizedBox(height: 12),
           SectionCard(
-            title: 'Timeline',
+            title: l.ordersTimeline,
             child: _Timeline(events: o.events),
           ),
         ],
@@ -370,6 +379,7 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final o = order;
     final outlet = AppScope.of(context).inbox.outlet;
     return SectionCard(
@@ -379,21 +389,27 @@ class _Header extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                // A wrap, not a row: a longer status word moves under the
+                // number instead of overflowing.
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Flexible(
-                      child: Text(
-                        o.displayNo,
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
+                    Text(
+                      o.displayNo,
+                      style: Theme.of(context).textTheme.headlineSmall,
                     ),
-                    const SizedBox(width: 10),
                     StatusChip.delivery(context, o.status),
                   ],
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Placed ${clockTime(o.placedAt)} · ${timeAgo(o.placedAt)} · ${o.channel}',
+                  l.ordersPlacedLine(
+                    time: clockTime(o.placedAt),
+                    ago: timeAgo(l, o.placedAt),
+                    channel: o.channel,
+                  ),
                   style: TextStyle(color: t.inkSecondary, fontSize: 13.5),
                 ),
               ],
@@ -418,11 +434,12 @@ class _Customer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final o = order;
     final phone = o.customerPhone?.trim();
     final place = o.address ?? o.area;
     return SectionCard(
-      title: 'Customer',
+      title: l.commonCustomer,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -432,14 +449,14 @@ class _Customer extends StatelessWidget {
                 radius: 20,
                 backgroundColor: t.surfaceMuted,
                 child: Text(
-                  firstName(o.customerName).substring(0, 1).toUpperCase(),
+                  firstName(l, o.customerName).substring(0, 1).toUpperCase(),
                   style: TextStyle(fontWeight: FontWeight.w800, color: t.ink),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  o.customerName,
+                  customerDisplayName(l, o.customerName),
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -466,12 +483,12 @@ class _Customer extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Copy number',
+                  tooltip: l.ordersCopyNumber,
                   icon: const Icon(Icons.copy_rounded, size: 20),
                   onPressed: () async {
                     await Clipboard.setData(ClipboardData(text: phone));
                     if (context.mounted) {
-                      showDone(context, 'Phone number copied.');
+                      showDone(context, l.ordersNumberCopied);
                     }
                   },
                 ),
@@ -517,6 +534,7 @@ class _Timeline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final sorted = [...events]..sort((a, b) => a.at.compareTo(b.at));
     return Column(
       children: [
@@ -557,7 +575,7 @@ class _Timeline extends StatelessWidget {
                           children: [
                             Expanded(
                               child: Text(
-                                e.label,
+                                orderEventLabel(l, e),
                                 style: TextStyle(
                                   fontWeight: FontWeight.w700,
                                   color: t.ink,

@@ -7,6 +7,8 @@ import '../../application/menu_editor.dart';
 import '../../core/money.dart';
 import '../../domain/menu.dart';
 import '../../domain/staff.dart';
+import '../../l10n/failure_text.dart';
+import '../../l10n/l10n.dart';
 import '../theme/staff_theme.dart';
 import '../widgets/chips.dart';
 import '../widgets/food_art.dart';
@@ -72,18 +74,19 @@ class _MenuScreenState extends State<MenuScreen> {
     return ListenableBuilder(
       listenable: _c,
       builder: (context, _) {
+        final l = context.l10n;
         final menu = _c.menu;
         final isEmpty =
             menu != null && menu.categories.isEmpty && menu.items.isEmpty;
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Menu'),
+            title: Text(l.commonMenu),
             actions: [
               if (menu != null)
                 TextButton.icon(
                   onPressed: () => context.push(Routes.menuCategories),
                   icon: const Icon(Icons.segment_rounded, size: 20),
-                  label: const Text('Categories'),
+                  label: Text(l.menuCategories),
                 ),
               const SizedBox(width: 8),
             ],
@@ -92,7 +95,7 @@ class _MenuScreenState extends State<MenuScreen> {
               ? FloatingActionButton.extended(
                   onPressed: _newItem,
                   icon: const Icon(Icons.add_rounded),
-                  label: const Text('Add item'),
+                  label: Text(l.menuAddItem),
                 )
               : null,
           body: _body(menu, isEmpty: isEmpty, canEdit: canEdit),
@@ -110,7 +113,7 @@ class _MenuScreenState extends State<MenuScreen> {
       if (_c.failure != null && !_c.loading) {
         return FailureView(failure: _c.failure!, onRetry: _c.load);
       }
-      return const LoadingView(label: 'Loading your menu…');
+      return LoadingView(label: context.l10n.menuLoading);
     }
     if (isEmpty) {
       return RefreshIndicator(
@@ -145,6 +148,7 @@ class _MenuScreenState extends State<MenuScreen> {
 
   Widget _header(MenuSnapshot menu) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final soldOut = menu.items.where((i) => !i.isAvailable).length;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
@@ -156,12 +160,12 @@ class _MenuScreenState extends State<MenuScreen> {
             onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
             textInputAction: TextInputAction.search,
             decoration: InputDecoration(
-              hintText: 'Search dishes',
+              hintText: l.menuSearchHint,
               prefixIcon: const Icon(Icons.search_rounded),
               suffixIcon: _query.isEmpty
                   ? null
                   : IconButton(
-                      tooltip: 'Clear search',
+                      tooltip: l.menuSearchClear,
                       icon: const Icon(Icons.close_rounded),
                       onPressed: () {
                         _search.clear();
@@ -171,25 +175,33 @@ class _MenuScreenState extends State<MenuScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              _Stat(label: 'Dishes', value: '${menu.items.length}'),
-              const SizedBox(width: 8),
-              _Stat(label: 'Categories', value: '${menu.categories.length}'),
-              const SizedBox(width: 8),
-              _Stat(
-                label: 'Sold out',
-                value: '$soldOut',
-                color: soldOut > 0 ? t.danger : null,
-              ),
-            ],
+          // Stretch so the three boxes stay one height when a longer
+          // translation wraps in one of them.
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _Stat(label: l.menuStatDishes, value: '${menu.items.length}'),
+                const SizedBox(width: 8),
+                _Stat(
+                  label: l.menuCategories,
+                  value: '${menu.categories.length}',
+                ),
+                const SizedBox(width: 8),
+                _Stat(
+                  label: l.menuSoldOut,
+                  value: '$soldOut',
+                  color: soldOut > 0 ? t.danger : null,
+                ),
+              ],
+            ),
           ),
           if (_c.failure != null) ...[
             const SizedBox(height: 12),
             NoticeBanner(
               icon: Icons.sync_problem_rounded,
               tone: t.warning,
-              message: 'Could not refresh. ${_c.failure!.message}',
+              message: l.menuRefreshFailed(reason: failureText(l, _c.failure!)),
             ),
           ],
         ],
@@ -203,6 +215,7 @@ class _MenuScreenState extends State<MenuScreen> {
       (i.description?.toLowerCase().contains(_query) ?? false);
 
   List<Widget> _sections(MenuSnapshot menu, {required bool canEdit}) {
+    final l = context.l10n;
     final canToggle = _can(Capability.toggleAvailability);
     final groups = <({MenuCategory? category, List<MenuItem> items})>[
       for (final c in _c.categories) (category: c, items: menu.itemsIn(c.id)),
@@ -225,10 +238,13 @@ class _MenuScreenState extends State<MenuScreen> {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: PanelLabel(
-              '${g.category?.name ?? 'Uncategorised'} · ${g.items.length}',
+              l.menuCategoryHeading(
+                name: g.category?.name ?? l.menuUncategorised,
+                count: g.items.length,
+              ),
               trailing: canEdit && g.category != null && _query.isEmpty
                   ? _SmallAction(
-                      label: 'Add',
+                      label: l.commonAdd,
                       onTap: () => _newItem(categoryId: g.category!.id),
                     )
                   : null,
@@ -272,8 +288,8 @@ class _MenuScreenState extends State<MenuScreen> {
           hasScrollBody: false,
           child: EmptyView(
             icon: Icons.search_off_rounded,
-            title: 'No dishes match "${_search.text.trim()}"',
-            message: 'Try another word, or clear the search.',
+            title: l.menuNoMatchTitle(query: _search.text.trim()),
+            message: l.menuNoMatchMessage,
           ),
         ),
       );
@@ -358,7 +374,7 @@ class _ItemRow extends StatelessWidget {
                       if (item.isRecommended) const BestsellerMark(),
                       if (off)
                         Text(
-                          'Sold out',
+                          context.l10n.menuSoldOut,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
@@ -371,7 +387,7 @@ class _ItemRow extends StatelessWidget {
               ),
             ),
             Semantics(
-              label: 'Available',
+              label: context.l10n.menuAvailable,
               child: Switch(
                 value: item.isAvailable,
                 onChanged: canToggle ? onToggle : null,
@@ -403,7 +419,7 @@ class BestsellerMark extends StatelessWidget {
           Icon(Icons.star_rounded, size: 12, color: t.warning),
           const SizedBox(width: 3),
           Text(
-            'Bestseller',
+            context.l10n.menuBestseller,
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
@@ -496,12 +512,12 @@ class _EmptyCategoryRow extends StatelessWidget {
     return ListTile(
       leading: Icon(Icons.restaurant_outlined, color: t.inkMuted),
       title: Text(
-        'No dishes in this category yet',
+        context.l10n.menuCategoryEmpty,
         style: TextStyle(color: t.inkMuted, fontSize: 14),
       ),
       trailing: onAdd == null
           ? null
-          : TextButton(onPressed: onAdd, child: const Text('Add a dish')),
+          : TextButton(onPressed: onAdd, child: Text(context.l10n.menuAddDish)),
     );
   }
 }
@@ -521,6 +537,7 @@ class _EmptyMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
     final text = Theme.of(context).textTheme;
+    final l = context.l10n;
     return Padding(
       padding: const EdgeInsets.all(32),
       child: Column(
@@ -541,15 +558,13 @@ class _EmptyMenu extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           Text(
-            'Your menu is empty',
+            l.menuEmptyTitle,
             textAlign: TextAlign.center,
             style: text.titleLarge,
           ),
           const SizedBox(height: 8),
           Text(
-            canEdit
-                ? 'Add a category first, then your dishes. The POS, One Local and your storefront all sell from this one menu.'
-                : 'Nothing on the menu yet. An owner or manager can add dishes.',
+            canEdit ? l.menuEmptyBodyEditor : l.menuEmptyBodyViewer,
             textAlign: TextAlign.center,
             style: text.bodyMedium,
           ),
@@ -560,7 +575,7 @@ class _EmptyMenu extends StatelessWidget {
               child: FilledButton.icon(
                 onPressed: onAddCategory,
                 icon: const Icon(Icons.create_new_folder_outlined),
-                label: const Text('Add a category'),
+                label: Text(l.menuAddACategory),
               ),
             ),
             const SizedBox(height: 10),
@@ -569,7 +584,7 @@ class _EmptyMenu extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: onAddDish,
                 icon: const Icon(Icons.add_rounded),
-                label: const Text('Add a dish'),
+                label: Text(l.menuAddDish),
               ),
             ),
           ],

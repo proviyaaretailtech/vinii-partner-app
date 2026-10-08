@@ -191,9 +191,6 @@ class StaffRole {
   /// "Manager", "KOT / Kitchen".
   final String name;
   final String? description;
-
-  /// What this role can do in this app, in plain words.
-  String get summary => roleSummary(slug);
 }
 
 /// One row of `org_users`: a person on this restaurant's team.
@@ -246,79 +243,140 @@ class TeamMember {
   );
 }
 
-/// What a role can do in this app, in plain words, built from the same
-/// [capabilityRoles] table the screens ask, so the sentence can never drift
-/// from what the buttons do. Strong abilities come first and swallow the
-/// weaker ones they include ("edit the menu" covers "see the menu").
-String roleSummary(String roleSlug) {
+/// One thing a role can do in this app, as a code with no words in it. The
+/// Team screen turns each into a phrase in the reader's language
+/// (lib/presentation/team/role_summary_l10n.dart); [roleSummary] keeps the
+/// English sentence for tests and logs.
+enum RoleAbility {
+  manageTeam,
+  changeBillSettings,
+  publishStorefront,
+  editStorefront,
+  editMenu,
+  switchDishes,
+  changeStoreStatus,
+  waiveServiceCharge,
+  takePayments,
+  takeTableOrders,
+  acceptDeliveryOrders,
+  markFoodReady,
+  seeDeliveryOrders,
+  seeMenu,
+  seeBillSettings,
+}
+
+/// Strongest ability first. Each row: the capability that earns it, the
+/// ability, and the weaker capabilities it makes redundant ("edit the menu"
+/// covers "see the menu").
+const _abilityTable = <(Capability, RoleAbility, List<Capability>)>[
+  (Capability.manageTeam, RoleAbility.manageTeam, [Capability.viewTeam]),
+  (
+    Capability.editBillSettings,
+    RoleAbility.changeBillSettings,
+    [Capability.viewBillSettings],
+  ),
+  (
+    Capability.publishStorefront,
+    RoleAbility.publishStorefront,
+    [Capability.editStorefront, Capability.viewStorefront],
+  ),
+  (
+    Capability.editStorefront,
+    RoleAbility.editStorefront,
+    [Capability.viewStorefront],
+  ),
+  (
+    Capability.editMenu,
+    RoleAbility.editMenu,
+    [Capability.toggleAvailability, Capability.viewMenu],
+  ),
+  (
+    Capability.toggleAvailability,
+    RoleAbility.switchDishes,
+    [Capability.viewMenu],
+  ),
+  (Capability.toggleOutlet, RoleAbility.changeStoreStatus, []),
+  (Capability.waiveServiceCharge, RoleAbility.waiveServiceCharge, []),
+  (Capability.takePayment, RoleAbility.takePayments, []),
+  (Capability.sell, RoleAbility.takeTableOrders, [Capability.handToGuest]),
+  (
+    Capability.acceptOrders,
+    RoleAbility.acceptDeliveryOrders,
+    [Capability.viewOrders],
+  ),
+  (Capability.markReady, RoleAbility.markFoodReady, []),
+  (Capability.viewOrders, RoleAbility.seeDeliveryOrders, []),
+  (Capability.viewMenu, RoleAbility.seeMenu, []),
+  (Capability.viewBillSettings, RoleAbility.seeBillSettings, []),
+];
+
+/// What a role can do in this app, strongest first, built from the same
+/// [capabilityRoles] table the screens ask, so the list can never drift from
+/// what the buttons do. Strong abilities swallow the weaker ones they include
+/// ("edit the menu" covers "see the menu"). Empty when the role has nothing in
+/// this app.
+List<RoleAbility> roleAbilities(String roleSlug) {
   bool has(Capability c) => capabilityRoles[c]?.contains(roleSlug) ?? false;
 
-  const phrases = <(Capability, String, List<Capability>)>[
-    (Capability.manageTeam, 'manage the team', [Capability.viewTeam]),
-    (
-      Capability.editBillSettings,
-      'change the bill and GST settings',
-      [Capability.viewBillSettings],
-    ),
-    (
-      Capability.publishStorefront,
-      'publish the guest storefront',
-      [Capability.editStorefront, Capability.viewStorefront],
-    ),
-    (
-      Capability.editStorefront,
-      'edit the guest storefront',
-      [Capability.viewStorefront],
-    ),
-    (
-      Capability.editMenu,
-      'edit the menu',
-      [Capability.toggleAvailability, Capability.viewMenu],
-    ),
-    (
-      Capability.toggleAvailability,
-      'switch dishes on and off',
-      [Capability.viewMenu],
-    ),
-    (Capability.toggleOutlet, 'change the store status', []),
-    (
-      Capability.waiveServiceCharge,
-      'remove the service charge from a bill',
-      [],
-    ),
-    (Capability.takePayment, 'take payments', []),
-    (Capability.sell, 'take table orders', [Capability.handToGuest]),
-    (
-      Capability.acceptOrders,
-      'accept delivery orders',
-      [Capability.viewOrders],
-    ),
-    (Capability.markReady, 'mark food ready', []),
-    (Capability.viewOrders, 'see delivery orders', []),
-    (Capability.viewMenu, 'see the menu', []),
-    (Capability.viewBillSettings, 'see the bill settings', []),
-  ];
-
   final covered = <Capability>{};
-  final said = <String>[];
-  for (final (cap, phrase, includes) in phrases) {
+  final said = <RoleAbility>[];
+  for (final (cap, ability, includes) in _abilityTable) {
     if (!has(cap) || covered.contains(cap)) continue;
-    said.add(phrase);
+    said.add(ability);
     covered.addAll(includes);
   }
-  if (said.isEmpty) return 'Cannot use Orders, Sell or Menu in this app.';
+  return said;
+}
+
+/// The English sentence for [roleAbilities], for tests and logs only: a
+/// person reads `roleSummaryText` (role_summary_l10n.dart) in their language.
+String roleSummary(String roleSlug) {
+  final said = roleAbilities(roleSlug);
+  if (said.isEmpty) return 'Cannot use Orders, Sell or Menu in this app.'; // i18n-ignore: English for tests/logs
 
   const show = 3;
-  final shown = said.take(show).toList();
+  final shown = [for (final a in said.take(show)) _englishPhrase(a)];
   final String list;
   if (said.length > show) {
-    list = '${shown.join(', ')} and more';
+    list =
+        '${shown.join(', ')} and more'; // i18n-ignore: English for tests/logs
   } else if (shown.length == 1) {
     list = shown.single;
   } else {
     list =
         '${shown.sublist(0, shown.length - 1).join(', ')}'
-        ' and ${shown.last}';
+        ' and ${shown.last}'; // i18n-ignore: English for tests/logs
   }
-  return 'Can $list.';
+  return 'Can $list.'; // i18n-ignore: English for tests/logs
 }
+
+String _englishPhrase(RoleAbility a) => switch (a) {
+  RoleAbility.manageTeam =>
+    'manage the team', // i18n-ignore: English for tests/logs
+  RoleAbility.changeBillSettings =>
+    'change the bill and GST settings', // i18n-ignore: English for tests/logs
+  RoleAbility.publishStorefront =>
+    'publish the guest storefront', // i18n-ignore: English for tests/logs
+  RoleAbility.editStorefront =>
+    'edit the guest storefront', // i18n-ignore: English for tests/logs
+  RoleAbility.editMenu =>
+    'edit the menu', // i18n-ignore: English for tests/logs
+  RoleAbility.switchDishes =>
+    'switch dishes on and off', // i18n-ignore: English for tests/logs
+  RoleAbility.changeStoreStatus =>
+    'change the store status', // i18n-ignore: English for tests/logs
+  RoleAbility.waiveServiceCharge => 'remove the service charge from a bill', // i18n-ignore: English for tests/logs
+  RoleAbility.takePayments =>
+    'take payments', // i18n-ignore: English for tests/logs
+  RoleAbility.takeTableOrders =>
+    'take table orders', // i18n-ignore: English for tests/logs
+  RoleAbility.acceptDeliveryOrders =>
+    'accept delivery orders', // i18n-ignore: English for tests/logs
+  RoleAbility.markFoodReady =>
+    'mark food ready', // i18n-ignore: English for tests/logs
+  RoleAbility.seeDeliveryOrders =>
+    'see delivery orders', // i18n-ignore: English for tests/logs
+  RoleAbility.seeMenu => 'see the menu', // i18n-ignore: English for tests/logs
+  RoleAbility.seeBillSettings =>
+    'see the bill settings', // i18n-ignore: English for tests/logs
+};

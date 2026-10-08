@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/l10n.dart';
+import '../../l10n/script_fonts.dart';
 import '../theme/staff_theme.dart';
 
 /// A setting you switch ON or OFF: the whole row is the target, the state is
@@ -45,7 +47,7 @@ class SettingSwitchRow extends StatelessWidget {
                             color: enabled ? t.ink : t.inkSecondary,
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
-                            height: 1.25,
+                            height: scriptLineHeight(1.25),
                           ),
                         ),
                         if (subtitle != null) ...[
@@ -55,7 +57,7 @@ class SettingSwitchRow extends StatelessWidget {
                             style: TextStyle(
                               color: t.inkSecondary,
                               fontSize: 13.5,
-                              height: 1.35,
+                              height: scriptLineHeight(1.35),
                             ),
                           ),
                         ],
@@ -63,16 +65,22 @@ class SettingSwitchRow extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  SizedBox(
-                    width: 30,
+                  // A minimum, not a fixed width: the word is longer in some
+                  // languages.
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(minWidth: 30),
                     child: Text(
-                      value ? 'ON' : 'OFF',
+                      value ? context.l10n.commonOn : context.l10n.commonOff,
                       textAlign: TextAlign.end,
                       style: TextStyle(
                         color: value ? t.success : t.inkSecondary,
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
-                        letterSpacing: 0.4,
+                        // Letter spacing pulls Devanagari conjuncts apart.
+                        letterSpacing:
+                            Localizations.localeOf(context).languageCode == 'hi'
+                            ? 0
+                            : 0.4,
                       ),
                     ),
                   ),
@@ -125,7 +133,7 @@ class ChoiceSegments<T> extends StatelessWidget {
               for (final (value, label) in options)
                 ButtonSegment<T>(
                   value: value,
-                  label: Text(label, maxLines: 1, softWrap: false),
+                  label: Text(label, textAlign: TextAlign.center),
                 ),
             ],
             selected: {?selected},
@@ -144,6 +152,7 @@ class ChoiceSegments<T> extends StatelessWidget {
               minimumSize: const Size(0, 48),
               textStyle: const TextStyle(
                 fontFamily: 'Inter',
+                fontFamilyFallback: kScriptFontFallback,
                 fontWeight: FontWeight.w700,
                 fontSize: 14,
               ),

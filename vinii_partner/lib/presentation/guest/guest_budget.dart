@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/money.dart';
 import '../../domain/billing.dart';
+import '../../l10n/l10n.dart';
 import '../theme/guest_theme.dart';
 import '../widgets/food_art.dart';
 import 'guest_flow.dart';
@@ -47,6 +48,7 @@ class _GuestBudgetScreenState extends State<GuestBudgetScreen> {
 
   Future<void> _edit() async {
     final p = GuestPalette.of(context);
+    final l = context.l10n;
     final b = GuestScope.read(context).features.budget;
     final ctl = TextEditingController(text: _amount.round().toString());
     final v = await showDialog<double>(
@@ -54,7 +56,7 @@ class _GuestBudgetScreenState extends State<GuestBudgetScreen> {
       useRootNavigator: false,
       builder: (context) => AlertDialog(
         backgroundColor: p.surface,
-        title: Text('Total budget', style: p.display(20)),
+        title: Text(l.guestBudgetTotal, style: p.display(20)),
         content: TextField(
           controller: ctl,
           autofocus: true,
@@ -68,12 +70,15 @@ class _GuestBudgetScreenState extends State<GuestBudgetScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: Text('Cancel', style: p.body(15)),
+            child: Text(l.commonCancel, style: p.body(15)),
           ),
           TextButton(
             onPressed: () =>
                 Navigator.of(context).pop(double.tryParse(ctl.text)),
-            child: Text('Set', style: p.body(15, weight: FontWeight.w700)),
+            child: Text(
+              l.guestBudgetSet,
+              style: p.body(15, weight: FontWeight.w700),
+            ),
           ),
         ],
       ),
@@ -91,11 +96,12 @@ class _GuestBudgetScreenState extends State<GuestBudgetScreen> {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
     final t = GuestCopy.of(context);
+    final l = context.l10n;
     final b = s.features.budget;
     final divisions = ((b.max - b.min) / b.step).round();
     return GuestPage(
       bottom: GuestButton(
-        label: t('budget.cta'),
+        label: t.own('budget.cta') ?? l.guestBudgetSaveContinue,
         onTap: () => _done(save: true),
       ),
       child: ListView(
@@ -106,7 +112,7 @@ class _GuestBudgetScreenState extends State<GuestBudgetScreen> {
               TextButton(
                 onPressed: () => _done(save: false),
                 child: Text(
-                  'Skip',
+                  l.commonSkip,
                   style: p.body(15, weight: FontWeight.w700, color: p.inkMuted),
                 ),
               ),
@@ -115,7 +121,10 @@ class _GuestBudgetScreenState extends State<GuestBudgetScreen> {
           Reveal(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
-              child: Text(t('budget.title'), style: p.display(30)),
+              child: Text(
+                t.own('budget.title') ?? l.guestBudgetTitle,
+                style: p.display(30),
+              ),
             ),
           ),
           Reveal(
@@ -123,7 +132,7 @@ class _GuestBudgetScreenState extends State<GuestBudgetScreen> {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
               child: Text(
-                t('budget.subtitle'),
+                t.own('budget.subtitle') ?? l.guestBudgetSubtitle,
                 style: p.body(15, color: p.inkMuted),
               ),
             ),
@@ -137,7 +146,10 @@ class _GuestBudgetScreenState extends State<GuestBudgetScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Total budget', style: p.body(14, color: p.inkMuted)),
+                    Text(
+                      l.guestBudgetTotal,
+                      style: p.body(14, color: p.inkMuted),
+                    ),
                     Row(
                       children: [
                         Expanded(
@@ -151,7 +163,7 @@ class _GuestBudgetScreenState extends State<GuestBudgetScreen> {
                         RoundIcon(
                           icon: Icons.edit_outlined,
                           size: 40,
-                          tooltip: 'Type an amount',
+                          tooltip: l.guestBudgetTypeAmount,
                           onTap: _edit,
                         ),
                       ],
@@ -196,7 +208,7 @@ class _GuestBudgetScreenState extends State<GuestBudgetScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Split between',
+                        l.guestBudgetSplitBetween,
                         style: p.body(14, color: p.inkMuted),
                       ),
                       const SizedBox(height: 12),
@@ -219,9 +231,10 @@ class _GuestBudgetScreenState extends State<GuestBudgetScreen> {
                           spent: 0,
                         ).perPerson(_people).roundToDouble(),
                         duration: GuestMotion.base,
-                        format: (v) =>
-                            '$_people ${_people == 1 ? 'person' : 'people'}  ·  '
-                            '${rupees(v)} per person',
+                        format: (v) => l.guestBudgetPerPerson(
+                          count: _people,
+                          amount: rupees(v),
+                        ),
                         style: p.body(14, weight: FontWeight.w600),
                       ),
                     ],
@@ -311,18 +324,19 @@ class GuestBudgetOverviewScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final l = context.l10n;
     final status = s.budgetStatus;
     final recent = s.lines.reversed.take(5).toList();
     return GuestPage(
       bottom: GuestButton(
-        label: 'View full order',
+        label: l.guestBudgetViewOrder,
         trailingArrow: true,
         onTap: () => GuestFlow.toOrder(context),
       ),
       child: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
-          const GuestTopBar(title: 'Your budget'),
+          GuestTopBar(title: l.guestBudgetOverviewTitle),
           const SizedBox(height: 16),
           if (status != null) ...[
             Center(
@@ -335,7 +349,8 @@ class GuestBudgetOverviewScreen extends StatelessWidget {
                   children: [
                     TextSpan(text: rupees(status.spent), style: p.price(26)),
                     TextSpan(
-                      text: '  of ${rupees(status.budget)}',
+                      text:
+                          '  ${l.guestBudgetOfAmount(amount: rupees(status.budget))}',
                       style: p.body(16, color: p.inkMuted),
                     ),
                   ],
@@ -344,7 +359,10 @@ class GuestBudgetOverviewScreen extends StatelessWidget {
             ),
             if (s.lines.isNotEmpty)
               Center(
-                child: Text('Estimated', style: p.body(12, color: p.inkMuted)),
+                child: Text(
+                  l.guestBudgetEstimated,
+                  style: p.body(12, color: p.inkMuted),
+                ),
               ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
@@ -355,7 +373,7 @@ class GuestBudgetOverviewScreen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
               child: Text(
-                'Recent additions',
+                l.guestBudgetRecent,
                 style: p.display(18, weight: FontWeight.w700),
               ),
             ),

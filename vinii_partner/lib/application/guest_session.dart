@@ -21,6 +21,8 @@ enum GuestBrowseView { swipe, menu }
 /// What the guest eats: filters the menu. Jain comes from the restaurant's
 /// "Jain" tag; veg and non-veg from each dish's food type (eggs count as
 /// non-veg here).
+// i18n-ignore: English fallback for logs/tests; screens use
+// AppLocalizations.guestDietLabel (guest_flow.dart).
 enum GuestDiet {
   all('All'),
   veg('Veg'),
@@ -37,6 +39,70 @@ enum GuestDiet {
       i.item.foodType == FoodType.nonVeg || i.item.foodType == FoodType.egg,
     GuestDiet.jain => i.isJain,
   };
+}
+
+/// Why "Place order" cannot be pressed yet. A code, not a sentence: the
+/// screen turns it into words with `AppLocalizations.guestBlockerText`
+/// (guest_flow.dart).
+enum GuestBlocker { empty, scanTable, pickupTime, deliveryDetails }
+
+/// What to tell the guest under the coupon row. Kept as a code (plus the
+/// server's own words or a failure) so the screen can say it in the guest's
+/// language with `AppLocalizations.guestCouponNoteText` (guest_flow.dart).
+@immutable
+class CouponNote {
+  const CouponNote._(this.kind, {this.text, this.failure, this.code, this.why});
+
+  /// The guest tapped Apply with nothing typed.
+  const CouponNote.enterCode() : this._(CouponNoteKind.enterCode);
+
+  /// The server refused the code and gave no reason.
+  const CouponNote.notApplicable() : this._(CouponNoteKind.notApplicable);
+
+  /// The server's own reason, in its words (shown as it is).
+  const CouponNote.reason(String text)
+    : this._(CouponNoteKind.serverReason, text: text);
+
+  /// The check could not be made (offline and so on).
+  const CouponNote.failed(AppFailure failure)
+    : this._(CouponNoteKind.failure, failure: failure);
+
+  /// A coupon that was applied was taken off after the cart changed.
+  const CouponNote.takenOff(String code, CouponNote why)
+    : this._(CouponNoteKind.takenOff, code: code, why: why);
+
+  final CouponNoteKind kind;
+
+  /// The server's reason ([CouponNoteKind.serverReason]).
+  final String? text;
+
+  /// The failure ([CouponNoteKind.failure]).
+  final AppFailure? failure;
+
+  /// The coupon that was taken off ([CouponNoteKind.takenOff]).
+  final String? code;
+
+  /// Why it was taken off ([CouponNoteKind.takenOff]).
+  final CouponNote? why;
+
+  /// The note in English, for logs and tests only.
+  // i18n-ignore: English fallback for logs/tests, screens use
+  // guestCouponNoteText
+  String get english => switch (kind) {
+    CouponNoteKind.enterCode => 'Enter a coupon code.',
+    CouponNoteKind.notApplicable => "That code doesn't apply.",
+    CouponNoteKind.serverReason => text!,
+    CouponNoteKind.failure => failure!.message,
+    CouponNoteKind.takenOff => 'Coupon $code was taken off: ${why!.english}',
+  };
+}
+
+enum CouponNoteKind {
+  enterCode,
+  notApplicable,
+  serverReason,
+  failure,
+  takenOff,
 }
 
 /// One guest party's visit, from "Start exploring" to the bill: what they
@@ -166,11 +232,16 @@ class GuestSession extends ChangeNotifier {
 
   /// "Table 12" (or "Room 12"): the storefront's own word for a table plus
   /// the table's number; unusual labels ("Patio 3") are shown as they are.
-  String? get tableName {
+  String? get tableName => tableNameWith(definition.tableLabel);
+
+  /// [tableName] with [word] as the word for a table: screens pass the
+  /// reader's language for the storefront's default word (see
+  /// `AppLocalizations.guestTableNameOf` in guest_flow.dart).
+  String? tableNameWith(String word) {
     final t = table;
     if (t == null) return null;
     final m = RegExp(r'^[A-Za-z]{0,2}\s*(\d+[A-Za-z]?)$').firstMatch(t.label);
-    return m == null ? t.label : '${definition.tableLabel} ${m.group(1)}';
+    return m == null ? t.label : '$word ${m.group(1)}';
   }
 
   /// Pre-order pickup slot.
@@ -244,8 +315,14 @@ class GuestSession extends ChangeNotifier {
   /// The coupon the server accepted for the cart as it stands, or null.
   CouponResult? coupon;
 
-  /// Why the last code did not apply, in the guest's words.
-  String? couponMessage;
+  /// Why the last code did not apply (or was taken off), as a code the
+  /// screen puts into words. Null when there is nothing to say.
+  CouponNote? couponNote;
+
+  /// [couponNote] in English (the server's own words when it gave a
+  /// reason), for logs and tests; screens use [couponNote].
+  // i18n-ignore: English fallback for logs/tests, screens use couponNote
+  String? get couponMessage => couponNote?.english;
   bool couponChecking = false;
   int _couponRun = 0;
   Timer? _couponTimer;
@@ -261,13 +338,13 @@ class GuestSession extends ChangeNotifier {
     final service = gateway.coupons;
     if (service == null) return;
     if (code.isEmpty) {
-      couponMessage = 'Enter a coupon code.';
+      couponNote = const CouponNote.enterCode();
       _notify();
       return;
     }
     final run = ++_couponRun;
     couponChecking = true;
-    couponMessage = null;
+    couponNote = null;
     _notify();
     try {
       final r = await service.check(
@@ -277,12 +354,14 @@ class GuestSession extends ChangeNotifier {
       );
       if (run != _couponRun) return;
       coupon = r.valid ? r : null;
-      couponMessage = r.valid
+      couponNote = r.valid
           ? null
-          : (r.message ?? "That code doesn't apply.");
+          : (r.message == null
+                ? const CouponNote.notApplicable()
+                : CouponNote.reason(r.message!));
     } catch (e) {
       if (run != _couponRun) return;
-      couponMessage = asFailure(e).message;
+      couponNote = CouponNote.failed(asFailure(e));
     } finally {
       if (run == _couponRun) {
         couponChecking = false;
@@ -296,7 +375,7 @@ class GuestSession extends ChangeNotifier {
     _couponRun++;
     _couponTimer?.cancel();
     coupon = null;
-    couponMessage = null;
+    couponNote = null;
     couponChecking = false;
     _notify();
   }
@@ -315,8 +394,9 @@ class GuestSession extends ChangeNotifier {
     _couponTimer = Timer(const Duration(milliseconds: 350), () async {
       final before = applied.code;
       await applyCoupon(before);
-      if (coupon == null && couponMessage != null) {
-        couponMessage = 'Coupon $before was taken off: $couponMessage';
+      final why = couponNote;
+      if (coupon == null && why != null) {
+        couponNote = CouponNote.takenOff(before, why);
         _notify();
       }
     });
@@ -399,31 +479,44 @@ class GuestSession extends ChangeNotifier {
     GuestServiceMode.delivery => ServiceType.delivery,
   };
 
-  /// Why "Place order" cannot be pressed yet, in the guest's words; null
-  /// when it can.
-  String? get blocker {
-    if (lines.isEmpty) return 'Add something to your order first.';
+  /// Why "Place order" cannot be pressed yet; null when it can. Screens put
+  /// it into words with `AppLocalizations.guestBlockerText`.
+  GuestBlocker? get blockerKind {
+    if (lines.isEmpty) return GuestBlocker.empty;
     if (mode == GuestServiceMode.dineIn &&
         table == null &&
         !gateway.isPreview) {
-      return 'Scan the QR code on your '
-          '${definition.tableLabel.toLowerCase()} to order from it.';
+      return GuestBlocker.scanTable;
     }
     if (mode == GuestServiceMode.preOrder && scheduledFor == null) {
-      return 'Choose a pickup time first.';
+      return GuestBlocker.pickupTime;
     }
     if (mode == GuestServiceMode.delivery &&
         (customerName.trim().isEmpty ||
             customerPhone.trim().length < 10 ||
             addressNote.trim().isEmpty)) {
-      return 'Add your name, phone and address for delivery.';
+      return GuestBlocker.deliveryDetails;
     }
     return null;
   }
 
+  /// [blockerKind] in English, for logs and tests only.
+  // i18n-ignore: English fallback for logs/tests, screens use blockerKind
+  String? get blocker => switch (blockerKind) {
+    null => null,
+    GuestBlocker.empty => 'Add something to your order first.',
+    GuestBlocker.scanTable =>
+      'Scan the QR code on your '
+          '${definition.tableLabel.toLowerCase()} to order from it.',
+    GuestBlocker.pickupTime => 'Choose a pickup time first.',
+    GuestBlocker.deliveryDetails =>
+      'Add your name, phone and address for delivery.',
+  };
+
   String? get _composedNotes {
     final parts = [
       if (mode == GuestServiceMode.delivery && addressNote.trim().isNotEmpty)
+        // i18n-ignore: stored order note, read by the kitchen
         'Deliver to: ${addressNote.trim()}',
       if (notes.trim().isNotEmpty) notes.trim(),
     ];
@@ -433,7 +526,12 @@ class GuestSession extends ChangeNotifier {
   /// Sends the cart through the gateway. Throws [AppFailure]; the key stays
   /// in [pendingKey] so the next tap retries the same order.
   Future<PlacedOrder> place() async {
-    if (placing) throw const AppFailure('Already placing your order.');
+    if (placing) {
+      throw const AppFailure(
+        'Already placing your order.',
+        code: 'guest_already_placing',
+      );
+    }
     pendingKey ??= const Uuid().v4();
     placing = true;
     placeError = null;

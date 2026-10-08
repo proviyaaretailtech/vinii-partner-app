@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 
 import '../../core/money.dart';
+import '../../core/time_format.dart';
 import '../../domain/pos_order.dart';
 import '../../domain/storefront.dart';
+import '../../l10n/l10n.dart';
 import '../theme/guest_theme.dart';
 import 'guest_effects.dart';
 import 'guest_flow.dart';
@@ -23,44 +24,51 @@ class GuestPlacedScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final l = context.l10n;
     final order = s.latest!;
     final pre = order.scheduledFor != null;
     final minutes = s.estimatedMinutes(order);
+    final tableName = l.guestTableNameOf(s);
     return CelebrationPage(
       title: pre
-          ? 'Pre-order confirmed!'
-          : GuestCopy.of(context)('order.placed'),
+          ? l.guestPlacedPreOrderTitle
+          : GuestCopy.of(context).own('order.placed') ?? l.guestPlacedTitle,
       lines: [
         '#${order.displayNo}',
         [
-          if (order.serviceType == ServiceType.dineIn && s.tableName != null)
-            s.tableName!,
-          '${order.itemCount} ${order.itemCount == 1 ? 'item' : 'items'}',
+          if (order.serviceType == ServiceType.dineIn && tableName != null)
+            tableName,
+          l.guestPlacedItemCount(count: order.itemCount),
           rupees(order.bill.payable),
         ].join(' · '),
         if (pre)
-          'Pickup on ${DateFormat('EEE, d MMM').format(order.scheduledFor!)} • '
-              '${DateFormat('h:mm a').format(order.scheduledFor!)}',
+          l.guestPlacedPickupOn(
+            day: dateFormat('EEE, d MMM').format(order.scheduledFor!),
+            time: wallClock(order.scheduledFor!),
+          ),
       ],
       card: pre || minutes == null
           ? null
           : _InfoCard(
               icon: Icons.timer_outlined,
-              title: 'Estimated serving time',
-              value: '$minutes–${minutes + 5} minutes',
+              title: l.guestPlacedEstimateTitle,
+              value: l.guestPlacedEstimateRange(
+                low: minutes,
+                high: minutes + 5,
+              ),
             ),
       primary: s.features.liveTracking && !pre
           ? GuestButton(
-              label: 'Track order',
+              label: l.guestPlacedTrackOrder,
               trailingArrow: true,
               onTap: () => GuestFlow.tracking(context),
             )
           : GuestButton(
-              label: pre ? 'View pre-order' : 'View order details',
+              label: pre ? l.guestPlacedViewPreOrder : l.guestPlacedViewDetails,
               onTap: () => GuestFlow.bill(context),
             ),
       secondary: GuestButton(
-        label: pre ? 'Order something else' : 'Continue exploring',
+        label: pre ? l.guestPlacedOrderElse : l.guestPlacedContinue,
         style: GuestButtonStyle.outline,
         onTap: () => GuestFlow.orderMore(context),
       ),
@@ -78,17 +86,18 @@ class GuestServedScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final l = context.l10n;
     final dineIn = s.mode == GuestServiceMode.dineIn;
     return CelebrationPage(
-      title: dineIn ? 'Your order is served!' : 'Your order is ready!',
-      lines: const ['Hope you enjoy your meal.'],
+      title: dineIn ? l.guestPlacedServedTitle : l.guestPlacedReadyTitle,
+      lines: [l.guestPlacedEnjoy],
       primary: GuestButton(
-        label: 'View bill',
+        label: l.guestPlacedViewBill,
         trailingArrow: true,
         onTap: () => GuestFlow.bill(context),
       ),
       secondary: GuestButton(
-        label: 'Order more',
+        label: l.guestPlacedOrderMore,
         style: GuestButtonStyle.outline,
         onTap: () => GuestFlow.orderMore(context),
       ),

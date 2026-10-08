@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_scope.dart';
 import '../../config/app_config.dart';
+import '../../l10n/l10n.dart';
 import '../widgets/state_views.dart';
 
 /// The organization requires a newer build than this one
@@ -13,6 +14,7 @@ class UpdateRequiredScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = AppScope.of(context).session;
+    final l = context.l10n;
     final needed = s.definition?.minAppVersion ?? '';
     return Scaffold(
       body: SafeArea(
@@ -21,10 +23,17 @@ class UpdateRequiredScreen extends StatelessWidget {
             Expanded(
               child: EmptyView(
                 icon: Icons.system_update_rounded,
-                title: 'Update VINII Partner',
-                message:
-                    '${s.membership?.organization.name ?? 'Your restaurant'} needs version $needed or newer. '
-                    'This phone has ${AppConfig.appVersion}. Install the update from the store, then open the app again.',
+                title: l.bootUpdateTitle,
+                message: s.membership == null
+                    ? l.bootUpdateBodyDefault(
+                        needed: needed,
+                        current: AppConfig.appVersion,
+                      )
+                    : l.bootUpdateBodyOrg(
+                        org: s.membership!.organization.name,
+                        needed: needed,
+                        current: AppConfig.appVersion,
+                      ),
               ),
             ),
             Padding(
@@ -34,17 +43,17 @@ class UpdateRequiredScreen extends StatelessWidget {
                 children: [
                   FilledButton(
                     onPressed: s.reload,
-                    child: const Text('I have updated — check again'),
+                    child: Text(l.bootUpdateCheckAgain),
                   ),
                   const SizedBox(height: 8),
                   if (s.activeMemberships.length > 1)
                     TextButton(
                       onPressed: s.switchOrganization,
-                      child: const Text('Switch organization'),
+                      child: Text(l.orgSwitch),
                     ),
                   TextButton(
                     onPressed: () => s.signOut(),
-                    child: const Text('Sign out'),
+                    child: Text(l.commonSignOut),
                   ),
                 ],
               ),

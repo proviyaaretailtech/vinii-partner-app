@@ -27,6 +27,9 @@ abstract class Backend {
   TablesRepository get tableCodes;
   ChannelsRepository get channels;
 
+  /// The signed-in person's own settings on the server (today: language).
+  UserPreferencesRepository get userPreferences;
+
   /// Called once at boot before anything else (Supabase init, etc.).
   Future<void> start();
 }
@@ -202,4 +205,16 @@ abstract class TablesRepository {
 abstract class ChannelsRepository {
   Future<List<SalesChannel>> list();
   Future<SalesChannel> setAccepting(SalesChannel channel, bool accepting);
+}
+
+/// `public.user_preferences`: one row per person (`user_id` = auth uid) that
+/// follows them to a new phone. The app mirrors it in local prefs so it
+/// starts in the right language offline; every failure here is silent and
+/// retried on the next launch (docs/I18N.md rule 7).
+abstract class UserPreferencesRepository {
+  /// The stored language code (`en`, `hi`), or null when there is no row.
+  Future<String?> loadLocale(String userId);
+
+  /// Upserts `{user_id, locale}`.
+  Future<void> saveLocale(String userId, String locale);
 }

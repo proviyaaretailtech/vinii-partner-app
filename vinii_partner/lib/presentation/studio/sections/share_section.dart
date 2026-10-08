@@ -4,6 +4,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../app/app_scope.dart';
 import '../../../application/studio_controller.dart';
+import '../../../l10n/l10n.dart';
 import '../../menu/panel.dart';
 import '../../theme/staff_theme.dart';
 import '../../widgets/state_views.dart';
@@ -19,6 +20,7 @@ class ShareSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final text = Theme.of(context).textTheme;
     final address = storefrontAddress(
       AppScope.of(context).config.storefrontBaseUrl,
@@ -32,7 +34,7 @@ class ShareSection extends StatelessWidget {
           NoticeBanner(
             icon: Icons.visibility_off_outlined,
             tone: t.warning,
-            message: 'Nothing is published yet, so guests who scan this see nothing. Publish from Studio first.',
+            message: l.studioShareNotPublished,
           ),
           const SizedBox(height: 12),
         ],
@@ -60,7 +62,7 @@ class ShareSection extends StatelessWidget {
                       dataModuleShape: QrDataModuleShape.square,
                       color: Colors.black,
                     ),
-                    semanticsLabel: 'QR code for $address',
+                    semanticsLabel: l.studioShareQrSemantics(address: address),
                   ),
                   const SizedBox(height: 12),
                   Text(
@@ -73,9 +75,10 @@ class ShareSection extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  const Text(
-                    'Scan to see the menu and order',
-                    style: TextStyle(color: Colors.black54, fontSize: 13),
+                  Text(
+                    l.studioShareScan,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.black54, fontSize: 13),
                   ),
                 ],
               ),
@@ -92,31 +95,25 @@ class ShareSection extends StatelessWidget {
               child: FilledButton.icon(
                 onPressed: () async {
                   await Clipboard.setData(ClipboardData(text: address));
-                  if (context.mounted) showDone(context, 'Address copied');
+                  if (context.mounted) showDone(context, l.studioAddressCopied);
                 },
                 icon: const Icon(Icons.copy_rounded),
-                label: const Text('Copy address'),
+                label: Text(l.studioCopyAddress),
               ),
             ),
           ],
         ),
         const SizedBox(height: 16),
-        const Panel(
+        Panel(
           children: [
-            _Line(
-              icon: Icons.print_outlined,
-              text: 'Print this QR for tables and the counter.',
-            ),
-            SizedBox(height: 12),
+            _Line(icon: Icons.print_outlined, text: l.studioSharePrintLine),
+            const SizedBox(height: 12),
             _Line(
               icon: Icons.table_restaurant_outlined,
-              text: 'Per-table QR codes, which open straight to a table, come later.',
+              text: l.studioSharePerTableLine,
             ),
-            SizedBox(height: 12),
-            _Line(
-              icon: Icons.language_rounded,
-              text: 'The address works once the VINII guest website is live. Until then, use the preview in Studio.',
-            ),
+            const SizedBox(height: 12),
+            _Line(icon: Icons.language_rounded, text: l.studioShareLiveLine),
           ],
         ),
       ],

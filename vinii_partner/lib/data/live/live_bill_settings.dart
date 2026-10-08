@@ -33,6 +33,7 @@ class LiveBillSettings implements BillSettingsRepository {
       throw fromSupabase(
         e,
         notReady: 'Bill settings are not set up in this database yet.',
+        notReadyCode: 'bill_not_ready',
       );
     }
   }
@@ -87,11 +88,13 @@ class LiveBillSettings implements BillSettingsRepository {
         'Someone else saved these settings while you were editing. '
         'Reload to see their changes, then make yours again.',
         kind: FailureKind.conflict,
+        code: 'bill_conflict',
       );
     }
     return const AppFailure(
       'These settings were not saved. You may not have permission to change them.',
       kind: FailureKind.forbidden,
+      code: 'bill_not_saved',
     );
   }
 }

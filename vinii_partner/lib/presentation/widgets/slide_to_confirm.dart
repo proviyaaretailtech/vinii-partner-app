@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../l10n/l10n.dart';
 import '../theme/staff_theme.dart';
 
 /// "Slide to mark delivered" — for steps that cannot be undone (partner PRD
@@ -100,12 +101,22 @@ class _SlideToConfirmState extends State<SlideToConfirm>
                   Center(
                     child: Opacity(
                       opacity: 1 - progress,
-                      child: Text(
-                        busy ? 'Sending…' : widget.label,
-                        style: TextStyle(
-                          color: on,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16,
+                      // Room for the thumb on both sides, so a long label (or
+                      // a longer language) wraps instead of hiding under it.
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: _thumb + 8,
+                        ),
+                        child: Text(
+                          busy ? context.l10n.uiSending : widget.label,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: on,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
                         ),
                       ),
                     ),

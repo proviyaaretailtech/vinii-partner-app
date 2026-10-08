@@ -6,6 +6,9 @@ import '../../app/routes.dart';
 import '../../application/session_controller.dart';
 import '../../core/failure.dart';
 import '../../domain/staff.dart';
+import '../../l10n/l10n.dart';
+import '../../l10n/labels.dart';
+import '../orders/order_widgets.dart' show inboxUnavailableText;
 import '../theme/staff_theme.dart';
 import '../widgets/chips.dart';
 import '../widgets/state_views.dart';
@@ -23,8 +26,9 @@ class SettingsScreen extends StatelessWidget {
     final t = ViniiTokens.of(context);
     final m = s.membership!;
     final user = s.user!;
+    final l = context.l10n;
     return Scaffold(
-      appBar: AppBar(title: const Text('More')),
+      appBar: AppBar(title: Text(l.commonMore)),
       body: RefreshIndicator(
         onRefresh: s.reload,
         // On a tablet or counter computer the column stays readable instead
@@ -79,7 +83,7 @@ class SettingsScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
-              const _Label('Organization'),
+              _Label(l.orgLabel),
               _Card(
                 children: [
                   ListTile(
@@ -88,15 +92,19 @@ class SettingsScreen extends StatelessWidget {
                       m.organization.name,
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
-                    subtitle: Text(m.roleName),
+                    subtitle: Text(
+                      l.roleLabel(m.roleSlug, fallback: m.roleName),
+                    ),
                   ),
                   if (s.activeMemberships.length > 1) ...[
                     Divider(height: 1, color: t.border),
                     ListTile(
                       leading: const Icon(Icons.swap_horiz_rounded),
-                      title: const Text('Switch organization'),
+                      title: Text(l.orgSwitch),
                       subtitle: Text(
-                        '${s.activeMemberships.length} restaurants on this login',
+                        l.orgRestaurantsOnLogin(
+                          count: s.activeMemberships.length,
+                        ),
                       ),
                       onTap: s.switchOrganization,
                     ),
@@ -106,16 +114,16 @@ class SettingsScreen extends StatelessWidget {
               const SizedBox(height: 16),
               ..._restaurantSection(context, s),
               if (s.can(Capability.toggleChannels)) ...[
-                const _Label('Sales channels'),
+                _Label(l.settingsSalesChannels),
                 const ChannelsCard(),
                 const SizedBox(height: 16),
               ],
               if (s.can(Capability.viewOrders)) ...[
-                const _Label('New-order alerts'),
+                _Label(l.settingsAlertsLabel),
                 _AlertsCard(),
                 const SizedBox(height: 16),
               ],
-              const _Label('Appearance'),
+              _Label(l.settingsAppearance),
               _Card(
                 children: [
                   Padding(
@@ -123,21 +131,21 @@ class SettingsScreen extends StatelessWidget {
                     child: ValueListenableBuilder(
                       valueListenable: services.themeMode,
                       builder: (context, mode, _) => SegmentedButton<ThemeMode>(
-                        segments: const [
+                        segments: [
                           ButtonSegment(
                             value: ThemeMode.system,
-                            label: Text('Auto'),
-                            icon: Icon(Icons.brightness_auto_rounded),
+                            label: Text(l.settingsThemeAuto),
+                            icon: const Icon(Icons.brightness_auto_rounded),
                           ),
                           ButtonSegment(
                             value: ThemeMode.light,
-                            label: Text('Light'),
-                            icon: Icon(Icons.light_mode_rounded),
+                            label: Text(l.settingsThemeLight),
+                            icon: const Icon(Icons.light_mode_rounded),
                           ),
                           ButtonSegment(
                             value: ThemeMode.dark,
-                            label: Text('Dark'),
-                            icon: Icon(Icons.dark_mode_rounded),
+                            label: Text(l.settingsThemeDark),
+                            icon: const Icon(Icons.dark_mode_rounded),
                           ),
                         ],
                         selected: {mode},
@@ -153,8 +161,31 @@ class SettingsScreen extends StatelessWidget {
               _Card(
                 children: [
                   ListTile(
+                    minTileHeight: 64,
+                    leading: const Icon(Icons.translate_rounded),
+                    title: Text(
+                      context.l10n.languageTitle,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    subtitle: ListenableBuilder(
+                      listenable: services.locale,
+                      builder: (context, _) => Text(
+                        context.l10n.languageSettingsSubtitle(
+                          language: services.locale.active.nativeName,
+                        ),
+                      ),
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => context.push(Routes.language),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _Card(
+                children: [
+                  ListTile(
                     leading: const Icon(Icons.info_outline_rounded),
-                    title: const Text('About this app'),
+                    title: Text(l.settingsAbout),
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () => context.push(Routes.about),
                   ),
@@ -167,7 +198,7 @@ class SettingsScreen extends StatelessWidget {
                   side: BorderSide(color: t.danger.withValues(alpha: 0.4)),
                 ),
                 icon: const Icon(Icons.logout_rounded),
-                label: const Text('Sign out'),
+                label: Text(l.commonSignOut),
                 onPressed: () => _confirmSignOut(context),
               ),
             ],
@@ -181,32 +212,33 @@ class SettingsScreen extends StatelessWidget {
   /// open it. Nothing is listed when a role has none of them.
   List<Widget> _restaurantSection(BuildContext context, SessionController s) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final entries = <(IconData, String, String, String)>[
       if (s.can(Capability.viewBillSettings))
         (
           Icons.receipt_long_outlined,
-          'Bill & GST',
-          'GST, service charge and what is printed on bills',
+          l.settingsBillGst,
+          l.settingsBillGstHint,
           Routes.billSettings,
         ),
       if (s.can(Capability.viewTeam))
         (
           Icons.groups_outlined,
-          'Team',
-          'Who works here and what each person can do',
+          l.settingsTeam,
+          l.settingsTeamHint,
           Routes.team,
         ),
       if (s.can(Capability.viewTableCodes))
         (
           Icons.qr_code_2_rounded,
-          'Table QR codes',
-          'One code per table for guests to scan',
+          l.settingsTableQr,
+          l.settingsTableQrHint,
           Routes.tableCodes,
         ),
     ];
     if (entries.isEmpty) return const [];
     return [
-      const _Label('Your restaurant'),
+      _Label(l.settingsYourRestaurant),
       _Card(
         children: [
           for (final (i, e) in entries.indexed) ...[
@@ -236,6 +268,7 @@ class SettingsScreen extends StatelessWidget {
       isScrollControlled: true,
       builder: (context) {
         final t = ViniiTokens.of(context);
+        final l = context.l10n;
         return SafeArea(
           child: SingleChildScrollView(
             padding: EdgeInsets.zero,
@@ -246,12 +279,12 @@ class SettingsScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Sign out?',
+                    l.settingsSignOutTitle,
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'This phone stops ringing for new orders until someone signs in again.',
+                    l.settingsSignOutBody,
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 20),
@@ -261,17 +294,17 @@ class SettingsScreen extends StatelessWidget {
                       foregroundColor: Colors.white,
                     ),
                     onPressed: () => Navigator.pop(context, 'here'),
-                    child: const Text('Sign out of this phone'),
+                    child: Text(l.settingsSignOutHere),
                   ),
                   const SizedBox(height: 8),
                   OutlinedButton(
                     onPressed: () => Navigator.pop(context, 'everywhere'),
-                    child: const Text('Sign out of every device'),
+                    child: Text(l.settingsSignOutEverywhere),
                   ),
                   const SizedBox(height: 4),
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel'),
+                    child: Text(l.commonCancel),
                   ),
                 ],
               ),
@@ -301,13 +334,14 @@ class _AlertsCardState extends State<_AlertsCard> {
   Widget build(BuildContext context) {
     final services = AppScope.of(context);
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final inbox = services.inbox;
     return _Card(
       children: [
         SwitchListTile(
           secondary: const Icon(Icons.volume_up_rounded),
-          title: const Text('Ring for new orders'),
-          subtitle: const Text('Vibration always stays on'),
+          title: Text(l.settingsRingTitle),
+          subtitle: Text(l.settingsRingSubtitle),
           value: services.prefs.ringEnabled,
           onChanged: (v) async {
             await services.prefs.setRingEnabled(v);
@@ -317,18 +351,18 @@ class _AlertsCardState extends State<_AlertsCard> {
         Divider(height: 1, color: t.border),
         ListTile(
           leading: const Icon(Icons.music_note_rounded),
-          title: const Text('Test the ring'),
+          title: Text(l.settingsRingTest),
           onTap: services.ring.test,
         ),
         if (services.session.can(Capability.sendTestOrder)) ...[
           Divider(height: 1, color: t.border),
           ListTile(
             leading: const Icon(Icons.science_outlined),
-            title: const Text('Send a test order'),
+            title: Text(l.settingsTestOrder),
             subtitle: Text(
               inbox.available
-                  ? 'Creates a marked test order for this restaurant on One Local, to check the ring end to end'
-                  : inbox.unavailableReason ?? '',
+                  ? l.settingsTestOrderHint
+                  : inboxUnavailableText(l, inbox.unavailableReason),
             ),
             enabled: inbox.available && !_sending,
             trailing: _sending
@@ -342,10 +376,7 @@ class _AlertsCardState extends State<_AlertsCard> {
               try {
                 await inbox.sendTestOrder();
                 if (context.mounted) {
-                  showDone(
-                    context,
-                    'Test order sent. It will ring in a few seconds.',
-                  );
+                  showDone(context, context.l10n.settingsTestOrderSent);
                 }
               } on AppFailure catch (e) {
                 if (context.mounted) showFailure(context, e);

@@ -53,6 +53,7 @@ class CashfreeCheckout {
     'We could not reach the payment service. Check your connection and try '
     'again, or ask a member of staff to take the payment.',
     kind: FailureKind.offline,
+    code: 'guest_pay_unreachable',
   );
 
   Future<CheckoutResult> open(OnlinePayment payment) async {

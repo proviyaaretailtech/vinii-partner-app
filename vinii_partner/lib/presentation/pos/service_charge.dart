@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/money.dart';
 import '../../domain/billing.dart' show formatPercent;
+import '../../l10n/l10n.dart';
+import '../../l10n/script_fonts.dart';
 import '../theme/staff_theme.dart';
 
 /// The service charge row of a bill and what a manager can do with it.
@@ -44,9 +46,10 @@ class ServiceChargeRow extends StatelessWidget {
     final strike = waived ? TextDecoration.lineThrough : null;
     final muted = waived ? t.inkMuted : t.inkSecondary;
     final action = waived ? line.onAddBack : line.onRemove;
+    final l = context.l10n;
     final label = line.percent > 0
-        ? 'Service charge (${formatPercent(line.percent)}%)'
-        : 'Service charge';
+        ? l.serviceChargeLabelPercent(percent: formatPercent(line.percent))
+        : l.serviceChargeLabel;
     return ConstrainedBox(
       constraints: const BoxConstraints(minHeight: 44),
       child: Row(
@@ -81,13 +84,16 @@ class ServiceChargeRow extends StatelessWidget {
                       foregroundColor: t.ink,
                       textStyle: const TextStyle(
                         fontFamily: 'Inter',
+                        fontFamilyFallback: kScriptFontFallback,
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                         decoration: TextDecoration.underline,
                       ),
                     ),
                     onPressed: action,
-                    child: Text(waived ? 'Add back' : 'Remove'),
+                    child: Text(
+                      waived ? l.serviceChargeAddBack : l.commonRemove,
+                    ),
                   ),
               ],
             ),
@@ -128,7 +134,7 @@ class _RemovedTag extends StatelessWidget {
           Icon(Icons.remove_circle_outline_rounded, size: 14, color: color),
           const SizedBox(width: 4),
           Text(
-            'Removed',
+            context.l10n.serviceChargeRemoved,
             style: TextStyle(
               color: color,
               fontSize: 12,
@@ -195,13 +201,14 @@ class _RemoveSheetState extends State<_RemoveSheet> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Remove the service charge from this bill?',
+                context.l10n.serviceChargeRemoveTitle,
                 style: text.titleLarge,
               ),
               const SizedBox(height: 8),
               Text(
-                'The guest will pay ${rupees(widget.payLess)} less. '
-                'This is recorded with your name.',
+                context.l10n.serviceChargeRemoveBody(
+                  amount: rupees(widget.payLess),
+                ),
                 style: text.bodyMedium,
               ),
               const SizedBox(height: 16),
@@ -210,9 +217,9 @@ class _RemoveSheetState extends State<_RemoveSheet> {
                 controller: _reason,
                 maxLength: 120,
                 textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                  labelText: 'Reason (optional)',
-                  hintText: 'e.g. Regular guest, complaint about service',
+                decoration: InputDecoration(
+                  labelText: context.l10n.serviceChargeReasonLabel,
+                  hintText: context.l10n.serviceChargeReasonHint,
                 ),
               ),
               const SizedBox(height: 8),
@@ -229,12 +236,12 @@ class _RemoveSheetState extends State<_RemoveSheet> {
                     ServiceChargeRemoval(reason.isEmpty ? null : reason),
                   );
                 },
-                child: const Text('Remove service charge'),
+                child: Text(context.l10n.serviceChargeRemoveConfirm),
               ),
               const SizedBox(height: 4),
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Keep it'),
+                child: Text(context.l10n.serviceChargeKeepIt),
               ),
             ],
           ),
@@ -280,7 +287,7 @@ class ServiceChargePrompt extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Service charge ${rupees(amount)} is on this bill. Remove it?',
+                  context.l10n.serviceChargePrompt(amount: rupees(amount)),
                   style: TextStyle(
                     color: t.ink,
                     fontSize: 14.5,
@@ -301,7 +308,7 @@ class ServiceChargePrompt extends StatelessWidget {
                   key: const Key('service-charge-prompt-keep'),
                   style: TextButton.styleFrom(minimumSize: const Size(64, 44)),
                   onPressed: onKeep,
-                  child: const Text('Keep'),
+                  child: Text(context.l10n.serviceChargeKeep),
                 ),
                 TextButton(
                   key: const Key('service-charge-prompt-remove'),
@@ -310,7 +317,7 @@ class ServiceChargePrompt extends StatelessWidget {
                     foregroundColor: t.danger,
                   ),
                   onPressed: onRemove,
-                  child: const Text('Remove'),
+                  child: Text(context.l10n.commonRemove),
                 ),
               ],
             ),

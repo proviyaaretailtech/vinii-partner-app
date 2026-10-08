@@ -7,6 +7,7 @@ import '../../application/guest_session.dart';
 import '../../domain/menu.dart';
 import '../../domain/pos_order.dart';
 import '../../domain/storefront.dart';
+import '../../l10n/l10n.dart';
 import '../theme/guest_theme.dart';
 import '../widgets/dish_art.dart';
 import 'guest_welcome.dart';
@@ -194,6 +195,7 @@ class _MenuPreparing extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
+    final l = context.l10n;
     final brand = GuestScope.of(context).definition.brand;
     return GuestPage(
       child: Column(
@@ -228,14 +230,14 @@ class _MenuPreparing extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      GuestCopy.of(context)('menu.empty'),
+                      GuestCopy.of(context).own('menu.empty') ??
+                          l.guestMenuPreparingTitle,
                       textAlign: TextAlign.center,
                       style: p.display(22, weight: FontWeight.w700),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Please check back in a little while, or ask a member '
-                      'of our staff.',
+                      l.guestMenuPreparingBody,
                       textAlign: TextAlign.center,
                       style: p.body(15, color: p.inkMuted),
                     ),

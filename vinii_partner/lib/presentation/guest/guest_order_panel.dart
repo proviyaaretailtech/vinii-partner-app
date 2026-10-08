@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/money.dart';
 import '../../domain/billing.dart';
+import '../../l10n/l10n.dart';
 import '../theme/guest_theme.dart';
 import '../widgets/dish_art.dart';
 import '../widgets/food_art.dart';
@@ -27,6 +28,7 @@ class GuestOrderPanel extends StatelessWidget {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
     final t = GuestCopy.of(context);
+    final l = context.l10n;
     final status = s.budgetStatus;
     return Container(
       width: 380,
@@ -42,10 +44,15 @@ class GuestOrderPanel extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(24, 22, 24, 10),
               child: Row(
                 children: [
-                  Expanded(child: Text(t('cart.title'), style: p.display(22))),
+                  Expanded(
+                    child: Text(
+                      t.own('cart.title') ?? l.guestOrderTitle,
+                      style: p.display(22),
+                    ),
+                  ),
                   if (s.lines.isNotEmpty)
                     Text(
-                      '${s.itemCount} ${s.itemCount == 1 ? 'item' : 'items'}',
+                      l.guestOrderItemCount(count: s.itemCount),
                       style: p.body(13.5, color: p.inkMuted),
                     ),
                 ],
@@ -78,13 +85,13 @@ class GuestOrderPanel extends StatelessWidget {
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            'Nothing here yet',
+                            l.guestOrderPanelEmptyTitle,
+                            textAlign: TextAlign.center,
                             style: p.display(18, weight: FontWeight.w700),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Swipe a dish right, or tap the heart, and it '
-                            'lands here.',
+                            l.guestOrderPanelEmptyBody,
                             textAlign: TextAlign.center,
                             style: p.body(13.5, color: p.inkMuted),
                           ),
@@ -160,7 +167,8 @@ class GuestOrderPanel extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            t('cart.estimated'),
+                            t.own('cart.estimated') ??
+                                l.guestOrderEstimatedTotal,
                             style: p.body(15, weight: FontWeight.w700),
                           ),
                         ),
@@ -175,7 +183,7 @@ class GuestOrderPanel extends StatelessWidget {
                     const SizedBox(height: 14),
                     GuestButton(
                       key: const ValueKey('panel-review'),
-                      label: 'Review and place order',
+                      label: l.guestOrderPanelReview,
                       trailingArrow: true,
                       onTap: () => GuestFlow.toOrder(context),
                     ),
@@ -214,7 +222,7 @@ class _BudgetBlock extends StatelessWidget {
                 style: p.price(15),
               ),
               Text(
-                '${status.percentUsed}% used',
+                context.l10n.guestBudgetUsed(percent: status.percentUsed),
                 style: p.body(12.5, color: budgetTextColor(p, status)),
               ),
             ],

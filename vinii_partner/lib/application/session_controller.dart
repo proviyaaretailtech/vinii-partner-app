@@ -36,6 +36,11 @@ enum SessionStage {
   ready,
 }
 
+/// What the loader is doing, as a code. The splash screen turns it into a
+/// sentence in the reader's language ([SessionController.bootOrgName] is the
+/// organization being opened for [BootStep.opening]).
+enum BootStep { starting, connecting, findingRestaurants, opening }
+
 class SessionController extends ChangeNotifier {
   SessionController({
     required this.config,
@@ -50,8 +55,11 @@ class SessionController extends ChangeNotifier {
   SessionStage _stage = SessionStage.booting;
   SessionStage get stage => _stage;
 
-  /// Human words for the loader: "Checking your account…".
-  String bootStep = 'Starting…';
+  /// What the loader is doing ("Connecting…", "Finding your restaurants…").
+  BootStep bootStep = BootStep.starting;
+
+  /// The organization named by [BootStep.opening].
+  String bootOrgName = '';
   AppFailure? bootFailure;
 
   StaffUser? user;
@@ -79,8 +87,9 @@ class SessionController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _step(String text) {
-    bootStep = text;
+  void _step(BootStep step, {String orgName = ''}) {
+    bootStep = step;
+    bootOrgName = orgName;
     notifyListeners();
   }
 
@@ -89,7 +98,7 @@ class SessionController extends ChangeNotifier {
     _go(SessionStage.booting);
     if (!config.isConfigured) return _go(SessionStage.notConfigured);
     try {
-      _step('Connecting…');
+      _step(BootStep.connecting);
       await backend.start();
       _authSub ??= backend.auth.changes.listen((u) {
         if (u == null && user != null) _signedOutElsewhere();
@@ -130,7 +139,7 @@ class SessionController extends ChangeNotifier {
       backend.auth.sendPasswordReset(email);
 
   Future<void> _loadWorkspace() async {
-    _step('Finding your restaurants…');
+    _step(BootStep.findingRestaurants);
     memberships = await backend.workspace.memberships(user!);
     final usable = activeMemberships;
     if (usable.isEmpty) return _go(SessionStage.noAccess);
@@ -144,7 +153,7 @@ class SessionController extends ChangeNotifier {
   }
 
   Future<void> _open(Membership m) async {
-    _step('Opening ${m.organization.name}…');
+    _step(BootStep.opening, orgName: m.organization.name);
     await backend.workspace.activate(m.organization);
     final def = await backend.workspace.appDefinition(m);
     membership = m;
@@ -196,6 +205,7 @@ class SessionController extends ChangeNotifier {
     bootFailure = const AppFailure(
       'You were signed out. Sign in again to continue.',
       kind: FailureKind.auth,
+      code: 'signed_out_elsewhere',
     );
     _go(SessionStage.signedOut);
   }

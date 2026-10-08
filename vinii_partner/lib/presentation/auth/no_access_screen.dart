@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_scope.dart';
+import '../../l10n/l10n.dart';
 import '../widgets/state_views.dart';
 
 /// Signed in, but not an active member of any organization (never added,
@@ -11,6 +12,7 @@ class NoAccessScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = AppScope.of(context).session;
+    final l = context.l10n;
     final suspended = s.memberships.where((m) => !m.active).toList();
     return Scaffold(
       body: SafeArea(
@@ -19,12 +21,16 @@ class NoAccessScreen extends StatelessWidget {
             Expanded(
               child: EmptyView(
                 icon: Icons.storefront_outlined,
-                title: 'No restaurant yet',
+                title: l.authNoAccessTitle,
                 message: suspended.isEmpty
-                    ? '${s.user?.email ?? 'This account'} is not on the staff of any restaurant. Ask your restaurant '
-                          'admin to add you from the VINII OS, then check again.'
-                    : 'Your access to ${suspended.map((m) => m.organization.name).join(', ')} is paused. Ask the '
-                          'restaurant admin to turn it back on.',
+                    ? (s.user?.email == null
+                          ? l.authNoAccessNotStaffAccount
+                          : l.authNoAccessNotStaffEmail(email: s.user!.email))
+                    : l.authNoAccessPaused(
+                        names: suspended
+                            .map((m) => m.organization.name)
+                            .join(', '),
+                      ),
               ),
             ),
             Padding(
@@ -34,12 +40,12 @@ class NoAccessScreen extends StatelessWidget {
                 children: [
                   FilledButton(
                     onPressed: s.reload,
-                    child: const Text('Check again'),
+                    child: Text(l.authCheckAgain),
                   ),
                   const SizedBox(height: 8),
                   OutlinedButton(
                     onPressed: () => s.signOut(),
-                    child: const Text('Sign out'),
+                    child: Text(l.commonSignOut),
                   ),
                 ],
               ),

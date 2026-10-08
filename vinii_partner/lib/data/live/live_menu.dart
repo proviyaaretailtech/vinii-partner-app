@@ -57,6 +57,7 @@ class LiveMenu implements MenuRepository {
       throw const AppFailure(
         'Give the category a name.',
         kind: FailureKind.rejected,
+        code: 'menu_category_name_needed',
       );
     }
     try {
@@ -97,6 +98,7 @@ class LiveMenu implements MenuRepository {
         throw const AppFailure(
           'That category could not be removed. It may already be gone.',
           kind: FailureKind.rejected,
+          code: 'menu_category_not_removed',
         );
       }
     } catch (e) {
@@ -126,12 +128,14 @@ class LiveMenu implements MenuRepository {
       throw const AppFailure(
         'Give the item a name.',
         kind: FailureKind.rejected,
+        code: 'menu_item_name_needed',
       );
     }
     if (item.price < 0) {
       throw const AppFailure(
         'Price cannot be negative.',
         kind: FailureKind.rejected,
+        code: 'menu_price_negative',
       );
     }
     final values = {
@@ -182,6 +186,7 @@ class LiveMenu implements MenuRepository {
         throw const AppFailure(
           'That item no longer exists.',
           kind: FailureKind.rejected,
+          code: 'menu_item_gone',
         );
       }
     } catch (e) {
@@ -199,6 +204,7 @@ class LiveMenu implements MenuRepository {
       throw const AppFailure(
         'That photo is too large. Choose one under 5 MB.',
         kind: FailureKind.rejected,
+        code: 'photo_too_large',
       );
     }
     final ext = extension.toLowerCase().replaceAll('.', '');

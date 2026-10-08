@@ -53,6 +53,16 @@
   - Should the restaurant's payment record exclude One Local's delivery fee?
   - May someone run a read-only check of production's functions and access rules to confirm the gaps?
 
+## 2026-10-02 — One Local Delivery: the order-to-rider connection, written down as an interface
+
+**Every successful delivery order now has a written contract for creating a delivery job and pinging the rider pool; nothing is built or applied yet.**
+
+- **Why:** orders placed in One Local must find a driver on their own, so the order side and the OnLatur Rider app need one agreed interface before either is coded.
+- **Structural decisions:** the apps never call each other; a dispatch service on the server does it, called by the order flow (not by any phone) with a service credential and a signature. One job per order, made safe to retry by a key built from the order id. Order, kitchen, delivery and payment keep separate status words, with one mapping in one place. The alternative, the rider app reading orders directly, lost because it ties two apps to each other's tables and leaks customer details. Per your standing instruction no SQL was written.
+- **What works now:** `docs/RIDER_DISPATCH_CONTRACT.md` lists four dispatch endpoints (create job, release, read, cancel), the events coming back (assigned, picked up, completed...), the offer rules (one rider at a time, 30 seconds, three rounds), the tables, and what each app does until the server exists. It is linked from section 4.7 of the platform contract.
+- **Left undone:** the tables, functions and server routes (yours); the rider app's side beyond what its own PRD already lists; rider pay rates.
+- **Open questions for the founder:** ping riders when the order is placed (what you described) or when the restaurant accepts (what the rider PRD proposed)? Where should the order flow live: a database trigger or the API? Is it acceptable that the dispatch service, but never the kitchen, receives the customer's address and phone? Who issues the service credential?
+
 ## 2026-10-02 — VINII Partner: Veg, non-veg and Jain filters on the guest menu
 
 **The guest menu now has All / Veg / Non-veg / Jain chips under the header, so a party can see only what they eat.**

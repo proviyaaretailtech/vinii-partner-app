@@ -26,10 +26,8 @@ class PartnerApiInbox implements DeliveryInbox {
   bool get available => _base.isNotEmpty;
 
   @override
-  String? get unavailableReason => available
-      ? null
-      : 'Delivery orders come from One Local. This build does not have the One Local server address '
-            '(PARTNER_API_BASE_URL), so it cannot show them.';
+  String? get unavailableReason =>
+      available ? null : partnerApiUnavailableReason;
 
   static const _uuid = Uuid();
 
@@ -41,6 +39,7 @@ class PartnerApiInbox implements DeliveryInbox {
       throw const AppFailure(
         'Your session has ended. Sign in again.',
         kind: FailureKind.auth,
+        code: 'session_ended',
       );
     }
     return {
@@ -57,7 +56,11 @@ class PartnerApiInbox implements DeliveryInbox {
     Map<String, Object?>? body,
   ]) async {
     if (!available) {
-      throw AppFailure(unavailableReason!, kind: FailureKind.notReady);
+      throw AppFailure(
+        unavailableReason!,
+        kind: FailureKind.notReady,
+        code: 'orders_unavailable',
+      );
     }
     final uri = Uri.parse('$_base/api/partner$path');
     final http.Response res;
@@ -72,6 +75,7 @@ class PartnerApiInbox implements DeliveryInbox {
       throw const AppFailure(
         'One Local is not answering. Check the connection and try again.',
         kind: FailureKind.offline,
+        code: 'orders_not_answering',
       );
     } catch (e) {
       throw asFailure(e);
@@ -89,45 +93,59 @@ class PartnerApiInbox implements DeliveryInbox {
     final text = detail == null
         ? null
         : '${detail[0].toUpperCase()}${detail.substring(1)}${detail.endsWith('.') ? '' : '.'}';
+    // One Local's own explanation (`detail`) is shown as it wrote it. When it
+    // sent none, the failure carries a code so the sentence is translated.
     throw switch (res.statusCode) {
       401 => AppFailure(
         text ?? 'Your session has ended. Sign in again.',
         kind: FailureKind.auth,
+        code: text == null ? 'session_ended' : null,
       ),
       403 => AppFailure(
         text ?? 'You do not have permission to do that.',
         kind: FailureKind.forbidden,
+        code: text == null ? 'permission_denied' : null,
       ),
       404 => AppFailure(
         text ?? 'That order no longer exists.',
         kind: FailureKind.rejected,
+        code: text == null ? 'orders_gone' : null,
       ),
       409 => AppFailure(
         text ?? 'Someone else changed this order first.',
         kind: FailureKind.conflict,
+        code: text == null ? 'orders_changed_first' : null,
       ),
       400 || 413 => AppFailure(
         text ?? 'That request was not accepted.',
         kind: FailureKind.rejected,
+        code: text == null ? 'orders_request_refused' : null,
       ),
       426 => AppFailure(
         text ?? 'Update the app to keep taking orders.',
         kind: FailureKind.notReady,
+        code: text == null ? 'orders_update_app' : null,
       ),
       503 => AppFailure(
         text ?? 'One Local is not connected to its database yet.',
         kind: FailureKind.notReady,
+        code: text == null ? 'orders_not_connected_db' : null,
       ),
       _ => AppFailure(
         text ??
             'One Local could not do that (error ${res.statusCode}). Please try again.',
+        code: text == null ? 'orders_could_not' : null,
+        args: {'status': res.statusCode},
       ),
     };
   }
 
   Map<String, dynamic> _map(Object? v) => v is Map
       ? Map<String, dynamic>.from(v)
-      : (throw const AppFailure('One Local sent an unexpected reply.'));
+      : (throw const AppFailure(
+          'One Local sent an unexpected reply.',
+          code: 'orders_bad_reply',
+        ));
 
   /// The partner server works out the restaurant from the login. If it is not
   /// the organization chosen in this app, refuse rather than show another
@@ -138,11 +156,13 @@ class PartnerApiInbox implements DeliveryInbox {
     if (serverOrg != null && serverOrg != 'null' && serverOrg != b.org.id) {
       final name = me['restaurant'] is Map
           ? '${(me['restaurant'] as Map)['name']}'
-          : 'another restaurant';
+          : null; // the failure text says "another restaurant" itself
       throw AppFailure(
-        'One Local links this login to $name, not ${b.org.name}. Delivery orders can be handled for one '
+        'One Local links this login to ${name ?? 'another restaurant'}, not ${b.org.name}. Delivery orders can be handled for one '
         'restaurant per login until One Local supports more.',
         kind: FailureKind.notReady,
+        code: 'orders_wrong_org',
+        args: {'name': name, 'org': b.org.name},
       );
     }
   }

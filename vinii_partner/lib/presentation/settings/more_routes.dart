@@ -5,6 +5,7 @@ import '../bill_settings/bill_settings_screen.dart';
 import '../table_codes/table_codes_screen.dart';
 import '../team/team_screen.dart';
 import 'about_screen.dart';
+import 'language_screen.dart';
 import 'settings_screen.dart';
 
 final moreBranchRoutes = <RouteBase>[
@@ -13,6 +14,10 @@ final moreBranchRoutes = <RouteBase>[
     builder: (context, state) => const SettingsScreen(),
     routes: [
       GoRoute(path: 'about', builder: (context, state) => const AboutScreen()),
+      GoRoute(
+        path: 'language',
+        builder: (context, state) => const LanguageScreen(),
+      ),
       GoRoute(
         path: 'bill',
         builder: (context, state) => const BillSettingsScreen(),

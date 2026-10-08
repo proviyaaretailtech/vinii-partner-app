@@ -171,7 +171,11 @@ class InboxController extends ChangeNotifier {
     Future<DeliveryOrder> Function() call,
   ) async {
     if (busy.contains(o.id)) {
-      throw const AppFailure('Already sending…', kind: FailureKind.rejected);
+      throw const AppFailure(
+        'Already sending…',
+        kind: FailureKind.rejected,
+        code: 'orders_already_sending',
+      );
     }
     busy.add(o.id);
     notifyListeners();

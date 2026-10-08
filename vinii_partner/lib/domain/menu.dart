@@ -27,6 +27,10 @@ enum FoodType {
 
   const FoodType(this.dbValue, this.label);
   final String dbValue;
+
+  /// English only. Screens read the word through `context.l10n.foodTypeLabel`
+  /// (lib/presentation/menu/menu_labels.dart).
+  // i18n-ignore: English fallback for logs/tests
   final String label;
 
   static FoodType? fromDb(String? v) =>

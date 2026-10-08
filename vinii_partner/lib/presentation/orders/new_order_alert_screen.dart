@@ -9,6 +9,8 @@ import '../../core/money.dart';
 import '../../core/time_format.dart';
 import '../../domain/delivery_order.dart';
 import '../../domain/staff.dart';
+import '../../l10n/l10n.dart';
+import '../../l10n/script_fonts.dart';
 import '../theme/staff_theme.dart';
 import '../widgets/rings.dart';
 import '../widgets/state_views.dart';
@@ -24,6 +26,29 @@ import 'order_widgets.dart';
 ///
 /// It is deliberately dark and loud whatever the app theme: it has to win
 /// attention in a busy kitchen from across the counter.
+/// Why the alert is closing. The words come from the language catalogues at
+/// the time they are drawn, so they follow the app language.
+enum _AlertEnd {
+  alreadyAnswered(Icons.check_circle_outline_rounded),
+  answeredElsewhere(Icons.devices_rounded),
+  timeUp(Icons.timer_off_outlined);
+
+  const _AlertEnd(this.icon);
+  final IconData icon;
+
+  String title(AppLocalizations l) => switch (this) {
+    alreadyAnswered => l.alertAlreadyAnswered,
+    answeredElsewhere => l.alertAnsweredElsewhere,
+    timeUp => l.alertTimeUp,
+  };
+
+  String message(AppLocalizations l) => switch (this) {
+    alreadyAnswered => l.alertNoLongerWaiting,
+    answeredElsewhere => l.alertAnsweredElsewhereMessage,
+    timeUp => l.alertTimeUpMessage,
+  };
+}
+
 class NewOrderAlertScreen extends StatefulWidget {
   const NewOrderAlertScreen({super.key, required this.orderId});
 
@@ -49,7 +74,7 @@ class _NewOrderAlertScreenState extends State<NewOrderAlertScreen> {
   bool _closing = false;
   bool _popped = false;
   Timer? _closeTimer;
-  ({IconData icon, String title, String message})? _ending;
+  _AlertEnd? _ending;
 
   @override
   void initState() {
@@ -64,11 +89,7 @@ class _NewOrderAlertScreenState extends State<NewOrderAlertScreen> {
     _inbox.addListener(_onInbox);
     if (_order == null) {
       WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _end(
-          icon: Icons.check_circle_outline_rounded,
-          title: 'Already answered',
-          message: 'This order is no longer waiting.',
-        ),
+        (_) => _end(_AlertEnd.alreadyAnswered),
       );
     }
   }
@@ -95,34 +116,21 @@ class _NewOrderAlertScreenState extends State<NewOrderAlertScreen> {
     if (expired) {
       _timeUp();
     } else {
-      _end(
-        icon: Icons.devices_rounded,
-        title: 'Answered on another phone',
-        message: 'Someone else in the restaurant took care of this order.',
-      );
+      _end(_AlertEnd.answeredElsewhere);
     }
   }
 
   /// Shows why the alert is closing, then closes it after a moment.
-  void _end({
-    required IconData icon,
-    required String title,
-    required String message,
-    Duration after = const Duration(seconds: 2),
-  }) {
+  void _end(_AlertEnd why, {Duration after = const Duration(seconds: 2)}) {
     if (_closing || !mounted) return;
     _closing = true;
-    setState(() => _ending = (icon: icon, title: title, message: message));
+    setState(() => _ending = why);
     _closeTimer = Timer(after, _pop);
   }
 
   void _timeUp() {
     if (_closing || _acting || !mounted) return;
-    _end(
-      icon: Icons.timer_off_outlined,
-      title: "Time's up",
-      message: "The customer is told the restaurant didn't respond.",
-    );
+    _end(_AlertEnd.timeUp);
     _inbox.snooze(widget.orderId);
   }
 
@@ -171,7 +179,10 @@ class _NewOrderAlertScreenState extends State<NewOrderAlertScreen> {
 
   Future<void> _accept(int prep) => _answer(
     (o) => _inbox.accept(o, prep),
-    'Accepted ${_order?.displayNo ?? ''}. Ready in $prep min.',
+    context.l10n.alertAcceptedDone(
+      number: _order?.displayNo ?? '',
+      minutes: prep,
+    ),
   );
 
   Future<void> _reject() async {
@@ -179,7 +190,7 @@ class _NewOrderAlertScreenState extends State<NewOrderAlertScreen> {
     if (reason == null || !mounted || _closing) return;
     await _answer(
       (o) => _inbox.reject(o, reason),
-      'Rejected ${_order?.displayNo ?? ''}. The customer has been told.',
+      context.l10n.alertRejectedDone(number: _order?.displayNo ?? ''),
     );
   }
 
@@ -208,18 +219,20 @@ class _NewOrderAlertScreenState extends State<NewOrderAlertScreen> {
 
   Widget _scaffold(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final o = _order;
+    final ending = _ending;
     return Scaffold(
       backgroundColor: ViniiColors.pageDark,
       body: SafeArea(
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 250),
-          child: _ending != null || o == null
+          child: ending != null || o == null
               ? _Ending(
                   key: const ValueKey('ending'),
-                  icon: _ending?.icon ?? Icons.hourglass_empty_rounded,
-                  title: _ending?.title ?? 'One moment…',
-                  message: _ending?.message ?? '',
+                  icon: ending?.icon ?? Icons.hourglass_empty_rounded,
+                  title: ending?.title(l) ?? l.alertOneMoment,
+                  message: ending?.message(l) ?? '',
                 )
               : Column(
                   key: const ValueKey('alert'),
@@ -254,6 +267,7 @@ class _TopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 8, 0),
       child: Row(
@@ -268,25 +282,23 @@ class _TopBar extends StatelessWidget {
                   color: ViniiColors.brandGreen.withValues(alpha: 0.4),
                 ),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.notifications_active_rounded,
                     size: 16,
                     color: ViniiColors.brandGreen,
                   ),
-                  SizedBox(width: 6),
+                  const SizedBox(width: 6),
                   Flexible(
                     child: Text(
-                      'NEW ORDER · One Local',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      l.alertNewOrderBadge,
                       style: TextStyle(
                         color: ViniiColors.brandGreen,
                         fontWeight: FontWeight.w800,
                         fontSize: 13,
-                        letterSpacing: 0.6,
+                        letterSpacing: tracking(context, 0.6),
                       ),
                     ),
                   ),
@@ -297,7 +309,7 @@ class _TopBar extends StatelessWidget {
           const SizedBox(width: 8),
           const Spacer(),
           IconButton(
-            tooltip: 'Silence',
+            tooltip: l.alertSilence,
             onPressed: onSilence,
             icon: Icon(Icons.volume_off_rounded, color: t.inkSecondary),
           ),
@@ -316,11 +328,12 @@ class _Details extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final outlet = AppScope.of(context).inbox.outlet;
     final o = order;
     final window = acceptWindow(o, outlet);
     final who = [
-      firstName(o.customerName),
+      firstName(l, o.customerName),
       if (o.area != null && o.area!.trim().isNotEmpty) o.area!,
     ].join(' · ');
     final notes = o.notes?.trim();
@@ -359,7 +372,7 @@ class _Details extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'seconds',
+                        l.alertSeconds,
                         style: TextStyle(
                           color: t.inkSecondary,
                           fontWeight: FontWeight.w600,
@@ -384,7 +397,7 @@ class _Details extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Placed ${clockTime(o.placedAt)} · $who',
+            l.alertPlacedLine(time: clockTime(o.placedAt), who: who),
             textAlign: TextAlign.center,
             style: TextStyle(color: t.inkSecondary, fontSize: 15),
           ),
@@ -434,7 +447,7 @@ class _Details extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '${itemCountLabel(o.itemCount)} · total',
+                              l.alertItemsTotal(count: o.itemCount),
                               style: TextStyle(color: t.inkSecondary),
                             ),
                             const SizedBox(height: 2),
@@ -448,9 +461,7 @@ class _Details extends StatelessWidget {
                                 const SizedBox(width: 6),
                                 Flexible(
                                   child: Text(
-                                    o.payment,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                    orderPaymentLabel(l, o.payment),
                                     style: TextStyle(
                                       color: t.success,
                                       fontWeight: FontWeight.w700,
@@ -505,6 +516,7 @@ class _Actions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = tokens;
+    final l = context.l10n;
     final canAnswer = AppScope.of(context).session.can(Capability.acceptOrders);
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
@@ -517,8 +529,7 @@ class _Actions extends StatelessWidget {
           ? Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Text(
-                'Only a manager or biller can accept orders. Ask them to answer '
-                'this one.',
+                l.alertOnlyManager,
                 textAlign: TextAlign.center,
                 style: TextStyle(color: t.inkSecondary),
               ),
@@ -528,7 +539,7 @@ class _Actions extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'Ready in',
+                  l.ordersReadyIn,
                   style: TextStyle(
                     color: t.inkSecondary,
                     fontWeight: FontWeight.w700,
@@ -537,8 +548,10 @@ class _Actions extends StatelessWidget {
                 const SizedBox(height: 8),
                 PrepTimeChips(value: prep, onChanged: onPrep, dark: true),
                 const SizedBox(height: 14),
-                SizedBox(
-                  height: 64,
+                ConstrainedBox(
+                  // At least 64 tall; a longer (Hindi) label wraps and the
+                  // button grows instead of cutting it off.
+                  constraints: const BoxConstraints(minHeight: 64),
                   child: FilledButton(
                     style: FilledButton.styleFrom(
                       backgroundColor: ViniiColors.brandGreen,
@@ -548,6 +561,7 @@ class _Actions extends StatelessWidget {
                       disabledForegroundColor: ViniiColors.ink,
                       textStyle: const TextStyle(
                         fontFamily: 'Inter',
+                        fontFamilyFallback: kScriptFontFallback,
                         fontSize: 19,
                         fontWeight: FontWeight.w800,
                       ),
@@ -561,14 +575,14 @@ class _Actions extends StatelessWidget {
                               color: ViniiColors.ink,
                             ),
                           )
-                        : Text('Accept · $prep min'),
+                        : Text(l.ordersAcceptWithPrep(minutes: prep)),
                   ),
                 ),
                 const SizedBox(height: 4),
                 TextButton(
                   style: TextButton.styleFrom(foregroundColor: t.danger),
                   onPressed: busy ? null : onReject,
-                  child: const Text('Reject'),
+                  child: Text(l.ordersReject),
                 ),
               ],
             ),

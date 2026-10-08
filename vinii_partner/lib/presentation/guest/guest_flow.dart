@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../application/guest_session.dart';
 import '../../domain/guest_catalog.dart';
 import '../../domain/storefront.dart';
+import '../../l10n/failure_text.dart';
+import '../../l10n/l10n.dart';
 import 'guest_bill.dart';
 import 'guest_browse.dart';
 import 'guest_budget.dart';
@@ -108,4 +111,68 @@ class GuestFlow {
         guestRoute<void>(const GuestCategoriesScreen()),
         (r) => r.isFirst,
       );
+}
+
+/// Words for the guest runtime's codes (docs/I18N.md rule 6): the controller
+/// holds enums, the screens say them in the reader's language.
+extension GuestText on AppLocalizations {
+  /// The way to order, as the guest reads it. Dine-in, takeaway and delivery
+  /// share the words the POS uses.
+  String guestModeLabel(GuestServiceMode m) => switch (m) {
+    GuestServiceMode.dineIn => serviceDineIn,
+    GuestServiceMode.takeaway => serviceTakeaway,
+    GuestServiceMode.preOrder => guestModePreOrder,
+    GuestServiceMode.delivery => serviceDelivery,
+  };
+
+  /// The line under a way to order, when the table is not named.
+  String guestModeHint(GuestServiceMode m) => switch (m) {
+    GuestServiceMode.dineIn => guestModeDineInHint,
+    GuestServiceMode.takeaway => guestModeTakeawayHint,
+    GuestServiceMode.preOrder => guestModePreOrderHint,
+    GuestServiceMode.delivery => guestModeDeliveryHint,
+  };
+
+  /// What the guest eats, as a filter chip.
+  String guestDietLabel(GuestDiet d) => switch (d) {
+    GuestDiet.all => commonAll,
+    GuestDiet.veg => menuFoodTypeVeg,
+    GuestDiet.nonVeg => menuFoodTypeNonVeg,
+    GuestDiet.jain => menuTagJain,
+  };
+
+  /// The storefront's word for a table. The default word ("Table") is
+  /// translated; a word the restaurant chose ("Room") is its own and shows
+  /// as written.
+  String guestTableWordFor(StorefrontDefinition d) =>
+      // i18n-ignore: the stored default word
+      d.tableLabel == 'Table' ? guestTableWord : d.tableLabel;
+
+  /// "Table 12" (or "Room 12"), with the default word in the reader's
+  /// language. Null when no table was scanned.
+  String? guestTableNameOf(GuestSession s) =>
+      s.tableNameWith(guestTableWordFor(s.definition));
+
+  /// Why "Place order" cannot be pressed yet.
+  String guestBlockerText(GuestBlocker b, GuestSession s) => switch (b) {
+    GuestBlocker.empty => guestBlockerEmpty,
+    GuestBlocker.scanTable => guestBlockerScanTable(
+      table: guestTableWordFor(s.definition).toLowerCase(),
+    ),
+    GuestBlocker.pickupTime => guestBlockerPickupTime,
+    GuestBlocker.deliveryDetails => guestBlockerDeliveryDetails,
+  };
+
+  /// What to say under the coupon row. A reason the server wrote shows as the
+  /// server wrote it.
+  String guestCouponNoteText(CouponNote n) => switch (n.kind) {
+    CouponNoteKind.enterCode => guestCouponEnterCode,
+    CouponNoteKind.notApplicable => guestCouponNotApplicable,
+    CouponNoteKind.serverReason => n.text!,
+    CouponNoteKind.failure => failureText(this, n.failure!),
+    CouponNoteKind.takenOff => guestCouponTakenOff(
+      code: n.code!,
+      reason: guestCouponNoteText(n.why!),
+    ),
+  };
 }

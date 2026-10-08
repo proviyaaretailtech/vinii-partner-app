@@ -15,19 +15,64 @@ const _everydayRoles = [
   'viewer',
 ];
 
-List<StaffRole> sortRoles(Iterable<StaffRole> roles) {
+/// [label] is how a role is named to the reader (the screen passes the
+/// localised label); without it the server's role name orders the rest.
+List<StaffRole> sortRoles(
+  Iterable<StaffRole> roles, {
+  String Function(StaffRole role)? label,
+}) {
   int rank(StaffRole r) {
     final i = _everydayRoles.indexOf(r.slug);
     return i < 0 ? _everydayRoles.length : i;
   }
 
+  String named(StaffRole r) => (label?.call(r) ?? r.name).toLowerCase();
+
   return roles.toList()..sort((a, b) {
     final byRank = rank(a).compareTo(rank(b));
-    return byRank != 0
-        ? byRank
-        : a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    return byRank != 0 ? byRank : named(a).compareTo(named(b));
   });
 }
+
+/// Why a change to a person cannot be made. A code the screen turns into
+/// words in the reader's language; [english] is the fallback for logs and
+/// tests, and [failure] is the same refusal as an error.
+enum TeamBlock {
+  /// Only an organization admin may change the team.
+  notAdmin(
+    'team_not_admin',
+    'Only an organization admin can change the team.', // i18n-ignore: English fallback for logs/tests
+  ),
+
+  /// Nobody changes their own role.
+  selfRole(
+    'team_self_role',
+    'You cannot change your own role.', // i18n-ignore: English fallback for logs/tests
+  ),
+
+  /// Nobody suspends themselves.
+  selfSuspend(
+    'team_self_suspend',
+    'You cannot suspend yourself.', // i18n-ignore: English fallback for logs/tests
+  ),
+
+  /// The last active admin stays an admin.
+  lastAdmin(
+    'team_last_admin',
+    'There must always be one active admin. Make someone else an admin first.', // i18n-ignore: English fallback for logs/tests
+  );
+
+  const TeamBlock(this.code, this.english);
+
+  /// Key into `teamFailureTexts` (lib/l10n/failure_texts/team.dart).
+  final String code;
+  final String english;
+
+  AppFailure get failure =>
+      AppFailure(english, kind: FailureKind.rejected, code: code);
+}
+
+String _serverName(StaffRole r) => r.name;
 
 /// The Team screen's state: who is on the team, which roles exist, the
 /// filter and search, and the changes an organization admin may make.
@@ -62,6 +107,11 @@ class TeamController extends ChangeNotifier {
   /// A role slug to show only that role, or null for everyone.
   String? roleFilter;
   String query = '';
+
+  /// How a role is named to the reader, used to search and to order the
+  /// filter. The screen sets this to the localised role label; until then the
+  /// server's role name.
+  String Function(StaffRole role) roleText = _serverName;
 
   bool _disposed = false;
 
@@ -108,7 +158,9 @@ class TeamController extends ChangeNotifier {
       final byCount = b.count.compareTo(a.count);
       return byCount != 0
           ? byCount
-          : a.role.name.toLowerCase().compareTo(b.role.name.toLowerCase());
+          : roleText(a.role)
+                .toLowerCase()
+                .compareTo(roleText(b.role).toLowerCase());
     });
   }
 
@@ -126,7 +178,8 @@ class TeamController extends ChangeNotifier {
             (q.isEmpty ||
                 m.displayName.toLowerCase().contains(q) ||
                 m.email.toLowerCase().contains(q) ||
-                m.role.name.toLowerCase().contains(q)))
+                m.role.name.toLowerCase().contains(q) ||
+                roleText(m.role).toLowerCase().contains(q)))
           m,
     ];
     list.sort((a, b) {
@@ -162,46 +215,47 @@ class TeamController extends ChangeNotifier {
       .where((m) => m.isAdmin && m.active)
       .length;
 
-  /// Why this person's role cannot be changed to [to], in plain words, or
-  /// null when it can.
-  String? whyNoRoleChange(TeamMember m, {StaffRole? to}) {
-    if (!canManage) return 'Only an organization admin can change the team.';
-    if (isMe(m)) return 'You cannot change your own role.';
+  /// Why this person's role cannot be changed to [to], or null when it can.
+  TeamBlock? blockRoleChange(TeamMember m, {StaffRole? to}) {
+    if (!canManage) return TeamBlock.notAdmin;
+    if (isMe(m)) return TeamBlock.selfRole;
     if (m.isAdmin &&
         m.active &&
         to?.slug != 'org_admin' &&
         _activeAdmins <= 1) {
-      return 'There must always be one active admin. Make someone else an admin first.';
+      return TeamBlock.lastAdmin;
     }
     return null;
   }
 
   /// Why this person cannot be suspended, or null when they can.
-  String? whyNoSuspend(TeamMember m) {
-    if (!canManage) return 'Only an organization admin can change the team.';
-    if (isMe(m)) return 'You cannot suspend yourself.';
+  TeamBlock? blockSuspend(TeamMember m) {
+    if (!canManage) return TeamBlock.notAdmin;
+    if (isMe(m)) return TeamBlock.selfSuspend;
     if (m.isAdmin && m.active && _activeAdmins <= 1) {
-      return 'There must always be one active admin. Make someone else an admin first.';
+      return TeamBlock.lastAdmin;
     }
     return null;
   }
 
+  /// [blockRoleChange] in English, for tests and logs.
+  String? whyNoRoleChange(TeamMember m, {StaffRole? to}) =>
+      blockRoleChange(m, to: to)?.english;
+
+  /// [blockSuspend] in English, for tests and logs.
+  String? whyNoSuspend(TeamMember m) => blockSuspend(m)?.english;
+
   Future<TeamMember> setRole(TeamMember member, StaffRole role) async {
-    final why = whyNoRoleChange(member, to: role);
-    if (why != null) throw AppFailure(why, kind: FailureKind.rejected);
+    final block = blockRoleChange(member, to: role);
+    if (block != null) throw block.failure;
     return _change(member, () => repository.setRole(member, role));
   }
 
   Future<TeamMember> setActive(TeamMember member, bool active) async {
-    if (!active) {
-      final why = whyNoSuspend(member);
-      if (why != null) throw AppFailure(why, kind: FailureKind.rejected);
-    } else if (!canManage) {
-      throw const AppFailure(
-        'Only an organization admin can change the team.',
-        kind: FailureKind.rejected,
-      );
-    }
+    final block = active
+        ? (canManage ? null : TeamBlock.notAdmin)
+        : blockSuspend(member);
+    if (block != null) throw block.failure;
     return _change(member, () => repository.setStatus(member, active: active));
   }
 
@@ -210,7 +264,11 @@ class TeamController extends ChangeNotifier {
     Future<TeamMember> Function() call,
   ) async {
     if (busy.contains(member.id)) {
-      throw const AppFailure('Already saving…', kind: FailureKind.rejected);
+      throw const AppFailure(
+        'Already saving…', // i18n-ignore: English fallback for logs/tests
+        kind: FailureKind.rejected,
+        code: 'team_already_saving',
+      );
     }
     busy.add(member.id);
     _notify();

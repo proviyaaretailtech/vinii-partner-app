@@ -5,6 +5,20 @@ import '../../app/app_scope.dart';
 import '../../app/routes.dart';
 import '../../domain/app_definition.dart';
 import '../../domain/delivery_order.dart';
+import '../../l10n/l10n.dart';
+
+/// The words on the bottom navigation, per language. [AppTab] stays a code
+/// (its English `label` is only for logs and tests); this is what a person
+/// reads.
+extension AppTabLabels on AppLocalizations {
+  String appTabLabel(AppTab tab) => switch (tab) {
+    AppTab.orders => commonOrders,
+    AppTab.sell => shellTabSell,
+    AppTab.menu => commonMenu,
+    AppTab.storefront => shellTabStorefront,
+    AppTab.more => commonMore,
+  };
+}
 
 /// The signed-in frame: bottom navigation built from this person's
 /// application definition (only the tabs their organization and role
@@ -61,6 +75,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final services = AppScope.of(context);
+    final l = context.l10n;
     final def = services.session.definition;
     if (def == null) return const SizedBox.shrink();
     final current = AppTab.values[widget.shell.currentIndex];
@@ -94,7 +109,7 @@ class _HomeShellState extends State<HomeShell> {
                     label: Text('$waiting'),
                     child: Icon(_icons[tab]!.$2),
                   ),
-                  label: tab.label,
+                  label: l.appTabLabel(tab),
                 ),
             ],
           );

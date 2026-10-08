@@ -9,6 +9,8 @@ import '../../core/failure.dart';
 import '../../core/money.dart';
 import '../../domain/pos_order.dart';
 import '../../domain/staff.dart';
+import '../../l10n/failure_text.dart';
+import '../../l10n/l10n.dart';
 import '../orders/order_widgets.dart' show SectionCard;
 import '../theme/staff_theme.dart';
 import '../widgets/state_views.dart';
@@ -75,6 +77,7 @@ class _TicketViewState extends State<TicketView> {
   }
 
   Future<void> _send({required bool fire}) async {
+    final l = context.l10n;
     final session = AppScope.of(context).session;
     final placedBy = session.membership?.roleSlug == 'captain'
         ? PlacedBy.captain
@@ -94,8 +97,8 @@ class _TicketViewState extends State<TicketView> {
       showDone(
         context,
         fire
-            ? '${order.displayNo} sent to the kitchen.'
-            : '${order.displayNo} saved and held.',
+            ? l.ticketSentToKitchen(orderNo: order.displayNo)
+            : l.ticketSavedHeld(orderNo: order.displayNo),
       );
       context.go(Routes.posOrder(order.id), extra: order);
     } on AppFailure catch (e) {
@@ -103,7 +106,7 @@ class _TicketViewState extends State<TicketView> {
       // Stop the spinner first: the dialog waits for the cashier.
       setState(() => _sendingFire = null);
       if (e.kind == FailureKind.notReady) {
-        await showNotAvailableDialog(context, e.message);
+        await showNotAvailableDialog(context, failureText(l, e));
       } else {
         showFailure(context, e);
       }
@@ -117,23 +120,23 @@ class _TicketViewState extends State<TicketView> {
   Future<void> _showEarlierOrder(PlacedOrder order) async {
     final open = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('An earlier order went through'),
-        content: Text(
-          "This phone's earlier order was saved as ${order.displayNo}. "
-          'Your cart is still here. Send it again to make a new order.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text('Open ${order.displayNo}'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Keep this cart'),
-          ),
-        ],
-      ),
+      builder: (context) {
+        final l = context.l10n;
+        return AlertDialog(
+          title: Text(l.ticketEarlierTitle),
+          content: Text(l.ticketEarlierBody(orderNo: order.displayNo)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(l.ticketOpenOrder(orderNo: order.displayNo)),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(l.ticketKeepCart),
+            ),
+          ],
+        );
+      },
     );
     if (open == true && mounted) {
       await context.push(Routes.posOrder(order.id), extra: order);
@@ -144,23 +147,24 @@ class _TicketViewState extends State<TicketView> {
     final t = ViniiTokens.of(context);
     final sure = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Clear this order?'),
-        content: const Text(
-          'Everything on it is removed. It has not been sent.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Keep it'),
-          ),
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: t.danger),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Clear order'),
-          ),
-        ],
-      ),
+      builder: (context) {
+        final l = context.l10n;
+        return AlertDialog(
+          title: Text(l.ticketClearTitle),
+          content: Text(l.ticketClearBody),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(l.ticketKeepIt),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: t.danger),
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(l.ticketClearConfirm),
+            ),
+          ],
+        );
+      },
     );
     if (sure == true) _cart.clear();
   }
@@ -193,28 +197,29 @@ class _TicketViewState extends State<TicketView> {
     final controller = TextEditingController(text: line.notes ?? '');
     final saved = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Note for ${line.name}'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLength: 140,
-          textCapitalization: TextCapitalization.sentences,
-          decoration: const InputDecoration(
-            hintText: 'e.g. Less spicy, no onion',
+      builder: (context) {
+        final l = context.l10n;
+        return AlertDialog(
+          title: Text(l.ticketNoteFor(name: line.name)),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            maxLength: 140,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: InputDecoration(hintText: l.sellNoteHint),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(l.commonCancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, controller.text),
+              child: Text(l.commonSave),
+            ),
+          ],
+        );
+      },
     );
     controller.dispose();
     if (saved != null) _cart.setLineNote(line.itemId, saved);
@@ -226,18 +231,19 @@ class _TicketViewState extends State<TicketView> {
       listenable: _cart,
       builder: (context, _) {
         final cart = _cart;
+        final l = context.l10n;
         if (cart.isEmpty) {
           return widget.embedded
-              ? const EmptyView(
+              ? EmptyView(
                   icon: Icons.shopping_basket_outlined,
-                  title: 'The order is empty',
-                  message: 'Tap a dish to add it.',
+                  title: l.ticketEmptyTitle,
+                  message: l.ticketEmptyEmbedded,
                 )
               : EmptyView(
                   icon: Icons.shopping_basket_outlined,
-                  title: 'The order is empty',
-                  message: 'Add dishes on the Sell screen.',
-                  actionLabel: 'Back to the menu',
+                  title: l.ticketEmptyTitle,
+                  message: l.ticketEmptyMessage,
+                  actionLabel: l.ticketBackToMenu,
                   onAction: () => context.go(Routes.sell),
                 );
         }
@@ -253,6 +259,7 @@ class _TicketViewState extends State<TicketView> {
 
   Widget _form(BuildContext context, SellCart cart) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final dineIn = cart.serviceType == ServiceType.dineIn;
     final gap = widget.embedded ? 10.0 : 12.0;
     return ListView(
@@ -263,30 +270,28 @@ class _TicketViewState extends State<TicketView> {
             children: [
               Expanded(
                 child: Text(
-                  'Current order',
+                  l.ticketCurrentOrder,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ),
               TextButton(
                 key: const Key('ticket-clear'),
                 onPressed: _clear,
-                child: const Text('Clear'),
+                child: Text(l.commonClear),
               ),
             ],
           ),
           SizedBox(height: gap),
         ],
         if (cart.hasPendingSend) ...[
-          const NoticeBanner(
+          NoticeBanner(
             icon: Icons.sync_problem_rounded,
-            message:
-                'An earlier send from this phone did not get an answer. '
-                'Sending again checks for it first, so nothing is made twice.',
+            message: l.ticketPendingSendNotice,
           ),
           SizedBox(height: gap),
         ],
         SectionCard(
-          title: 'Order type',
+          title: l.ticketOrderType,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -299,14 +304,15 @@ class _TicketViewState extends State<TicketView> {
                   children: [
                     Icon(Icons.group_outlined, size: 20, color: t.inkSecondary),
                     const SizedBox(width: 8),
-                    Text(
-                      'Guests',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: t.inkSecondary,
+                    Expanded(
+                      child: Text(
+                        l.ticketGuests,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: t.inkSecondary,
+                        ),
                       ),
                     ),
-                    const Spacer(),
                     QtyStepper(
                       qty: cart.guestCount,
                       min: 1,
@@ -319,9 +325,9 @@ class _TicketViewState extends State<TicketView> {
                   controller: _name,
                   textCapitalization: TextCapitalization.words,
                   textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(
-                    labelText: 'Customer name (optional)',
-                    prefixIcon: Icon(Icons.person_outline_rounded),
+                  decoration: InputDecoration(
+                    labelText: l.ticketCustomerNameOptional,
+                    prefixIcon: const Icon(Icons.person_outline_rounded),
                   ),
                   onChanged: cart.setCustomerName,
                 ),
@@ -335,11 +341,11 @@ class _TicketViewState extends State<TicketView> {
                   ],
                   decoration: InputDecoration(
                     labelText: cart.serviceType == ServiceType.delivery
-                        ? 'Customer phone'
-                        : 'Customer phone (optional)',
+                        ? l.ticketCustomerPhone
+                        : l.ticketCustomerPhoneOptional,
                     prefixIcon: const Icon(Icons.phone_outlined),
                     helperText: cart.serviceType == ServiceType.delivery
-                        ? 'Needed so the rider can reach the customer.'
+                        ? l.ticketPhoneHelper
                         : null,
                   ),
                   onChanged: cart.setCustomerPhone,
@@ -350,7 +356,7 @@ class _TicketViewState extends State<TicketView> {
         ),
         SizedBox(height: gap),
         SectionCard(
-          title: cart.itemCount == 1 ? '1 item' : '${cart.itemCount} items',
+          title: l.posItemCount(count: cart.itemCount),
           padding: const EdgeInsets.fromLTRB(16, 16, 12, 8),
           child: Column(
             children: [
@@ -367,22 +373,20 @@ class _TicketViewState extends State<TicketView> {
         ),
         SizedBox(height: gap),
         SectionCard(
-          title: 'Order note',
+          title: l.ticketOrderNote,
           child: TextField(
             controller: _notes,
             maxLines: 2,
             minLines: 1,
             maxLength: 200,
             textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(
-              hintText: 'For the whole order, e.g. Serve starters first',
-            ),
+            decoration: InputDecoration(hintText: l.ticketOrderNoteHint),
             onChanged: cart.setNotes,
           ),
         ),
         SizedBox(height: gap),
         SectionCard(
-          title: 'Bill',
+          title: l.commonBill,
           child: EstimatedBill(
             bill: cart.estimate,
             serviceCharge: _serviceLine(cart),
@@ -394,7 +398,8 @@ class _TicketViewState extends State<TicketView> {
 
   Widget _actions(BuildContext context, SellCart cart) {
     final t = ViniiTokens.of(context);
-    final blocker = cart.blocker;
+    final l = context.l10n;
+    final blocker = cart.blockerKind;
     final busy = cart.placing || _sendingFire != null;
     final enabled = blocker == null && !busy;
     Widget spinner(Color c) => SizedBox.square(
@@ -425,7 +430,7 @@ class _TicketViewState extends State<TicketView> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        blocker,
+                        l.sellBlockerText(blocker),
                         style: TextStyle(
                           color: t.ink,
                           fontWeight: FontWeight.w600,
@@ -437,36 +442,41 @@ class _TicketViewState extends State<TicketView> {
                 ),
                 const SizedBox(height: 10),
               ],
-              Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: OutlinedButton(
-                      onPressed: enabled ? () => _send(fire: false) : null,
-                      child: _sendingFire == false
-                          ? spinner(t.ink)
-                          : const FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text('Save & hold', maxLines: 1),
-                            ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 3,
-                    child: FilledButton(
-                      onPressed: enabled ? () => _send(fire: true) : null,
-                      child: _sendingFire == true
-                          ? spinner(t.onAccent)
-                          : FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                'Send to kitchen · ${rupees(cart.estimate.payable)}',
+              // The two labels wrap in a longer language; stretching keeps the
+              // buttons the same height when only one of them does.
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: OutlinedButton(
+                        onPressed: enabled ? () => _send(fire: false) : null,
+                        child: _sendingFire == false
+                            ? spinner(t.ink)
+                            : Text(
+                                l.ticketSaveHold,
+                                textAlign: TextAlign.center,
                               ),
-                            ),
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 3,
+                      child: FilledButton(
+                        onPressed: enabled ? () => _send(fire: true) : null,
+                        child: _sendingFire == true
+                            ? spinner(t.onAccent)
+                            : Text(
+                                l.ticketSendToKitchen(
+                                  total: rupees(cart.estimate.payable),
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -490,6 +500,7 @@ class _LineRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final note = line.notes;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
@@ -510,6 +521,7 @@ class _LineRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
+                  // i18n-ignore: arithmetic, no words
                   '${rupees(line.unitPrice)} × ${line.qty} = ${rupees(line.lineTotal)}',
                   style: TextStyle(color: t.inkSecondary, fontSize: 13),
                 ),
@@ -532,7 +544,7 @@ class _LineRow extends StatelessWidget {
                         const SizedBox(width: 6),
                         Flexible(
                           child: Text(
-                            note ?? 'Add note',
+                            note ?? l.ticketAddNote,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(

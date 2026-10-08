@@ -1,8 +1,10 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import '../../domain/storefront.dart';
+import '../../l10n/l10n.dart';
 import '../theme/guest_theme.dart';
 import '../widgets/dish_art.dart';
 import 'guest_effects.dart';
@@ -24,6 +26,7 @@ class GuestWelcomeScreen extends StatelessWidget {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
     final t = GuestCopy.of(context);
+    final l = context.l10n;
     final brand = s.definition.brand;
     // The layout follows the template; the faces may be the CMS's.
     final artisan = p.template == StorefrontTemplate.artisanDay;
@@ -40,7 +43,7 @@ class GuestWelcomeScreen extends StatelessWidget {
     // Shown only when the restaurant wrote it; the screen never had one.
     final tableLine = s.tableName == null
         ? null
-        : t.own('welcome.table_line', {'table': s.tableName!});
+        : t.own('welcome.table_line', {'table': l.guestTableNameOf(s)!});
 
     final names = cover == null
         ? DishSpread.pick([...s.catalog.chefsPicks, ...s.catalog.allItems])
@@ -48,94 +51,121 @@ class GuestWelcomeScreen extends StatelessWidget {
 
     // The words and the button, the same on every screen size. On a phone the
     // dishes fill the space above them; on a wide screen they stand beside.
-    Widget words({required bool wide}) => Padding(
-      padding: EdgeInsets.fromLTRB(24, 12, wide ? 24 : 16, 20),
-      child: Column(
-        crossAxisAlignment: artisan
-            ? CrossAxisAlignment.center
-            : CrossAxisAlignment.start,
-        children: [
-          _BrandRow(artisan: artisan, showName: hasHero || artisan),
-          if (s.languages.length > 1) ...[
-            const SizedBox(height: 14),
-            const _LanguageSwitch(),
-          ],
-          if (wide)
-            const Spacer(flex: 3)
-          else if (cover == null)
-            Expanded(child: _HeroDishes(names: names))
-          else
-            const Spacer(),
+    Widget words({required bool wide, double minHeight = 0}) {
+      final align = artisan
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start;
+      // Above the dishes: the brand and the language switch.
+      final top = <Widget>[
+        _BrandRow(artisan: artisan, showName: hasHero || artisan),
+        if (s.languages.length > 1) ...[
+          const SizedBox(height: 14),
+          const _LanguageSwitch(),
+        ],
+      ];
+      // Below them: the headline, the words and the button.
+      final bottom = <Widget>[
+        _Rise(
+          delay: 0,
+          child: hasHero
+              ? _Headline(
+                  text: brand.heroTitle,
+                  artisan: artisan,
+                  size: wide ? 52 : 40,
+                )
+              : Text(
+                  brand.displayName,
+                  textAlign: artisan ? TextAlign.center : TextAlign.start,
+                  style: p.display(wide ? 54 : 44, color: Colors.white),
+                ),
+        ),
+        if (brand.heroSubtitle.trim().isNotEmpty) ...[
+          const SizedBox(height: 14),
           _Rise(
-            delay: 0,
-            child: hasHero
-                ? _Headline(
-                    text: brand.heroTitle,
-                    artisan: artisan,
-                    size: wide ? 52 : 40,
+            delay: 120,
+            child: Text(
+              brand.heroSubtitle,
+              textAlign: artisan ? TextAlign.center : TextAlign.start,
+              style: p.body(
+                wide ? 18 : 16,
+                color: Colors.white.withValues(alpha: 0.78),
+              ),
+            ),
+          ),
+        ],
+        if (tableLine != null) ...[
+          const SizedBox(height: 14),
+          _Rise(
+            delay: 160,
+            child: Text(
+              tableLine,
+              textAlign: artisan ? TextAlign.center : TextAlign.start,
+              style: p.body(15, weight: FontWeight.w700, color: Colors.white),
+            ),
+          ),
+        ],
+        const SizedBox(height: 28),
+        _Rise(
+          delay: 220,
+          child: Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: modes.length == 2
+                ? Column(
+                    children: [
+                      for (final (i, m) in modes.indexed) ...[
+                        if (i > 0) const SizedBox(height: 12),
+                        _ModePill(
+                          key: ValueKey('welcome-mode-${m.name}'),
+                          mode: m,
+                          primary: i == 0,
+                        ),
+                      ],
+                    ],
                   )
-                : Text(
-                    brand.displayName,
-                    textAlign: artisan ? TextAlign.center : TextAlign.start,
-                    style: p.display(wide ? 54 : 44, color: Colors.white),
+                : GuestButton(
+                    key: const ValueKey('welcome-cta'),
+                    label: t.own('welcome.cta') ?? l.guestWelcomeStart,
+                    trailingArrow: true,
+                    onImage: true,
+                    onTap: () => GuestFlow.start(context),
                   ),
           ),
-          if (brand.heroSubtitle.trim().isNotEmpty) ...[
-            const SizedBox(height: 14),
-            _Rise(
-              delay: 120,
-              child: Text(
-                brand.heroSubtitle,
-                textAlign: artisan ? TextAlign.center : TextAlign.start,
-                style: p.body(
-                  wide ? 18 : 16,
-                  color: Colors.white.withValues(alpha: 0.78),
+        ),
+      ];
+      return Padding(
+        padding: EdgeInsets.fromLTRB(24, 12, wide ? 24 : 16, 20),
+        child: wide
+            ? Column(
+                crossAxisAlignment: align,
+                children: [
+                  ...top,
+                  const Spacer(flex: 3),
+                  ...bottom,
+                  const Spacer(flex: 2),
+                ],
+              )
+            // A phone: the dishes fill whatever the words leave, and when the
+            // words alone are taller than the screen (Hindi, large text, a
+            // phone on its side) the dishes shrink to nothing and the
+            // screen scrolls instead of overflowing.
+            : _SceneColumn(
+                minHeight: (minHeight - 32).clamp(0.0, double.infinity),
+                top: Column(
+                  crossAxisAlignment: align,
+                  mainAxisSize: MainAxisSize.min,
+                  children: top,
+                ),
+                scene: cover == null
+                    ? _HeroDishes(names: names)
+                    : const SizedBox.shrink(),
+                bottom: Column(
+                  crossAxisAlignment: align,
+                  mainAxisSize: MainAxisSize.min,
+                  children: bottom,
                 ),
               ),
-            ),
-          ],
-          if (tableLine != null) ...[
-            const SizedBox(height: 14),
-            _Rise(
-              delay: 160,
-              child: Text(
-                tableLine,
-                textAlign: artisan ? TextAlign.center : TextAlign.start,
-                style: p.body(15, weight: FontWeight.w700, color: Colors.white),
-              ),
-            ),
-          ],
-          const SizedBox(height: 28),
-          _Rise(
-            delay: 220,
-            child: Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: modes.length == 2
-                  ? Column(
-                      children: [
-                        for (final (i, m) in modes.indexed) ...[
-                          if (i > 0) const SizedBox(height: 12),
-                          _ModePill(
-                            key: ValueKey('welcome-mode-${m.name}'),
-                            mode: m,
-                            primary: i == 0,
-                          ),
-                        ],
-                      ],
-                    )
-                  : GuestButton(
-                      key: const ValueKey('welcome-cta'),
-                      label: t('welcome.cta'),
-                      trailingArrow: true,
-                      onImage: true,
-                      onTap: () => GuestFlow.start(context),
-                    ),
-            ),
-          ),
-          if (wide) const Spacer(flex: 2),
-        ],
-      ),
-    );
+      );
+    }
 
     return Scaffold(
       backgroundColor: p.isDark ? p.background : p.ink,
@@ -150,7 +180,13 @@ class GuestWelcomeScreen extends StatelessWidget {
                 // A wide screen (a tablet on its side, a counter display) puts
                 // the dishes beside the words, not under a phone-width column.
                 if (c.maxWidth < 900) {
-                  return GuestColumn(child: words(wide: false));
+                  return GuestColumn(
+                    child: LayoutBuilder(
+                      builder: (context, box) => SingleChildScrollView(
+                        child: words(wide: false, minHeight: box.maxHeight),
+                      ),
+                    ),
+                  );
                 }
                 return Row(
                   children: [
@@ -183,6 +219,115 @@ class GuestWelcomeScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Three stacked parts: [top] and [bottom] at their natural height, and the
+/// [scene] (the dishes) in whatever is left between them, which may be
+/// nothing. The whole is at least [minHeight] tall, so on a tall screen it
+/// fills it exactly as a Column with an Expanded would; on a short one it is
+/// as tall as [top] + [bottom] and the surrounding scroll view scrolls.
+class _SceneColumn extends MultiChildRenderObjectWidget {
+  _SceneColumn({
+    required this.minHeight,
+    required Widget top,
+    required Widget scene,
+    required Widget bottom,
+  }) : super(children: [top, scene, bottom]);
+
+  final double minHeight;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderSceneColumn(minHeight);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderSceneColumn renderObject,
+  ) => renderObject.minHeight = minHeight;
+}
+
+class _SceneParentData extends ContainerBoxParentData<RenderBox> {}
+
+class _RenderSceneColumn extends RenderBox
+    with
+        ContainerRenderObjectMixin<RenderBox, _SceneParentData>,
+        RenderBoxContainerDefaultsMixin<RenderBox, _SceneParentData> {
+  _RenderSceneColumn(this._minHeight);
+
+  double _minHeight;
+  set minHeight(double v) {
+    if (v == _minHeight) return;
+    _minHeight = v;
+    markNeedsLayout();
+  }
+
+  @override
+  void setupParentData(RenderBox child) {
+    if (child.parentData is! _SceneParentData) {
+      child.parentData = _SceneParentData();
+    }
+  }
+
+  RenderBox get _top => firstChild!;
+  RenderBox get _scene => childAfter(firstChild!)!;
+  RenderBox get _bottom => lastChild!;
+
+  @override
+  void performLayout() {
+    final w = constraints.maxWidth;
+    final natural = BoxConstraints(minWidth: w, maxWidth: w);
+    _top.layout(natural, parentUsesSize: true);
+    _bottom.layout(natural, parentUsesSize: true);
+    final words = _top.size.height + _bottom.size.height;
+    final total = words > _minHeight ? words : _minHeight;
+    final sceneHeight = total - words;
+    _scene.layout(BoxConstraints.tight(Size(w, sceneHeight)));
+    (_top.parentData! as _SceneParentData).offset = Offset.zero;
+    (_scene.parentData! as _SceneParentData).offset = Offset(
+      0,
+      _top.size.height,
+    );
+    (_bottom.parentData! as _SceneParentData).offset = Offset(
+      0,
+      _top.size.height + sceneHeight,
+    );
+    size = constraints.constrain(Size(w, total));
+  }
+
+  @override
+  double computeMinIntrinsicHeight(double width) =>
+      _top.getMinIntrinsicHeight(width) + _bottom.getMinIntrinsicHeight(width);
+
+  @override
+  double computeMaxIntrinsicHeight(double width) =>
+      _top.getMaxIntrinsicHeight(width) + _bottom.getMaxIntrinsicHeight(width);
+
+  @override
+  double computeMinIntrinsicWidth(double height) => 0;
+
+  @override
+  double computeMaxIntrinsicWidth(double height) => 0;
+
+  @override
+  Size computeDryLayout(BoxConstraints constraints) {
+    final w = constraints.maxWidth;
+    final natural = BoxConstraints(minWidth: w, maxWidth: w);
+    final words =
+        _top.getDryLayout(natural).height +
+        _bottom.getDryLayout(natural).height;
+    return constraints.constrain(
+      Size(w, words > _minHeight ? words : _minHeight),
+    );
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) =>
+      defaultPaint(context, offset);
+
+  @override
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) =>
+      defaultHitTestChildren(result, position: position);
 }
 
 class _HeroBackdrop extends StatelessWidget {
@@ -480,6 +625,7 @@ class _Headline extends StatelessWidget {
           TextSpan(text: first),
           if (rest.isNotEmpty)
             TextSpan(
+              // i18n-ignore: the restaurant's own headline
               text: '\n$rest',
               style: base.copyWith(color: p.accent),
             ),
@@ -499,13 +645,18 @@ class _ModePill extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.read(context);
+    final l = context.l10n;
+    final table = l.guestTableNameOf(s);
     final (title, hint) = switch (mode) {
       GuestServiceMode.dineIn => (
-        'Order now',
-        s.tableName == null ? 'Dine-in' : 'Dine-in at ${s.tableName}',
+        l.guestWelcomeOrderNow,
+        table == null ? l.serviceDineIn : l.guestWelcomeDineInAt(table: table),
       ),
-      GuestServiceMode.preOrder => ('Pre-order', 'Schedule for later'),
-      _ => (mode.label, mode.hint),
+      GuestServiceMode.preOrder => (
+        l.guestModePreOrder,
+        l.guestWelcomePreOrderHint,
+      ),
+      _ => (l.guestModeLabel(mode), l.guestModeHint(mode)),
     };
     // An outlined main button sits on the dark welcome picture: white.
     final outline = primary && p.buttonOutline;
@@ -537,28 +688,56 @@ class _ModePill extends StatelessWidget {
       child: InkWell(
         onTap: () => GuestFlow.start(context, chosen: mode),
         child: Container(
-          height: 58,
-          padding: const EdgeInsets.symmetric(horizontal: 18),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                title,
-                style: p.body(16, weight: FontWeight.w800, color: fg),
-              ),
-              Flexible(
-                child: Text(
-                  '  ·  $hint',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: p.body(14, color: fg.withValues(alpha: 0.72)),
-                ),
-              ),
-            ],
+          // At least 58 high; a longer line (Hindi) grows the pill.
+          constraints: const BoxConstraints(minHeight: 58),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+          child: LayoutBuilder(
+            builder: (context, c) {
+              final titleStyle = p.body(16, weight: FontWeight.w800, color: fg);
+              final hintStyle = p.body(14, color: fg.withValues(alpha: 0.72));
+              // i18n-ignore: the dot between the two parts
+              const dot = '  ·  ';
+              // One line when both parts fit (English); otherwise the hint
+              // goes under the title, so nothing is squeezed or cut.
+              final inline =
+                  _lineWidth(context, title, titleStyle) +
+                      _lineWidth(context, '$dot$hint', hintStyle) <=
+                  c.maxWidth;
+              if (!inline) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(title, textAlign: TextAlign.center, style: titleStyle),
+                    Text(hint, textAlign: TextAlign.center, style: hintStyle),
+                  ],
+                );
+              }
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(title, style: titleStyle),
+                  Text('$dot$hint', style: hintStyle),
+                ],
+              );
+            },
           ),
         ),
       ),
     );
+  }
+
+  /// How wide [text] is on one line at the reader's text size.
+  static double _lineWidth(BuildContext context, String text, TextStyle style) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    final width = painter.width;
+    painter.dispose();
+    return width;
   }
 }
 

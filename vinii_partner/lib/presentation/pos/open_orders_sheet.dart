@@ -7,6 +7,8 @@ import '../../core/failure.dart';
 import '../../core/money.dart';
 import '../../core/time_format.dart';
 import '../../domain/pos_order.dart';
+import '../../l10n/l10n.dart';
+import '../../l10n/labels.dart';
 import '../theme/staff_theme.dart';
 import '../widgets/chips.dart';
 import '../widgets/state_views.dart';
@@ -57,6 +59,7 @@ class _OpenOrdersSheetState extends State<_OpenOrdersSheet> {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final text = Theme.of(context).textTheme;
     final orders = _orders;
     Widget body;
@@ -68,13 +71,12 @@ class _OpenOrdersSheetState extends State<_OpenOrdersSheet> {
     } else if (orders == null) {
       body = const SizedBox(height: 220, child: LoadingView());
     } else if (orders.isEmpty) {
-      body = const SizedBox(
+      body = SizedBox(
         height: 300,
         child: EmptyView(
           icon: Icons.receipt_long_outlined,
-          title: 'No open orders',
-          message:
-              "Today's unpaid orders show here, from this phone and the POS.",
+          title: l.posOpenOrdersEmptyTitle,
+          message: l.posOpenOrdersEmptyMessage,
         ),
       );
     } else {
@@ -86,7 +88,8 @@ class _OpenOrdersSheetState extends State<_OpenOrdersSheet> {
           separatorBuilder: (_, _) => const SizedBox(height: 10),
           itemBuilder: (context, i) {
             final o = orders[i];
-            final where = o.table?.displayName ?? o.serviceType.label;
+            final where =
+                o.table?.nameIn(l) ?? l.serviceTypeLabel(o.serviceType);
             return Material(
               color: t.surface,
               borderRadius: BorderRadius.circular(16),
@@ -105,26 +108,26 @@ class _OpenOrdersSheetState extends State<_OpenOrdersSheet> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
+                            // Wraps under the number when the status word is long.
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
-                                Flexible(
-                                  child: Text(
-                                    o.displayNo,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 16,
-                                      color: t.ink,
-                                    ),
+                                Text(
+                                  o.displayNo,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 16,
+                                    color: t.ink,
                                   ),
                                 ),
-                                const SizedBox(width: 8),
                                 StatusChip.pos(context, o.status),
                               ],
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '$where · ${timeAgo(o.createdAt)}',
+                              '$where · ${timeAgo(l, o.createdAt)}',
                               style: TextStyle(
                                 color: t.inkSecondary,
                                 fontSize: 13.5,
@@ -150,7 +153,7 @@ class _OpenOrdersSheetState extends State<_OpenOrdersSheet> {
                           ),
                           if (o.paidAmount > 0.009)
                             Text(
-                              'Due ${rupees(o.due)}',
+                              l.posOpenDue(amount: rupees(o.due)),
                               style: TextStyle(
                                 color: t.warning,
                                 fontWeight: FontWeight.w700,
@@ -181,9 +184,11 @@ class _OpenOrdersSheetState extends State<_OpenOrdersSheet> {
               padding: const EdgeInsets.fromLTRB(20, 0, 12, 12),
               child: Row(
                 children: [
-                  Expanded(child: Text('Open orders', style: text.titleLarge)),
+                  Expanded(
+                    child: Text(l.posOpenOrders, style: text.titleLarge),
+                  ),
                   IconButton(
-                    tooltip: 'Refresh',
+                    tooltip: l.commonRefresh,
                     onPressed: _load,
                     icon: const Icon(Icons.refresh_rounded),
                   ),

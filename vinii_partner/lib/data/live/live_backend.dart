@@ -15,6 +15,7 @@ import 'live_pos.dart';
 import 'live_storefront.dart';
 import 'live_tables.dart';
 import 'live_team.dart';
+import 'live_user_preferences.dart';
 import 'live_workspace.dart';
 import 'partner_api_inbox.dart';
 
@@ -41,6 +42,7 @@ class LiveBackend implements Backend {
       (throw const AppFailure(
         'Choose an organization first.',
         kind: FailureKind.rejected,
+        code: 'choose_org',
       ));
 
   /// Contract R7: every request says who is calling. [CallerClient] adds
@@ -74,6 +76,9 @@ class LiveBackend implements Backend {
   late final TablesRepository tableCodes = LiveTables(this);
   @override
   late final ChannelsRepository channels = LiveChannels(this);
+  @override
+  late final UserPreferencesRepository userPreferences =
+      LiveUserPreferences(this);
 
   var _started = false;
 
@@ -81,9 +86,12 @@ class LiveBackend implements Backend {
   Future<void> start() async {
     if (_started) return;
     if (!config.isConfigured) {
+      final missing = config.missingSettings.join(' and ');
       throw AppFailure(
-        'This build is missing ${config.missingSettings.join(' and ')}.',
+        'This build is missing $missing.',
         kind: FailureKind.notReady,
+        code: 'build_missing',
+        args: {'settings': missing},
       );
     }
     await Supabase.initialize(
@@ -101,6 +109,7 @@ class LiveBackend implements Backend {
   String get actorName {
     final u = client.auth.currentUser;
     final meta = u?.userMetadata ?? const {};
+    // i18n-ignore: fallback name for event rows; stored data, no screen reads it
     return (meta['full_name'] ?? meta['name'] ?? u?.email ?? 'Staff')
         .toString();
   }

@@ -7,6 +7,7 @@ import '../../application/guest_nearby.dart';
 import '../../application/guest_session.dart';
 import '../../application/guest_social.dart';
 import '../../domain/guest_catalog.dart';
+import '../../l10n/l10n.dart';
 import '../theme/guest_theme.dart';
 import '../widgets/food_art.dart';
 import 'guest_flow.dart';
@@ -129,12 +130,13 @@ class _NearbyAlertHostState extends State<NearbyAlertHost> {
         key: ValueKey('nearby-${order.id}'),
         child: _AlertCard(
           key: const ValueKey('nearby-alert'),
-          who: who.isEmpty ? 'A table near you' : who,
+          who: who.isEmpty ? context.l10n.guestNearbyTableNearYou : who,
           name: item.item.name,
           qty: order.qty,
           imageUrl: item.item.imageUrl,
           added: _confirming?.id == order.id,
-          addLabel: GuestCopy.of(context)('menu.add'),
+          addLabel:
+              GuestCopy.of(context).own('menu.add') ?? context.l10n.commonAdd,
           onOpen: () => unawaited(GuestFlow.openItem(context, item)),
           onAdd: () => _add(feed, order, item),
           onDismiss: () => _dismiss(feed, order),
@@ -220,6 +222,7 @@ class _AlertCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
+    final l = context.l10n;
     final shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(20),
       side: BorderSide(color: p.hairline),
@@ -238,13 +241,13 @@ class _AlertCard extends StatelessWidget {
       explicitChildNodes: true,
       liveRegion: true,
       label: added
-          ? 'Added $name to your order'
-          : '$who just ordered $name${qty > 1 ? ' ×$qty' : ''}',
-      hint: 'Double tap for details',
+          ? l.guestNearbyAddedLabel(name: name)
+          : l.guestNearbyOrderedLabel(who: who, name: name, qty: qty),
+      hint: l.guestNearbyOpenHint,
       onTap: onOpen,
       customSemanticsActions: {
-        const CustomSemanticsAction(label: 'Add to order'): onAdd,
-        const CustomSemanticsAction(label: 'Dismiss'): onDismiss,
+        CustomSemanticsAction(label: l.guestNearbyAddToOrder): onAdd,
+        CustomSemanticsAction(label: l.guestNearbyDismiss): onDismiss,
       },
       child: DecoratedBox(
         decoration: ShapeDecoration(
@@ -324,6 +327,7 @@ class _Dish extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
+    final l = context.l10n;
     return InkWell(
       key: const ValueKey('nearby-open'),
       borderRadius: BorderRadius.circular(14),
@@ -350,7 +354,7 @@ class _Dish extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    '$who just ordered',
+                    l.guestNearbyJustOrdered(who: who),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: p.body(12.5, color: p.inkMuted),
@@ -401,6 +405,7 @@ class _AddButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
+    final l = context.l10n;
     final Color fill;
     final Color ink;
     BorderSide side = BorderSide.none;
@@ -421,7 +426,7 @@ class _AddButton extends StatelessWidget {
       child: Semantics(
         button: true,
         enabled: !added,
-        label: added ? 'Added' : label,
+        label: added ? l.guestNearbyAdded : label,
         onTap: added ? null : onTap,
         excludeSemantics: true,
         child: Material(
@@ -440,9 +445,8 @@ class _AddButton extends StatelessWidget {
                   widthFactor: 1,
                   heightFactor: 1,
                   child: Text(
-                    added ? 'Added' : label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    added ? l.guestNearbyAdded : label,
+                    textAlign: TextAlign.center,
                     style: p.body(14, weight: FontWeight.w800, color: ink),
                   ),
                 ),
@@ -462,12 +466,13 @@ class _CloseButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
+    final l = context.l10n;
     return Tooltip(
-      message: 'Dismiss',
+      message: l.guestNearbyDismiss,
       excludeFromSemantics: true,
       child: Semantics(
         button: true,
-        label: 'Dismiss',
+        label: l.guestNearbyDismiss,
         onTap: onTap,
         excludeSemantics: true,
         child: InkWell(

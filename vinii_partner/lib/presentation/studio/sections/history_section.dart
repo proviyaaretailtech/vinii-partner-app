@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import '../../../app/app_scope.dart';
 import '../../../application/studio_controller.dart';
 import '../../../core/failure.dart';
+import '../../../core/time_format.dart';
 import '../../../domain/staff.dart';
 import '../../../domain/storefront.dart';
+import '../../../l10n/failure_text.dart';
+import '../../../l10n/l10n.dart';
 import '../../menu/panel.dart';
 import '../../theme/staff_theme.dart';
 import '../../widgets/chips.dart';
@@ -18,37 +20,42 @@ class HistorySection extends StatelessWidget {
   final StudioController controller;
 
   Future<void> _restore(BuildContext context, StorefrontVersion v) async {
+    final l = context.l10n;
     final live = controller.state?.published?.version ?? 0;
     final next = live + 1;
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Make version ${v.version} live again?'),
+        title: Text(l.studioHistoryRestoreTitle(version: v.version)),
         content: Text(
-          'Guests will see version ${v.version} again. It is published as '
-          'version $next, so nothing is lost.'
-          '${controller.hasUnpublishedChanges ? ' Your unpublished changes in Studio are replaced by it.' : ''}',
+          controller.hasUnpublishedChanges
+              ? l.studioHistoryRestoreBodyUnpublished(
+                  version: v.version,
+                  next: next,
+                )
+              : l.studioHistoryRestoreBody(version: v.version, next: next),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(l.commonCancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Restore'),
+            child: Text(l.studioRestore),
           ),
         ],
       ),
     );
     if (ok != true || !context.mounted) return;
+    // i18n-ignore: stored publisher name when the account has none
     final by = AppScope.of(context).session.user?.displayName ?? 'Staff';
     try {
       final published = await controller.restore(v, publishedBy: by);
       if (context.mounted) {
         showDone(
           context,
-          'Version ${v.version} is live again as version ${published.version}',
+          l.studioHistoryRestored(version: v.version, next: published.version),
         );
       }
     } on AppFailure catch (e) {
@@ -57,12 +64,12 @@ class HistorySection extends StatelessWidget {
         await showDialog<void>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Restoring is not available yet'),
-            content: Text(e.message),
+            title: Text(l.studioHistoryRestoreUnavailable),
+            content: Text(failureText(l, e)),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
+                child: Text(l.commonOk),
               ),
             ],
           ),
@@ -76,6 +83,7 @@ class HistorySection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final text = Theme.of(context).textTheme;
     final state = controller.state;
     final history = state?.history ?? const <StorefrontVersion>[];
@@ -83,13 +91,12 @@ class HistorySection extends StatelessWidget {
     final canRestore = AppScope.of(context).session
         .can(Capability.publishStorefront);
     if (history.isEmpty) {
-      return const EmptyView(
+      return EmptyView(
         icon: Icons.history_rounded,
-        title: 'Nothing published yet',
-        message: 'Each time you publish, a numbered copy is kept here so you can always go back.',
+        title: l.studioNothingPublished,
+        message: l.studioHistoryEmptyMessage,
       );
     }
-    final format = DateFormat('d MMM y, h:mm a');
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
       itemCount: history.length + 1,
@@ -100,8 +107,8 @@ class HistorySection extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Text(
               canRestore
-                  ? 'Restore an older version to make it live again.'
-                  : 'Owners and admins can restore an older version.',
+                  ? l.studioHistoryRestoreHint
+                  : l.studioHistoryRestoreHintLocked,
               style: text.bodyMedium,
             ),
           );
@@ -118,10 +125,13 @@ class HistorySection extends StatelessWidget {
                     runSpacing: 4,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      Text('Version ${v.version}', style: text.titleMedium),
+                      Text(
+                        l.studioVersionNumber(version: v.version),
+                        style: text.titleMedium,
+                      ),
                       if (isLive)
                         StatusChip(
-                          label: 'Live',
+                          label: l.studioLive,
                           color: t.success,
                           icon: Icons.circle,
                         ),
@@ -131,26 +141,28 @@ class HistorySection extends StatelessWidget {
                 if (canRestore && !isLive)
                   OutlinedButton(
                     style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(0, 40),
+                      minimumSize: const Size(0, 44),
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                     ),
                     onPressed: controller.busy
                         ? null
                         : () => _restore(context, v),
-                    child: const Text('Restore'),
+                    child: Text(l.studioRestore),
                   ),
               ],
             ),
             const SizedBox(height: 6),
             Text(
               [
-                format.format(v.publishedAt),
-                if (v.publishedBy != null) 'by ${v.publishedBy}',
+                dayMonthYearTime(v.publishedAt),
+                if (v.publishedBy != null)
+                  l.studioPublishedBy(name: v.publishedBy!),
               ].join(' · '),
               style: text.bodyMedium,
             ),
             const SizedBox(height: 2),
             Text(
+              // i18n-ignore: the restaurant's name and the template's name
               '${v.definition.brand.displayName} · ${v.definition.template.label}',
               style: text.bodySmall,
             ),

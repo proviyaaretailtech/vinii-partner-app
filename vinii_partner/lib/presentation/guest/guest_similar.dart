@@ -10,6 +10,8 @@ import '../../core/money.dart';
 import '../../domain/guest_catalog.dart';
 import '../../domain/menu.dart';
 import '../../domain/storefront.dart';
+import '../../l10n/app_localizations_en.dart';
+import '../../l10n/l10n.dart';
 import '../theme/guest_theme.dart';
 import '../widgets/food_art.dart';
 import 'guest_widgets.dart';
@@ -92,6 +94,7 @@ class _Section extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
+    final l = context.l10n;
     return Column(
       key: const ValueKey('similar-strip'),
       mainAxisSize: MainAxisSize.min,
@@ -109,10 +112,8 @@ class _Section extends StatelessWidget {
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text(
-                      'Tables like yours',
+                      l.guestSimilarHeading,
                       key: const ValueKey('similar-heading'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                       style: p.body(
                         13,
                         weight: FontWeight.w700,
@@ -183,6 +184,7 @@ class _TableCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
+    final l10n = context.l10n;
     final dishes = [for (final l in table.availableLines) l.dish!.item];
     final shown = dishes.take(3).toList();
     final more = dishes.length - shown.length;
@@ -225,8 +227,8 @@ class _TableCard extends StatelessWidget {
             key: ValueKey('similar-card-${table.id}'),
             button: true,
             // Every word the card leaves out, for someone who cannot see it.
-            label: similarSpoken(table),
-            hint: 'See what they ordered',
+            label: similarSpoken(table, l10n),
+            hint: l10n.guestSimilarSeeOrder,
             onTap: open,
             onLongPress: hold,
             excludeSemantics: true,
@@ -382,8 +384,6 @@ class _Dishes extends StatelessWidget {
 /// Lines set close, so a few of them make a card no taller than it needs.
 TextStyle _tight(TextStyle s) => s.copyWith(height: 1.2);
 
-String _people(int n) => n == 1 ? '1 person' : '$n people';
-
 /// Whether the server's name for the table already says how many sat there
 /// ("A table of 4"), so the party is not said twice.
 bool _namesParty(String who, int n) =>
@@ -406,27 +406,37 @@ String similarPeek(SimilarTable t) => [
 
 /// Everything the card shows and leaves out, in words, for a screen reader:
 /// the table, its party, every dish with how many, and the total.
-String similarSpoken(SimilarTable t) {
+///
+/// [l] is the reader's language; English when it is left out.
+String similarSpoken(SimilarTable t, [AppLocalizations? l]) {
+  final words = l ?? AppLocalizationsEn();
   final n = t.partySize;
   final who = n == null || n < 1 || _namesParty(t.who, n)
       ? t.who
-      : '${t.who}, ${_people(n)}';
+      : words.guestSimilarWhoParty(who: t.who, count: n);
   final dishes = [
-    for (final l in t.distinctLines.where((l) => l.available))
-      l.qty == 1 ? l.dish!.item.name : '${l.qty} ${l.dish!.item.name}',
+    for (final line in t.distinctLines.where((line) => line.available))
+      line.qty == 1
+          ? line.dish!.item.name
+          : '${line.qty} ${line.dish!.item.name}',
   ].join(', ');
-  return '$who. $dishes. Total ${rupees(t.total)}';
+  return words.guestSimilarSpoken(
+    who: who,
+    dishes: dishes,
+    total: rupees(t.total),
+  );
 }
 
-/// How long ago, in the few words a glance needs.
+/// How long ago, in the few words a glance needs. [l] is the reader's
+/// language; English when it is left out.
 @visibleForTesting
-String similarAgo(Duration age) {
+String similarAgo(Duration age, [AppLocalizations? l]) {
+  final words = l ?? AppLocalizationsEn();
   final minutes = age.inMinutes;
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return '$minutes min ago';
-  if (age.inHours < 24) return '${age.inHours} hr ago';
-  final days = age.inDays;
-  return days == 1 ? '1 day ago' : '$days days ago';
+  if (minutes < 1) return words.guestSimilarAgoNow;
+  if (minutes < 60) return words.guestSimilarAgoMinutes(minutes: minutes);
+  if (age.inHours < 24) return words.guestSimilarAgoHours(hours: age.inHours);
+  return words.guestSimilarAgoDays(days: age.inDays);
 }
 
 /// The server's name for a table inside a sentence ("a table of 4" rather than
@@ -605,9 +615,10 @@ class _SimilarSheetState extends State<_SimilarSheet> {
     final messenger = ScaffoldMessenger.maybeOf(context);
     final width = math.min(440.0, MediaQuery.sizeOf(context).width - 32);
     final reduced = reducedMotion(context);
-    final text =
-        'Added $portions ${portions == 1 ? 'dish' : 'dishes'} '
-        'from ${_inSentence(widget.table.who)}';
+    final text = context.l10n.guestSimilarAddedFrom(
+      count: portions,
+      who: _inSentence(widget.table.who),
+    );
     Navigator.of(context).pop();
     if (portions == 0 || messenger == null) return;
     messenger
@@ -632,6 +643,7 @@ class _SimilarSheetState extends State<_SimilarSheet> {
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
+    final l = context.l10n;
     final table = widget.table;
     final picks = _picks;
     final portions = table.portionsOf(picks);
@@ -639,8 +651,8 @@ class _SimilarSheetState extends State<_SimilarSheet> {
     final party = table.partySize;
     final meta = [
       if (party != null && party >= 1 && !_namesParty(table.who, party))
-        'A table of $party',
-      similarAgo(DateTime.now().difference(table.orderedAt)),
+        l.guestSimilarTableOfParty(count: party),
+      similarAgo(DateTime.now().difference(table.orderedAt), l),
     ].join(' · ');
     return Stack(
       children: [
@@ -706,10 +718,10 @@ class _SimilarSheetState extends State<_SimilarSheet> {
                               container: true,
                               header: true,
                               child: Text(
-                                'What ${_inSentence(table.who)} ordered',
+                                l.guestSimilarSheetTitle(
+                                  who: _inSentence(table.who),
+                                ),
                                 key: const ValueKey('similar-title'),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
                                 style: p.display(24),
                               ),
                             ),
@@ -769,10 +781,11 @@ class _SimilarSheetState extends State<_SimilarSheet> {
                       child: GuestButton(
                         key: const ValueKey('similar-add-all'),
                         label: portions == 0
-                            ? 'Choose a dish'
-                            : 'Add $portions '
-                                  '${portions == 1 ? 'dish' : 'dishes'}'
-                                  ' · ${rupees(total)}',
+                            ? l.guestSimilarChooseDish
+                            : l.guestSimilarAddAll(
+                                count: portions,
+                                total: rupees(total),
+                              ),
                         icon: portions > 0 ? Icons.add_rounded : null,
                         onTap: portions > 0 ? _addPicked : null,
                       ),
@@ -789,7 +802,10 @@ class _SimilarSheetState extends State<_SimilarSheet> {
                           textStyle: p.body(15, weight: FontWeight.w600),
                         ),
                         // Something went in already: this is "finished" now.
-                        child: Text(_addedOne ? 'Done' : 'Not now'),
+                        child: Text(
+                          _addedOne ? l.commonDone : l.guestSimilarNotNow,
+                          textAlign: TextAlign.center,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -815,12 +831,13 @@ class _TotalRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
-    final dishes = '$portions ${portions == 1 ? 'dish' : 'dishes'}';
+    final l = context.l10n;
+    final dishes = l.guestDishCount(count: portions);
     return Semantics(
       container: true,
       label: portions == 0
-          ? 'Nothing chosen'
-          : 'Total ${rupees(total)} for $dishes',
+          ? l.guestSimilarNothingChosen
+          : l.guestSimilarTotalFor(total: rupees(total), dishes: dishes),
       excludeSemantics: true,
       child: Wrap(
         key: const ValueKey('similar-total'),
@@ -833,9 +850,9 @@ class _TotalRow extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Total', style: p.body(15, weight: FontWeight.w700)),
+              Text(l.commonTotal, style: p.body(15, weight: FontWeight.w700)),
               Text(
-                portions == 0 ? 'Nothing chosen' : dishes,
+                portions == 0 ? l.guestSimilarNothingChosen : dishes,
                 style: p.body(12.5, color: p.inkMuted),
               ),
             ],
@@ -880,6 +897,7 @@ class _PickRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
+    final l = context.l10n;
     final id = line.itemId;
     final dish = line.dish!.item;
     final price = rupees(fromPaise(toPaise(dish.price) * qty));
@@ -903,9 +921,11 @@ class _PickRow extends StatelessWidget {
                 Semantics(
                   container: true,
                   checked: picked,
-                  label:
-                      '${dish.name}, '
-                      '${qty == 1 ? '1 portion' : '$qty portions'}, $price',
+                  label: l.guestSimilarLineLabel(
+                    name: dish.name,
+                    count: qty,
+                    price: price,
+                  ),
                   onTap: onToggle,
                   excludeSemantics: true,
                   child: _Tick(key: ValueKey('similar-tick-$id'), on: picked),
@@ -967,7 +987,7 @@ class _PickRow extends StatelessWidget {
                           Semantics(
                             container: true,
                             explicitChildNodes: true,
-                            label: '${dish.name} quantity',
+                            label: l.guestSimilarQtyLabel(name: dish.name),
                             value: '$qty',
                             // A tap beside its buttons (or on a button that
                             // cannot go lower) is the stepper's, not the row's.
@@ -1047,6 +1067,7 @@ class _AddPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
+    final l = context.l10n;
     final tone = p.readable(p.success);
     final ink = added ? tone : p.ink;
     return Semantics(
@@ -1054,7 +1075,9 @@ class _AddPill extends StatelessWidget {
       button: true,
       enabled: !added,
       liveRegion: added,
-      label: added ? 'Added $name' : 'Add $name to my order',
+      label: added
+          ? l.guestSimilarAddedName(name: name)
+          : l.guestSimilarAddNameLabel(name: name),
       onTap: added ? null : onTap,
       excludeSemantics: true,
       child: Material(
@@ -1100,7 +1123,7 @@ class _AddPill extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          added ? 'Added' : 'Add',
+                          added ? l.guestNearbyAdded : l.commonAdd,
                           style: p.body(
                             13,
                             weight: FontWeight.w700,
@@ -1129,11 +1152,12 @@ class _GoneRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
+    final l = context.l10n;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Semantics(
         container: true,
-        label: 'No longer available, will not be added',
+        label: l.guestSimilarGoneLabel,
         excludeSemantics: true,
         child: Row(
           children: [
@@ -1144,6 +1168,7 @@ class _GoneRow extends StatelessWidget {
             const SizedBox.square(
               dimension: 48,
               child: FoodArt(
+                // i18n-ignore: name of the painted plate, not shown as text
                 name: 'plate',
                 radius: 14,
                 animate: false,
@@ -1153,9 +1178,7 @@ class _GoneRow extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'No longer available',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+                l.guestSimilarGone,
                 style: p.body(14.5, weight: FontWeight.w600, color: p.inkMuted),
               ),
             ),

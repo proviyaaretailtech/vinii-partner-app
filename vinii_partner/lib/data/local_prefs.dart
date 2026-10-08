@@ -33,6 +33,17 @@ class LocalPrefs {
   Future<void> setThemeMode(ThemeMode mode) =>
       _prefs.setString('theme_mode', mode.name);
 
+  /// The language the person chose (`en`, `hi`), or null while the phone's
+  /// own language is being followed. Mirrors `user_preferences.locale`.
+  String? get localeCode => _prefs.getString('locale');
+  Future<void> setLocaleCode(String code) => _prefs.setString('locale', code);
+
+  /// True while the chosen language has not reached the server yet (offline,
+  /// or nobody was signed in); retried on the next launch.
+  bool get localeSyncPending => _prefs.getBool('locale_sync_pending') ?? false;
+  Future<void> setLocaleSyncPending(bool pending) =>
+      _prefs.setBool('locale_sync_pending', pending);
+
   bool get ringEnabled => _prefs.getBool('ring_enabled') ?? true;
   Future<void> setRingEnabled(bool on) => _prefs.setBool('ring_enabled', on);
 

@@ -18,5 +18,8 @@ Future<void> main() async {
     prefs: prefs,
     backend: LiveBackend(config, prefs),
   );
+  // The saved language (and its font, for Hindi) is in place before the
+  // first frame, so a Hindi user never sees English first.
+  await services.locale.restore();
   runApp(ViniiPartnerApp(services: services));
 }

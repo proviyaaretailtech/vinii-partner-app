@@ -29,7 +29,7 @@ class BrandMark extends StatelessWidget {
         children: [
           Center(
             child: Text(
-              'V',
+              'V', // i18n-ignore: brand mark letter
               style: TextStyle(
                 color: fg,
                 fontSize: size * 0.52,

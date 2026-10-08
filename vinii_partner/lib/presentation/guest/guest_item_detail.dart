@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/money.dart';
 import '../../domain/guest_catalog.dart';
 import '../../domain/menu.dart';
+import '../../l10n/l10n.dart';
+import '../menu/menu_labels.dart';
 import '../theme/guest_theme.dart';
 import '../widgets/food_art.dart';
 import 'guest_effects.dart';
@@ -47,6 +49,7 @@ class _GuestItemDetailScreenState extends State<GuestItemDetailScreen> {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final l = context.l10n;
     final f = s.features;
     final item = widget.item;
     final i = item.item;
@@ -78,7 +81,7 @@ class _GuestItemDetailScreenState extends State<GuestItemDetailScreen> {
             Expanded(
               child: GuestButton(
                 key: const ValueKey('detail-add'),
-                label: 'Add to order · ${rupees(i.price * _qty)}',
+                label: l.guestItemAddToOrder(price: rupees(i.price * _qty)),
                 icon: Icons.keyboard_arrow_up_rounded,
                 style: p.isDark
                     ? GuestButtonStyle.success
@@ -137,7 +140,7 @@ class _GuestItemDetailScreenState extends State<GuestItemDetailScreen> {
                         children: [
                           RoundIcon(
                             icon: Icons.close_rounded,
-                            tooltip: 'Close',
+                            tooltip: l.commonClose,
                             color: Colors.white,
                             background: Colors.black.withValues(alpha: 0.4),
                             onTap: () => Navigator.of(context).maybePop(),
@@ -148,9 +151,7 @@ class _GuestItemDetailScreenState extends State<GuestItemDetailScreen> {
                               icon: liked
                                   ? Icons.favorite_rounded
                                   : Icons.favorite_border_rounded,
-                              tooltip: liked
-                                  ? 'Saved for later'
-                                  : 'Save for later',
+                              tooltip: liked ? l.guestDishSaved : l.guestDishSave,
                               color: liked ? p.danger : Colors.white,
                               background: Colors.black.withValues(alpha: 0.4),
                               onTap: () => s.toggleLike(i.id),
@@ -235,7 +236,7 @@ class _GuestItemDetailScreenState extends State<GuestItemDetailScreen> {
                     if (f.showIngredients && pres.ingredients.isNotEmpty) ...[
                       const SizedBox(height: 24),
                       Text(
-                        'Ingredients',
+                        l.guestItemIngredients,
                         style: p.display(18, weight: FontWeight.w700),
                       ),
                       const SizedBox(height: 12),
@@ -256,17 +257,19 @@ class _GuestItemDetailScreenState extends State<GuestItemDetailScreen> {
                     ],
                     if (f.showAllergens && pres.allergens.isNotEmpty)
                       _Accordion(
-                        title: 'Allergen information',
+                        title: l.guestItemAllergens,
                         child: Text(
-                          'Contains: ${pres.allergens.join(', ')}',
+                          l.guestItemContains(
+                            list: pres.allergens.map(l.allergenLabel).join(', '),
+                          ),
                           style: p.body(14, color: p.inkMuted),
                         ),
                       ),
                     if (f.showNutrition && pres.kcal != null)
                       _Accordion(
-                        title: 'Nutritional info',
+                        title: l.guestItemNutrition,
                         child: Text(
-                          '${pres.kcal} kcal per serving',
+                          l.guestItemKcal(kcal: pres.kcal!),
                           style: p.body(14, color: p.inkMuted),
                         ),
                       ),
@@ -282,7 +285,7 @@ class _GuestItemDetailScreenState extends State<GuestItemDetailScreen> {
                           const SizedBox(width: 6),
                           Flexible(
                             child: Text(
-                              'About ${i.prepMinutes} min to prepare',
+                              l.guestItemPrep(minutes: i.prepMinutes!),
                               style: p.body(13, color: p.inkMuted),
                             ),
                           ),
@@ -402,6 +405,7 @@ void showAddedSheet(BuildContext navContext, GuestItem item) {
     builder: (context) {
       final p = GuestPalette.of(context);
       final s = GuestScope.of(context);
+      final l = context.l10n;
       final i = item.item;
       return SafeArea(
         child: SingleChildScrollView(
@@ -411,7 +415,11 @@ void showAddedSheet(BuildContext navContext, GuestItem item) {
             children: [
               const SuccessCheck(size: 72),
               const SizedBox(height: 16),
-              Text('Added to your order!', style: p.display(24)),
+              Text(
+                l.guestItemAddedTitle,
+                textAlign: TextAlign.center,
+                style: p.display(24),
+              ),
               const SizedBox(height: 16),
               GuestCard(
                 padding: const EdgeInsets.all(10),
@@ -445,7 +453,10 @@ void showAddedSheet(BuildContext navContext, GuestItem item) {
                 children: [
                   Expanded(
                     child: GuestButton(
-                      label: 'View order (${s.itemCount})',
+                      label: l.guestCartBarLabel(
+                        label: l.guestCartView,
+                        count: s.itemCount,
+                      ),
                       style: GuestButtonStyle.outline,
                       dense: true,
                       onTap: () {
@@ -457,7 +468,7 @@ void showAddedSheet(BuildContext navContext, GuestItem item) {
                   const SizedBox(width: 12),
                   Expanded(
                     child: GuestButton(
-                      label: 'Keep exploring',
+                      label: l.guestItemKeepExploring,
                       dense: true,
                       onTap: () => Navigator.of(context).pop(),
                     ),

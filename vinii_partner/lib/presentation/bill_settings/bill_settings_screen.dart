@@ -3,9 +3,12 @@ import 'package:flutter/services.dart';
 
 import '../../app/app_scope.dart';
 import '../../application/bill_settings_controller.dart';
+import '../../core/money.dart';
 import '../../core/time_format.dart';
 import '../../domain/billing.dart';
 import '../../domain/staff.dart';
+import '../../l10n/failure_text.dart';
+import '../../l10n/l10n.dart';
 import '../menu/panel.dart';
 import '../pos/pos_widgets.dart' show BillLines;
 import '../theme/staff_theme.dart';
@@ -117,12 +120,17 @@ class _BillSettingsScreenState extends State<BillSettingsScreen> {
     put(_service, _c.serviceText);
   }
 
-  String? _error(BillField f) => _touched.contains(f) ? _c.errors[f] : null;
+  /// The problem with [f] in the reader's language, once it has been left.
+  String? _error(AppLocalizations l, BillField f) {
+    final problem = _touched.contains(f) ? _c.errors[f] : null;
+    return problem == null ? null : l.billProblemText(problem);
+  }
 
   Future<void> _save() async {
+    final l = context.l10n;
     FocusScope.of(context).unfocus();
     final ok = await _c.save();
-    if (ok && mounted) showDone(context, 'Bill settings saved.');
+    if (ok && mounted) showDone(context, l.billSaved);
   }
 
   Future<void> _onBlockedPop() async {
@@ -133,6 +141,7 @@ class _BillSettingsScreenState extends State<BillSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = context.l10n;
     return ListenableBuilder(
       listenable: _c,
       builder: (context, _) {
@@ -142,7 +151,7 @@ class _BillSettingsScreenState extends State<BillSettingsScreen> {
             if (!didPop) _onBlockedPop();
           },
           child: Scaffold(
-            appBar: AppBar(title: const Text('Bill & GST')),
+            appBar: AppBar(title: Text(l.settingsBillGst)),
             bottomNavigationBar: _c.saved != null && _c.canEdit
                 ? _SaveBar(
                     controller: _c,
@@ -158,11 +167,12 @@ class _BillSettingsScreenState extends State<BillSettingsScreen> {
   }
 
   Widget _body(BuildContext context) {
+    final l = context.l10n;
     if (!_canView) {
-      return const EmptyView(
+      return EmptyView(
         icon: Icons.lock_outline_rounded,
-        title: 'Not available for your role',
-        message: 'Ask an owner or admin to look at the bill settings.',
+        title: l.billBlockedTitle,
+        message: l.billBlockedMessage,
       );
     }
     final saved = _c.saved;
@@ -173,7 +183,7 @@ class _BillSettingsScreenState extends State<BillSettingsScreen> {
           onRetry: () => _c.load(force: true),
         );
       }
-      return const LoadingView(label: 'Loading bill settings…');
+      return LoadingView(label: l.billLoading);
     }
     return LayoutBuilder(
       builder: (context, box) {
@@ -222,41 +232,43 @@ class _BillSettingsScreenState extends State<BillSettingsScreen> {
   }
 
   List<Widget> _sections(BuildContext context, {required bool includePreview}) {
+    final l = context.l10n;
     final t = ViniiTokens.of(context);
     final text = Theme.of(context).textTheme;
     final edit = _c.canEdit;
     final saved = _c.saved!;
     final cgst = formatPercent(_c.cgst);
     final sgst = formatPercent(_c.sgst);
-    final serviceError = _error(BillField.service);
+    final serviceError = _error(l, BillField.service);
     return [
       if (!edit) ...[
-        const NoticeBanner(
+        NoticeBanner(
           icon: Icons.lock_outline_rounded,
-          message: 'Only an owner or admin can change this.',
+          message: l.billNoticeReadOnly,
         ),
         const SizedBox(height: 12),
       ] else if (!saved.exists) ...[
-        const NoticeBanner(
-          message:
-              'No bill settings are saved yet, so bills use the standard 5% '
-              'GST. Change anything below, then save.',
+        NoticeBanner(
+          message: l.billNoticeNoSettings(
+            percent: formatPercent(BillSettings.defaults.gstPercent),
+          ),
         ),
         const SizedBox(height: 12),
       ],
       Panel(
         children: [
-          Text('GST rate', style: text.titleMedium),
+          Text(l.billGstRate, style: text.titleMedium),
           const SizedBox(height: 2),
           Text(
-            'Added to every bill, on the food and on the service charge.',
+            l.billGstRateHelp,
             style: text.bodySmall?.copyWith(height: 1.35),
           ),
           const SizedBox(height: 12),
           ChoiceSegments<double>(
             options: [
-              for (final p in gstPresets) (p, '${formatPercent(p)}%'),
-              (-1, 'Custom'),
+              for (final p in gstPresets)
+                (p, l.billPercent(percent: formatPercent(p))),
+              (-1, l.billCustom),
             ],
             selected: _c.customGst ? -1 : _c.selectedGstPreset,
             onChanged: edit
@@ -286,10 +298,10 @@ class _BillSettingsScreenState extends State<BillSettingsScreen> {
                 ),
               ],
               decoration: InputDecoration(
-                labelText: 'GST rate',
-                hintText: 'e.g. 12.5',
-                suffixText: '%',
-                errorText: _error(BillField.customGst),
+                labelText: l.billGstRate,
+                hintText: l.billCustomGstHint,
+                suffixText: '%', // i18n-ignore: percent sign
+                errorText: _error(l, BillField.customGst),
               ),
               onChanged: _c.setCustomGstText,
             ),
@@ -301,7 +313,7 @@ class _BillSettingsScreenState extends State<BillSettingsScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'CGST $cgst% + SGST $sgst%',
+                  l.billGstSplit(cgst: cgst, sgst: sgst),
                   key: const Key('bill-gst-split'),
                   style: TextStyle(
                     color: t.ink,
@@ -328,10 +340,10 @@ class _BillSettingsScreenState extends State<BillSettingsScreen> {
               LengthLimitingTextInputFormatter(15),
             ],
             decoration: InputDecoration(
-              labelText: 'GSTIN',
-              hintText: '22AAAAA0000A1Z5',
-              helperText: 'Printed on every bill',
-              errorText: _error(BillField.gstin),
+              labelText: l.billGstin,
+              hintText: '22AAAAA0000A1Z5', // i18n-ignore: sample GSTIN
+              helperText: l.billGstinHelper,
+              errorText: _error(l, BillField.gstin),
             ),
             onChanged: _c.setGstin,
           ),
@@ -343,8 +355,8 @@ class _BillSettingsScreenState extends State<BillSettingsScreen> {
         children: [
           SettingSwitchRow(
             key: const Key('bill-service-switch'),
-            title: 'Service charge',
-            subtitle: 'Added before GST. Staff can remove it from a bill at the final order.',
+            title: l.billServiceCharge,
+            subtitle: l.billServiceChargeHelp,
             value: _c.serviceOn,
             onChanged: edit
                 ? (on) {
@@ -363,7 +375,7 @@ class _BillSettingsScreenState extends State<BillSettingsScreen> {
                   ChoiceSegments<double>(
                     options: [
                       for (final p in servicePresets)
-                        (p, '${formatPercent(p)}%'),
+                        (p, l.billPercent(percent: formatPercent(p))),
                     ],
                     selected: _c.selectedServicePreset,
                     onChanged: edit
@@ -388,10 +400,12 @@ class _BillSettingsScreenState extends State<BillSettingsScreen> {
                       ),
                     ],
                     decoration: InputDecoration(
-                      labelText: 'Percentage',
-                      hintText: 'e.g. 10',
-                      suffixText: '%',
-                      helperText: 'Up to 50%',
+                      labelText: l.billPercentage,
+                      hintText: l.billServicePercentHint,
+                      suffixText: '%', // i18n-ignore: percent sign
+                      helperText: l.billServicePercentHelper(
+                        max: formatPercent(maxServiceChargePercent),
+                      ),
                       errorText: serviceError,
                     ),
                     onChanged: _c.setServiceText,
@@ -408,8 +422,8 @@ class _BillSettingsScreenState extends State<BillSettingsScreen> {
         children: [
           SettingSwitchRow(
             key: const Key('bill-round-switch'),
-            title: 'Round the final bill to the nearest rupee',
-            subtitle: 'For example, ₹553.46 becomes ₹553.',
+            title: l.billRoundTitle,
+            subtitle: l.billRoundHelp,
             value: _c.roundOff,
             onChanged: edit ? _c.setRoundOff : null,
           ),
@@ -419,7 +433,7 @@ class _BillSettingsScreenState extends State<BillSettingsScreen> {
         const SizedBox(height: 20),
         _PreviewCard(controller: _c),
       ],
-      const PanelLabel('On the printed bill'),
+      PanelLabel(l.billSectionPrinted),
       Panel(
         children: [
           TextField(
@@ -429,9 +443,9 @@ class _BillSettingsScreenState extends State<BillSettingsScreen> {
             maxLength: 80,
             textCapitalization: TextCapitalization.words,
             textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(
-              labelText: 'Legal name',
-              hintText: 'Your registered business name',
+            decoration: InputDecoration(
+              labelText: l.billLegalName,
+              hintText: l.billLegalNameHint,
               counterText: '',
             ),
             onChanged: _c.setLegalName,
@@ -445,8 +459,8 @@ class _BillSettingsScreenState extends State<BillSettingsScreen> {
             maxLines: 4,
             maxLength: 200,
             textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(
-              labelText: 'Address',
+            decoration: InputDecoration(
+              labelText: l.commonAddress,
               alignLabelWithHint: true,
               counterText: '',
             ),
@@ -464,8 +478,8 @@ class _BillSettingsScreenState extends State<BillSettingsScreen> {
               LengthLimitingTextInputFormatter(18),
             ],
             decoration: InputDecoration(
-              labelText: 'Phone',
-              errorText: _error(BillField.phone),
+              labelText: l.billPhone,
+              errorText: _error(l, BillField.phone),
             ),
             onChanged: _c.setPhone,
           ),
@@ -481,9 +495,9 @@ class _BillSettingsScreenState extends State<BillSettingsScreen> {
               LengthLimitingTextInputFormatter(14),
             ],
             decoration: InputDecoration(
-              labelText: 'FSSAI number',
-              helperText: '14 digits',
-              errorText: _error(BillField.fssai),
+              labelText: l.billFssai,
+              helperText: l.billFssaiHelper,
+              errorText: _error(l, BillField.fssai),
             ),
             onChanged: _c.setFssai,
           ),
@@ -494,9 +508,9 @@ class _BillSettingsScreenState extends State<BillSettingsScreen> {
             enabled: edit,
             maxLength: 160,
             textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(
-              labelText: 'Footer note',
-              hintText: 'Thank you! Visit again.',
+            decoration: InputDecoration(
+              labelText: l.billFooter,
+              hintText: l.billFooterHint,
               counterText: '',
             ),
             onChanged: _c.setFooterNote,
@@ -515,6 +529,7 @@ class _PreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = context.l10n;
     final text = Theme.of(context).textTheme;
     return Card(
       key: const Key('bill-preview'),
@@ -523,14 +538,17 @@ class _PreviewCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Example: ₹1,000 of food', style: text.titleMedium),
+            Text(
+              l.billExampleTitle(amount: rupees(exampleFoodAmount)),
+              style: text.titleMedium,
+            ),
             const SizedBox(height: 2),
             Text(
-              'Changes as you edit the settings.',
+              l.billExampleHelp,
               style: text.bodySmall?.copyWith(height: 1.35),
             ),
             const SizedBox(height: 10),
-            BillLines(bill: controller.example, totalLabel: 'Guest pays'),
+            BillLines(bill: controller.example, totalLabel: l.billGuestPays),
           ],
         ),
       ),
@@ -551,9 +569,9 @@ class _SaveBar extends StatelessWidget {
   final VoidCallback onSave;
   final VoidCallback onReload;
 
-  String _savedAt(String? updatedAt) {
+  String _savedAt(AppLocalizations l, String? updatedAt) {
     final at = DateTime.tryParse(updatedAt ?? '');
-    if (at == null) return 'Saved.';
+    if (at == null) return l.billSavedPlain;
     final local = at.toLocal();
     final now = DateTime.now();
     final today =
@@ -561,12 +579,13 @@ class _SaveBar extends StatelessWidget {
         local.month == now.month &&
         local.day == now.day;
     return today
-        ? 'Last saved at ${clockTime(local)}'
-        : 'Last saved ${shortDay(local)}, ${clockTime(local)}';
+        ? l.billLastSavedAt(time: clockTime(local))
+        : l.billLastSavedOn(day: shortDay(local), time: clockTime(local));
   }
 
   @override
   Widget build(BuildContext context) {
+    final l = context.l10n;
     final t = ViniiTokens.of(context);
     final c = controller;
     final failure = c.saveFailure;
@@ -577,33 +596,31 @@ class _SaveBar extends StatelessWidget {
     if (c.stale) {
       icon = Icons.sync_problem_rounded;
       color = t.warning;
-      message =
-          'Someone else saved these settings while you were editing. '
-          'Reload to see their changes. Your edits here will be replaced.';
+      message = l.billStale;
     } else if (failure != null) {
       icon = Icons.error_outline_rounded;
       color = t.danger;
-      message = failure.message;
+      message = failureText(l, failure);
     } else if (c.isDirty && !c.isValid) {
       icon = Icons.edit_note_rounded;
       color = t.warning;
-      message = 'Fix the highlighted fields to save.';
+      message = l.billFixFields;
     } else if (c.isDirty) {
       icon = Icons.edit_note_rounded;
       color = t.inkSecondary;
-      message = 'You have changes that are not saved yet.';
+      message = l.billUnsaved;
     } else if (c.justSaved) {
       icon = Icons.check_circle_rounded;
       color = t.success;
-      message = 'All changes saved.';
+      message = l.billAllSaved;
     } else if (c.saved?.exists ?? false) {
       icon = Icons.history_rounded;
       color = t.inkSecondary;
-      message = _savedAt(c.saved?.updatedAt);
+      message = _savedAt(l, c.saved?.updatedAt);
     } else {
       icon = Icons.info_outline_rounded;
       color = t.inkSecondary;
-      message = 'Not saved yet.';
+      message = l.billNotSaved;
     }
 
     return Material(
@@ -649,26 +666,30 @@ class _SaveBar extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    if (c.stale)
-                      FilledButton(
-                        key: const Key('bill-reload'),
-                        onPressed: onReload,
-                        child: const Text('Reload'),
-                      )
-                    else
-                      FilledButton(
-                        key: const Key('bill-save'),
-                        onPressed: c.canSave ? onSave : null,
-                        child: c.saving
-                            ? SizedBox.square(
-                                dimension: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.4,
-                                  color: t.onAccent,
-                                ),
-                              )
-                            : const Text('Save changes'),
-                      ),
+                    // The button may wrap its words onto two lines (Hindi is
+                    // longer) but never takes the room the status needs.
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 180),
+                      child: c.stale
+                          ? FilledButton(
+                              key: const Key('bill-reload'),
+                              onPressed: onReload,
+                              child: Text(l.billReload),
+                            )
+                          : FilledButton(
+                              key: const Key('bill-save'),
+                              onPressed: c.canSave ? onSave : null,
+                              child: c.saving
+                                  ? SizedBox.square(
+                                      dimension: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.4,
+                                        color: t.onAccent,
+                                      ),
+                                    )
+                                  : Text(l.billSaveChanges),
+                            ),
+                    ),
                   ],
                 ),
               ),
@@ -678,4 +699,17 @@ class _SaveBar extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Words for a [BillProblem] (the controller only knows the code).
+extension BillProblemText on AppLocalizations {
+  String billProblemText(BillProblem p) => switch (p) {
+    BillProblem.customRate => billProblemCustomRate,
+    BillProblem.servicePercent => billProblemService(
+      max: formatPercent(maxServiceChargePercent),
+    ),
+    BillProblem.gstinShape => billProblemGstin,
+    BillProblem.fssaiDigits => billProblemFssai,
+    BillProblem.phoneDigits => billProblemPhone,
+  };
 }

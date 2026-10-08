@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_scope.dart';
 import '../../config/app_config.dart';
+import '../../l10n/l10n.dart';
+import '../../l10n/labels.dart';
+import '../shell/home_shell.dart' show AppTabLabels;
 import '../theme/staff_theme.dart';
 
 /// What support asks for: which build, which database, which configuration.
@@ -14,40 +17,46 @@ class AboutScreen extends StatelessWidget {
     final s = services.session;
     final def = s.definition;
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final rows = [
-      ('App version', '${AppConfig.appVersion} (${AppConfig.buildNumber})'),
-      ('Environment', services.config.appEnv),
-      ('Database', services.config.databaseHost),
+      (l.aboutAppVersion, '${AppConfig.appVersion} (${AppConfig.buildNumber})'),
+      (l.aboutEnvironment, services.config.appEnv),
+      (l.aboutDatabase, services.config.databaseHost),
       (
-        'One Local server',
+        l.aboutOneLocalServer,
         services.config.partnerApiBaseUrl.isEmpty
-            ? 'Not set'
+            ? l.aboutNotSet
             : Uri.parse(services.config.partnerApiBaseUrl).host,
       ),
-      ('Organization', s.membership?.organization.name ?? '—'),
+      (l.orgLabel, s.membership?.organization.name ?? '—'),
       (
-        'Role',
+        l.aboutRole,
         s.membership == null
             ? '—'
-            : '${s.membership!.roleName} (${s.membership!.roleSlug})',
+            : '${l.roleLabel(s.membership!.roleSlug, fallback: s.membership!.roleName)} '
+                  '(${s.membership!.roleSlug})',
       ),
       (
-        'Configuration',
-        def == null ? '—' : '${def.configVersion} · from ${def.source}',
+        l.aboutConfiguration,
+        def == null
+            ? '—'
+            : l.aboutConfigValue(
+                version: def.configVersion,
+                source: def.source,
+              ),
       ),
-      ('Minimum version', def?.minAppVersion ?? '—'),
-      ('Tabs', def == null ? '—' : def.tabs.map((e) => e.label).join(', ')),
+      (l.aboutMinVersion, def?.minAppVersion ?? '—'),
+      (l.aboutTabs, def == null ? '—' : def.tabs.map(l.appTabLabel).join(', ')),
     ];
     return Scaffold(
-      appBar: AppBar(title: const Text('About')),
+      appBar: AppBar(title: Text(l.aboutTitle)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
             child: Text(
-              'Support may ask you to read these out. You do not need to '
-              'change or do anything with them.',
+              l.aboutIntro,
               style: TextStyle(color: t.inkMuted, fontSize: 14, height: 1.4),
             ),
           ),
@@ -85,10 +94,7 @@ class AboutScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          Text(
-            'VINII Partner shows only what is in your organization\'s database. It has no sample data.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
+          Text(l.aboutFooter, style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
     );

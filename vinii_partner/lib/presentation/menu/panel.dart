@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/l10n.dart';
 import '../theme/staff_theme.dart';
 
 /// Small building blocks shared by the Menu and Studio screens, so both
@@ -143,27 +144,30 @@ class TintIcon extends StatelessWidget {
   }
 }
 
-/// Asks "leave without saving?" and returns true to leave.
+/// Asks "leave without saving?" and returns true to leave. [title] and
+/// [message] default to the standard wording in the reader's language; a
+/// caller that passes its own must pass an already-translated sentence.
 Future<bool> confirmDiscard(
   BuildContext context, {
-  String title = 'Discard your changes?',
-  String message = 'What you changed on this screen has not been saved.',
+  String? title,
+  String? message,
 }) async {
   final t = ViniiTokens.of(context);
+  final l = context.l10n;
   final leave = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
-      title: Text(title),
-      content: Text(message),
+      title: Text(title ?? l.menuDiscardTitle),
+      content: Text(message ?? l.menuDiscardMessage),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
-          child: const Text('Keep editing'),
+          child: Text(l.menuKeepEditing),
         ),
         TextButton(
           style: TextButton.styleFrom(foregroundColor: t.danger),
           onPressed: () => Navigator.pop(context, true),
-          child: const Text('Discard'),
+          child: Text(l.menuDiscard),
         ),
       ],
     ),

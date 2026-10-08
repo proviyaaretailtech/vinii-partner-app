@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../core/failure.dart';
+import '../../l10n/failure_text.dart';
+import '../../l10n/l10n.dart';
+import '../../l10n/labels.dart';
 import '../theme/staff_theme.dart';
 
 /// Every list and screen has four honest states: loading, empty, failed,
@@ -101,20 +104,21 @@ class FailureView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (icon, title) = switch (failure.kind) {
-      FailureKind.offline => (Icons.wifi_off_rounded, 'You are offline'),
-      FailureKind.forbidden => (Icons.lock_outline_rounded, 'Not allowed'),
-      FailureKind.notReady => (Icons.construction_rounded, 'Not available yet'),
-      FailureKind.auth => (Icons.person_off_outlined, 'Signed out'),
-      _ => (Icons.error_outline_rounded, 'Something went wrong'),
+    final l = context.l10n;
+    final icon = switch (failure.kind) {
+      FailureKind.offline => Icons.wifi_off_rounded,
+      FailureKind.forbidden => Icons.lock_outline_rounded,
+      FailureKind.notReady => Icons.construction_rounded,
+      FailureKind.auth => Icons.person_off_outlined,
+      _ => Icons.error_outline_rounded,
     };
     return EmptyView(
       icon: icon,
-      title: title,
-      message: failure.message,
+      title: l.failureKindTitle(failure.kind),
+      message: failureText(l, failure),
       actionLabel: onRetry == null || failure.kind == FailureKind.notReady
           ? null
-          : 'Try again',
+          : l.commonTryAgain,
       onAction: onRetry,
     );
   }
@@ -164,12 +168,12 @@ class NoticeBanner extends StatelessWidget {
   }
 }
 
-/// Shows an [AppFailure] as a snackbar with the right words.
+/// Shows an [AppFailure] as a snackbar, in the current language.
 void showFailure(BuildContext context, Object error) {
   final f = error is AppFailure ? error : asFailure(error);
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(f.message)));
+    ..showSnackBar(SnackBar(content: Text(failureText(context.l10n, f))));
 }
 
 void showDone(BuildContext context, String message) {

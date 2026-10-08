@@ -9,6 +9,8 @@ import '../../core/failure.dart';
 import '../../core/money.dart';
 import '../../domain/billing.dart';
 import '../../domain/pos_order.dart';
+import '../../l10n/failure_text.dart';
+import '../../l10n/l10n.dart';
 import '../theme/guest_theme.dart';
 import 'guest_bill.dart';
 import 'guest_flow.dart';
@@ -53,7 +55,7 @@ class _GuestPaymentScreenState extends State<GuestPaymentScreen> {
   late int _people = GuestScope.read(context).partySize.clamp(2, 30);
   String _key = _uuid.v4();
   OnlinePayment? _attempt;
-  String? _problem;
+  AppFailure? _problem;
   bool _showQr = false;
   bool _showBill = false;
   double _paid = 0;
@@ -69,11 +71,11 @@ class _GuestPaymentScreenState extends State<GuestPaymentScreen> {
 
   /// Said only once the guest has typed enough digits to be wrong, and says
   /// what to change.
-  String? get _phoneError {
+  String? _phoneError(AppLocalizations l) {
     final d = _digits;
-    if (d.length > 10) return 'Enter just the 10 digits, without 0 or +91';
+    if (d.length > 10) return l.guestPayPhoneTooLong;
     if (d.length == 10 && !RegExp(r'^[6-9]').hasMatch(d)) {
-      return 'A mobile number starts with 6, 7, 8 or 9';
+      return l.guestPayPhoneBadStart;
     }
     return null;
   }
@@ -127,7 +129,7 @@ class _GuestPaymentScreenState extends State<GuestPaymentScreen> {
       if (!mounted) return;
       setState(() {
         _phase = _Phase.failed;
-        _problem = e.message;
+        _problem = e;
       });
     }
   }
@@ -144,7 +146,7 @@ class _GuestPaymentScreenState extends State<GuestPaymentScreen> {
         if (!mounted) return;
         setState(() {
           _phase = _Phase.pending;
-          _problem = e.message;
+          _problem = e;
         });
         return;
       }
@@ -192,6 +194,7 @@ class _GuestPaymentScreenState extends State<GuestPaymentScreen> {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final l = context.l10n;
     final payments = s.gateway.payments;
     final orders = _orders;
     final busy =
@@ -201,7 +204,7 @@ class _GuestPaymentScreenState extends State<GuestPaymentScreen> {
     final canSplit = s.features.splitBill && s.features.splitParty;
     final bill = orders.isEmpty ? null : combinedBill(orders);
     final subtitle = [
-      if (s.tableName != null) s.tableName!,
+      ?l.guestTableNameOf(s),
       for (final o in orders) '#${o.displayNo}',
     ].join(' · ');
     return GuestPage(
@@ -215,14 +218,14 @@ class _GuestPaymentScreenState extends State<GuestPaymentScreen> {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: Text(
-                      'Enter your mobile number to pay',
+                      l.guestPayNeedPhone,
                       textAlign: TextAlign.center,
                       style: p.body(13.5, color: p.inkMuted),
                     ),
                   ),
                 GuestButton(
                   key: const ValueKey('pay-now'),
-                  label: 'Pay ${rupees(_amount)}',
+                  label: l.guestPayButton(amount: rupees(_amount)),
                   icon: Icons.lock_outline_rounded,
                   busy: busy,
                   onTap: busy || _amount <= 0 || !_phoneOk ? null : _pay,
@@ -234,14 +237,13 @@ class _GuestPaymentScreenState extends State<GuestPaymentScreen> {
           ListView(
             padding: const EdgeInsets.only(bottom: 24),
             children: [
-              const GuestTopBar(title: 'Pay'),
+              GuestTopBar(title: l.guestPayTitle),
               const Center(child: PreviewBanner()),
               if (payments == null || orders.isEmpty)
                 Padding(
                   padding: const EdgeInsets.all(32),
                   child: Text(
-                    'Online payment is not set up here. Please ask a member of '
-                    'staff for the bill.',
+                    l.guestPayNotSetUp,
                     textAlign: TextAlign.center,
                     style: p.body(15, color: p.inkMuted),
                   ),
@@ -252,7 +254,7 @@ class _GuestPaymentScreenState extends State<GuestPaymentScreen> {
                     children: [
                       const SizedBox(height: 8),
                       Text(
-                        _share ? 'Your share' : 'Amount to pay',
+                        _share ? l.guestPayYourShare : l.guestPayAmountToPay,
                         style: p.body(14, color: p.inkMuted),
                       ),
                       const SizedBox(height: 4),
@@ -274,18 +276,17 @@ class _GuestPaymentScreenState extends State<GuestPaymentScreen> {
                   _Notice(
                     icon: Icons.error_outline_rounded,
                     color: p.danger,
-                    title: "The payment didn't go through",
-                    body:
-                        _problem ??
-                        'Nothing has been paid. You can try again, or ask a '
-                            'member of staff to take the payment.',
+                    title: l.guestPayFailedTitle,
+                    body: _problem == null
+                        ? l.guestPayFailedBody
+                        : failureText(l, _problem!),
                   ),
                 if (_phase == _Phase.dropped)
                   _Notice(
                     icon: Icons.info_outline_rounded,
                     color: p.keyLight,
-                    title: 'Payment window closed',
-                    body: 'Nothing has been paid yet. Tap Pay when you are ready.',
+                    title: l.guestPayClosedTitle,
+                    body: l.guestPayClosedBody,
                   ),
                 if (canSplit && _due > 0)
                   Reveal(
@@ -321,7 +322,7 @@ class _GuestPaymentScreenState extends State<GuestPaymentScreen> {
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
-                                    'See the bill',
+                                    l.guestPaySeeBill,
                                     style: p.body(15, weight: FontWeight.w700),
                                   ),
                                 ),
@@ -355,7 +356,7 @@ class _GuestPaymentScreenState extends State<GuestPaymentScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Your mobile number',
+                              l.guestPayYourMobile,
                               style: p.body(15, weight: FontWeight.w700),
                             ),
                             const SizedBox(height: 10),
@@ -376,6 +377,7 @@ class _GuestPaymentScreenState extends State<GuestPaymentScreen> {
                                   child: Center(
                                     widthFactor: 1,
                                     child: Text(
+                                      // i18n-ignore: country calling code
                                       '+91',
                                       style: p.body(
                                         16,
@@ -385,15 +387,15 @@ class _GuestPaymentScreenState extends State<GuestPaymentScreen> {
                                     ),
                                   ),
                                 ),
+                                // i18n-ignore: sample phone number
                                 hintText: '98765 43210',
                                 counterText: '',
-                                errorText: _phoneError,
+                                errorText: _phoneError(l),
                               ),
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'The payment service asks for it with every '
-                              'payment.',
+                              l.guestPayMobileWhy,
                               style: p.body(12.5, color: p.inkMuted),
                             ),
                           ],
@@ -416,8 +418,7 @@ class _GuestPaymentScreenState extends State<GuestPaymentScreen> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'UPI, cards, netbanking or wallets. You choose in '
-                            'the next step.',
+                            l.guestPayMethods,
                             style: p.body(13.5, color: p.inkMuted),
                           ),
                         ),
@@ -442,7 +443,7 @@ class _GuestPaymentScreenState extends State<GuestPaymentScreen> {
                             if (mounted) {
                               setState(() {
                                 _showQr = false;
-                                _problem = e.message;
+                                _problem = e;
                               });
                             }
                           }
@@ -464,7 +465,7 @@ class _GuestPaymentScreenState extends State<GuestPaymentScreen> {
                       const SizedBox(width: 6),
                       Flexible(
                         child: Text(
-                          'Payments are processed by Cashfree.',
+                          l.guestPayProcessedBy,
                           style: p.body(12.5, color: p.inkMuted),
                         ),
                       ),
@@ -480,7 +481,7 @@ class _GuestPaymentScreenState extends State<GuestPaymentScreen> {
               _phase == _Phase.pending)
             _Overlay(
               phase: _phase,
-              problem: _problem,
+              problem: _problem == null ? null : failureText(l, _problem!),
               onCheck: _attempt == null
                   ? null
                   : () => unawaited(
@@ -558,6 +559,7 @@ class _SplitCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
+    final l = context.l10n;
     Widget option(bool value, String title, String sub) {
       final on = share == value;
       return Expanded(
@@ -598,11 +600,11 @@ class _SplitCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              option(false, 'Whole bill', rupees(whole)),
+              option(false, l.guestPaySplitWhole, rupees(whole)),
               const SizedBox(width: 10),
               option(
                 true,
-                'My share',
+                l.guestPaySplitMine,
                 rupees(money(whole / people).clamp(1, whole)),
               ),
             ],
@@ -618,13 +620,16 @@ class _SplitCard extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            'Split between',
+                            l.guestPaySplitBetween,
                             style: p.body(14, color: p.inkMuted),
                           ),
                         ),
                         QtyStepper(qty: people, min: 2, onChanged: onPeople),
                         const SizedBox(width: 8),
-                        Text('people', style: p.body(14, color: p.inkMuted)),
+                        Text(
+                          l.guestPayPeople,
+                          style: p.body(14, color: p.inkMuted),
+                        ),
                       ],
                     ),
                   )
@@ -655,6 +660,7 @@ class _PhoneQr extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
+    final l = context.l10n;
     final link = attempt?.linkUrl;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
@@ -676,7 +682,7 @@ class _PhoneQr extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Pay from your own phone',
+                          l.guestPayOwnPhone,
                           style: p.body(
                             15,
                             weight: FontWeight.w700,
@@ -685,7 +691,7 @@ class _PhoneQr extends StatelessWidget {
                         ),
                         if (!ready)
                           Text(
-                            'Enter your mobile number above first.',
+                            l.guestPayOwnPhoneNeedNumber,
                             style: p.body(12.5, color: p.inkMuted),
                           ),
                       ],
@@ -727,7 +733,7 @@ class _PhoneQr extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'Scan with your camera to pay ${rupees(attempt!.amount)}',
+                    l.guestPayScanToPay(amount: rupees(attempt!.amount)),
                     textAlign: TextAlign.center,
                     style: p.body(13.5, color: p.inkMuted),
                   ),
@@ -756,22 +762,12 @@ class _Overlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
+    final l = context.l10n;
     final (title, body) = switch (phase) {
-      _Phase.starting => ('Getting your payment ready', ''),
-      _Phase.checkout => (
-        'Complete your payment',
-        'Finish in the payment window. Do not close this page.',
-      ),
-      _Phase.verifying => (
-        'Confirming with your bank',
-        "This only takes a moment. Please don't pay again.",
-      ),
-      _ => (
-        'Waiting for your bank',
-        problem ??
-            "This can take a minute. Please don't pay again: this page will "
-                'update on its own.',
-      ),
+      _Phase.starting => (l.guestPayStartingTitle, ''),
+      _Phase.checkout => (l.guestPayCheckoutTitle, l.guestPayCheckoutBody),
+      _Phase.verifying => (l.guestPayVerifyingTitle, l.guestPayVerifyingBody),
+      _ => (l.guestPayPendingTitle, problem ?? l.guestPayPendingBody),
     };
     return Positioned.fill(
       child: ColoredBox(
@@ -815,7 +811,7 @@ class _Overlay extends StatelessWidget {
                   if (phase == _Phase.pending && onCheck != null) ...[
                     const SizedBox(height: 18),
                     GuestButton(
-                      label: 'Check now',
+                      label: l.guestPayCheckNow,
                       dense: true,
                       style: GuestButtonStyle.soft,
                       onTap: onCheck,
@@ -842,25 +838,29 @@ class _PaidScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final l = context.l10n;
     final allPaid = remaining < 0.5;
     return CelebrationPage(
-      title: allPaid ? 'Payment received' : 'Your share is paid',
+      title: allPaid ? l.guestPayReceivedTitle : l.guestPayShareTitle,
       lines: [
         rupees(paid),
         if (allPaid)
-          'Thank you for dining with ${s.definition.brand.displayName}.'
+          l.guestPayThanks(name: s.definition.brand.displayName)
         else
-          '${rupees(remaining)} is still to pay on this ${s.definition.tableLabel.toLowerCase()}.',
+          l.guestPayRemaining(
+            amount: rupees(remaining),
+            table: l.guestTableWordFor(s.definition).toLowerCase(),
+          ),
       ],
       primary: GuestButton(
-        label: allPaid ? 'Order more' : 'Back to the bill',
+        label: allPaid ? l.guestPlacedOrderMore : l.guestPayBackToBill,
         trailingArrow: true,
         onTap: () => allPaid
             ? GuestFlow.orderMore(context)
             : Navigator.of(context).maybePop(),
       ),
       secondary: GuestButton(
-        label: allPaid ? 'Done' : 'Order more',
+        label: allPaid ? l.commonDone : l.guestPlacedOrderMore,
         style: GuestButtonStyle.outline,
         onTap: () => allPaid
             ? Navigator.of(context).popUntil((r) => r.isFirst)

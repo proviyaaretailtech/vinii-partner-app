@@ -9,6 +9,9 @@ import '../../application/table_codes_controller.dart';
 import '../../core/failure.dart';
 import '../../domain/pos_order.dart';
 import '../../domain/staff.dart';
+import '../../l10n/failure_text.dart';
+import '../../l10n/l10n.dart';
+import '../../l10n/script_fonts.dart';
 import '../pos/pos_widgets.dart' show showNotAvailableDialog;
 import '../theme/staff_theme.dart';
 import '../widgets/chips.dart';
@@ -38,7 +41,10 @@ class TableCodesScreen extends StatefulWidget {
 class _TableCodesScreenState extends State<TableCodesScreen> {
   late final TableCodesController _c;
   late final bool _canView;
-  late final String _restaurant;
+
+  /// The organisation's name, or null when it is not known (the card then
+  /// says "Restaurant" in the reader's language).
+  late final String? _restaurantName;
   late final String _baseUrl;
   bool _printing = false;
 
@@ -48,7 +54,7 @@ class _TableCodesScreenState extends State<TableCodesScreen> {
     final services = AppScope.of(context);
     final session = services.session;
     _canView = session.can(Capability.viewTableCodes);
-    _restaurant = session.membership?.organization.name ?? 'Restaurant';
+    _restaurantName = session.membership?.organization.name;
     _baseUrl = services.config.storefrontBaseUrl;
     _c = TableCodesController(
       repository: services.backend.tableCodes,
@@ -67,18 +73,33 @@ class _TableCodesScreenState extends State<TableCodesScreen> {
     super.dispose();
   }
 
-  CodeCard _card(TableCode t) => CodeCard(
-    tableName: t.displayName,
-    restaurant: _restaurant,
+  String _restaurant(AppLocalizations l) =>
+      _restaurantName ?? l.tableRestaurantFallback;
+
+  /// What the picture's file name is built from: Latin, whatever language the
+  /// words on the card are in ("table 12" -> test-kitchen-table-12-qr.png).
+  // i18n-ignore: file name, not shown to anyone
+  String _fileLabel(TableCode t) =>
+      RegExp(r'^\d+$').hasMatch(t.label) ? 'table ${t.label}' : t.label;
+
+  CodeCard _card(AppLocalizations l, TableCode t) => CodeCard(
+    tableName: t.nameIn(l),
+    restaurant: _restaurant(l),
     link: t.link(_baseUrl)!,
+    scanLine: l.tableCardScan,
+    fileLabel: _fileLabel(t),
   );
 
   Future<void> _printAll() async {
-    final cards = [for (final t in _c.printable) _card(t)];
+    final l = context.l10n;
+    final cards = [for (final t in _c.printable) _card(l, t)];
     if (cards.isEmpty || _printing) return;
     setState(() => _printing = true);
     try {
-      await widget.exporter.printSheet('Table QR codes - $_restaurant', cards);
+      await widget.exporter.printSheet(
+        l.tablePrintTitle(restaurant: _restaurant(l)),
+        cards,
+      );
     } on AppFailure catch (e) {
       if (mounted) showFailure(context, e);
     } catch (e) {
@@ -89,32 +110,34 @@ class _TableCodesScreenState extends State<TableCodesScreen> {
   }
 
   Future<void> _save(TableCode t) async {
+    final l = context.l10n;
     try {
-      await widget.exporter.saveImage(_card(t));
-      if (mounted) showDone(context, 'Saved the picture for ${t.displayName}.');
+      await widget.exporter.saveImage(_card(l, t));
+      if (mounted) {
+        showDone(context, l.tableImageSaved(table: t.nameIn(l)));
+      }
     } catch (e) {
       if (mounted) showFailure(context, e);
     }
   }
 
   Future<void> _copy(TableCode t) async {
+    final l = context.l10n;
     await Clipboard.setData(ClipboardData(text: t.link(_baseUrl)!));
-    if (mounted) showDone(context, 'Link for ${t.displayName} copied.');
+    if (mounted) showDone(context, l.tableLinkCopied(table: t.nameIn(l)));
   }
 
   Future<void> _issue(TableCode t) async {
+    final l = context.l10n;
     try {
       await _c.issue(t);
       if (mounted) {
-        showDone(
-          context,
-          'Code issued for ${t.displayName}. Print its sticker.',
-        );
+        showDone(context, l.tableCodeIssued(table: t.nameIn(l)));
       }
     } on AppFailure catch (e) {
       if (!mounted) return;
       if (e.kind == FailureKind.notReady) {
-        await showNotAvailableDialog(context, e.message);
+        await showNotAvailableDialog(context, failureText(l, e));
       } else {
         showFailure(context, e);
       }
@@ -122,21 +145,18 @@ class _TableCodesScreenState extends State<TableCodesScreen> {
   }
 
   Future<void> _replace(TableCode t) async {
+    final l = context.l10n;
     final tokens = ViniiTokens.of(context);
     final sure = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         icon: Icon(Icons.warning_amber_rounded, color: tokens.danger, size: 32),
-        title: Text('Replace the code for ${t.displayName}?'),
-        content: const Text(
-          'Printed stickers will stop working. Guests who scan the old code '
-          'will not reach this table. Only do this if the sticker was lost '
-          'or shared by mistake.',
-        ),
+        title: Text(l.tableReplaceTitle(table: t.nameIn(l))),
+        content: Text(l.tableReplaceBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Keep the code'),
+            child: Text(l.tableReplaceKeep),
           ),
           FilledButton(
             key: const Key('replace-code-confirm'),
@@ -146,7 +166,7 @@ class _TableCodesScreenState extends State<TableCodesScreen> {
               minimumSize: const Size(64, 48),
             ),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Replace code'),
+            child: Text(l.tableReplaceConfirm),
           ),
         ],
       ),
@@ -155,15 +175,12 @@ class _TableCodesScreenState extends State<TableCodesScreen> {
     try {
       await _c.issue(t, replace: true);
       if (mounted) {
-        showDone(
-          context,
-          'New code for ${t.displayName}. Print its new sticker.',
-        );
+        showDone(context, l.tableCodeReplaced(table: t.nameIn(l)));
       }
     } on AppFailure catch (e) {
       if (!mounted) return;
       if (e.kind == FailureKind.notReady) {
-        await showNotAvailableDialog(context, e.message);
+        await showNotAvailableDialog(context, failureText(l, e));
       } else {
         showFailure(context, e);
       }
@@ -172,9 +189,10 @@ class _TableCodesScreenState extends State<TableCodesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = context.l10n;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Table QR codes'),
+        title: Text(l.tableScreenTitle),
         actions: [
           if (_canView)
             ListenableBuilder(
@@ -185,19 +203,11 @@ class _TableCodesScreenState extends State<TableCodesScreen> {
                 }
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: TextButton.icon(
-                    key: const Key('print-all'),
-                    onPressed: _c.printable.isEmpty || _printing
-                        ? null
-                        : _printAll,
-                    icon: _printing
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2.2),
-                          )
-                        : const Icon(Icons.print_outlined),
-                    label: const Text('Print all'),
-                  ),
+                  // A word and an icon when there is room beside the title;
+                  // just the icon (the word becomes its tooltip) on a narrow
+                  // phone or with large text, where the word would squeeze
+                  // the title (Hindi is longer).
+                  child: _printAllAction(context, l),
                 );
               },
             ),
@@ -207,12 +217,62 @@ class _TableCodesScreenState extends State<TableCodesScreen> {
     );
   }
 
+  Widget _printAllAction(BuildContext context, AppLocalizations l) {
+    final onPressed = _c.printable.isEmpty || _printing ? null : _printAll;
+    final icon = _printing
+        ? const SizedBox.square(
+            dimension: 18,
+            child: CircularProgressIndicator(strokeWidth: 2.2),
+          )
+        : const Icon(Icons.print_outlined);
+    double widthOf(String text, TextStyle? style) {
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: style),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+        maxLines: 1,
+      )..layout();
+      final w = painter.width;
+      painter.dispose();
+      return w;
+    }
+
+    final theme = Theme.of(context);
+    final word = widthOf(l.tablePrintAll, theme.textTheme.labelLarge);
+    final title = widthOf(l.tableScreenTitle, theme.appBarTheme.titleTextStyle);
+    final leading = Navigator.of(context).canPop() ? 56.0 : 16.0;
+    // screen - leading - title - button (icon, gap, label, padding) - margins
+    final room =
+        MediaQuery.sizeOf(context).width - leading - title - word - 50 - 24;
+    if (room < 0) {
+      return Tooltip(
+        message: l.tablePrintAll,
+        child: TextButton(
+          key: const Key('print-all'),
+          onPressed: onPressed,
+          style: TextButton.styleFrom(
+            minimumSize: const Size(48, 48),
+            padding: EdgeInsets.zero,
+          ),
+          child: Semantics(label: l.tablePrintAll, child: icon),
+        ),
+      );
+    }
+    return TextButton.icon(
+      key: const Key('print-all'),
+      onPressed: onPressed,
+      icon: icon,
+      label: Text(l.tablePrintAll),
+    );
+  }
+
   Widget _body(BuildContext context, Widget? _) {
+    final l = context.l10n;
     if (!_canView) {
-      return const EmptyView(
+      return EmptyView(
         icon: Icons.lock_outline_rounded,
-        title: 'Not available for your role',
-        message: 'Ask an owner or admin for the table codes.',
+        title: l.tableBlockedTitle,
+        message: l.tableBlockedMessage,
       );
     }
     final tables = _c.tables;
@@ -223,7 +283,7 @@ class _TableCodesScreenState extends State<TableCodesScreen> {
           onRetry: () => _c.load(force: true),
         );
       }
-      return const LoadingView(label: 'Loading tables…');
+      return LoadingView(label: l.tableLoading);
     }
     if (tables.isEmpty) {
       return RefreshIndicator(
@@ -234,12 +294,10 @@ class _TableCodesScreenState extends State<TableCodesScreen> {
             children: [
               SizedBox(
                 height: box.maxHeight,
-                child: const EmptyView(
+                child: EmptyView(
                   icon: Icons.table_restaurant_outlined,
-                  title: 'No tables yet',
-                  message:
-                      'Add your tables in the VINII control panel. Each one '
-                      'gets its own QR code here.',
+                  title: l.tableEmptyTitle,
+                  message: l.tableEmptyMessage,
                 ),
               ),
             ],
@@ -264,9 +322,10 @@ class _TableCodesScreenState extends State<TableCodesScreen> {
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
             children: [
               Text(
-                'Guests scan a table\'s code to order from that table. '
-                '${_c.withCodes.length} of ${tables.length} '
-                '${tables.length == 1 ? 'table has' : 'tables have'} a code.',
+                l.tableIntro(
+                  withCode: _c.withCodes.length,
+                  total: tables.length,
+                ),
                 style: text.bodyMedium,
               ),
               for (final g in groups) ...[
@@ -274,7 +333,10 @@ class _TableCodesScreenState extends State<TableCodesScreen> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(2, 20, 2, 10),
                     child: Text(
-                      '${g.name ?? 'Other tables'} · ${g.tables.length}',
+                      l.tableGroupHeader(
+                        name: g.name ?? l.posOtherTables,
+                        count: g.tables.length,
+                      ),
                       style: TextStyle(
                         color: t.ink,
                         fontSize: 16,
@@ -344,6 +406,7 @@ class _TableCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = context.l10n;
     final t = ViniiTokens.of(context);
     final hasCode = link != null;
     return Card(
@@ -362,34 +425,35 @@ class _TableCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
+                      // A wrap, not a row: the "Not in use" chip drops under
+                      // the name when both do not fit side by side.
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          Flexible(
-                            child: Text(
-                              table.displayName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: table.isActive ? t.ink : t.inkSecondary,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.2,
-                              ),
+                          Text(
+                            table.nameIn(l),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: table.isActive ? t.ink : t.inkSecondary,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.2,
                             ),
                           ),
-                          if (!table.isActive) ...[
-                            const SizedBox(width: 8),
+                          if (!table.isActive)
                             StatusChip(
-                              label: 'Not in use',
+                              label: l.tableNotInUse,
                               color: t.inkMuted,
                               icon: Icons.block_rounded,
                             ),
-                          ],
                         ],
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${table.seats} ${table.seats == 1 ? 'seat' : 'seats'}',
+                        l.tableSeats(count: table.seats),
                         style: TextStyle(color: t.inkSecondary, fontSize: 13.5),
                       ),
                       const SizedBox(height: 6),
@@ -410,14 +474,14 @@ class _TableCard extends StatelessWidget {
                             child: _ActionButton(
                               key: Key('replace-${table.id}'),
                               icon: Icons.refresh_rounded,
-                              label: 'New code',
+                              label: l.tableNewCode,
                               color: t.inkSecondary,
                               onPressed: busy ? null : onReplace,
                             ),
                           ),
                       ] else ...[
                         Text(
-                          'No code yet',
+                          l.tableNoCode,
                           key: Key('no-code-${table.id}'),
                           style: TextStyle(
                             color: t.warning,
@@ -443,11 +507,11 @@ class _TableCard extends StatelessWidget {
                                       strokeWidth: 2.2,
                                     ),
                                   )
-                                : const Text('Issue code'),
+                                : Text(l.tableIssueCode),
                           )
                         else
                           Text(
-                            'An admin or manager can issue it.',
+                            l.tableIssueHint,
                             style: TextStyle(
                               color: t.inkSecondary,
                               fontSize: 13,
@@ -461,37 +525,42 @@ class _TableCard extends StatelessWidget {
             ),
             if (hasCode) ...[
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  if (table.isActive) ...[
+              // The tiles share one height: a label that wraps to a third line
+              // in Hindi makes all three taller instead of being cut off.
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (table.isActive) ...[
+                      Expanded(
+                        child: _TileAction(
+                          key: Key('preview-${table.id}'),
+                          icon: Icons.phone_iphone_rounded,
+                          label: l.commonPreview,
+                          onPressed: onPreview,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                     Expanded(
                       child: _TileAction(
-                        key: Key('preview-${table.id}'),
-                        icon: Icons.phone_iphone_rounded,
-                        label: 'Preview',
-                        onPressed: onPreview,
+                        key: Key('copy-${table.id}'),
+                        icon: Icons.link_rounded,
+                        label: l.tableCopyLink,
+                        onPressed: onCopy,
                       ),
                     ),
                     const SizedBox(width: 8),
+                    Expanded(
+                      child: _TileAction(
+                        key: Key('save-${table.id}'),
+                        icon: Icons.download_rounded,
+                        label: l.tableSaveImage,
+                        onPressed: onSave,
+                      ),
+                    ),
                   ],
-                  Expanded(
-                    child: _TileAction(
-                      key: Key('copy-${table.id}'),
-                      icon: Icons.link_rounded,
-                      label: 'Copy link',
-                      onPressed: onCopy,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _TileAction(
-                      key: Key('save-${table.id}'),
-                      icon: Icons.download_rounded,
-                      label: 'Save image',
-                      onPressed: onSave,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ],
           ],
@@ -519,6 +588,8 @@ class TableCodeImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
+    final qrLabel = l.tableQrSemantics(table: table.nameIn(l));
     if (link == null) {
       return Container(
         width: size,
@@ -532,7 +603,7 @@ class TableCodeImage extends StatelessWidget {
       );
     }
     return Semantics(
-      label: 'QR code for ${table.displayName}',
+      label: qrLabel,
       image: true,
       child: Container(
         width: size,
@@ -549,7 +620,7 @@ class TableCodeImage extends StatelessWidget {
           padding: const EdgeInsets.all(6),
           backgroundColor: Colors.white,
           gapless: true,
-          semanticsLabel: 'QR code for ${table.displayName}',
+          semanticsLabel: qrLabel,
         ),
       ),
     );
@@ -580,6 +651,7 @@ class _ActionButton extends StatelessWidget {
         tapTargetSize: MaterialTapTargetSize.padded,
         textStyle: const TextStyle(
           fontFamily: 'Inter',
+          fontFamilyFallback: kScriptFontFallback,
           fontSize: 13.5,
           fontWeight: FontWeight.w700,
         ),
@@ -633,7 +705,6 @@ class _TileAction extends StatelessWidget {
                   Text(
                     label,
                     textAlign: TextAlign.center,
-                    maxLines: 2,
                     style: TextStyle(
                       color: t.ink,
                       fontSize: 12.5,

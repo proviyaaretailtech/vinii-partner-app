@@ -1,0 +1,11 @@
+# gen-l10n (Flutter's official localisation). Catalogues: lib/l10n/app_en.arb
+# (template, source of truth for keys) and lib/l10n/app_hi.arb. Regenerate
+# with `flutter gen-l10n`; the generated Dart is checked in next to them.
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
+output-class: AppLocalizations
+nullable-getter: false
+use-named-parameters: true
+# A key missing from app_hi.arb falls back to English, never to a blank.
+untranslated-messages-file: .dart_tool/l10n_untranslated.json

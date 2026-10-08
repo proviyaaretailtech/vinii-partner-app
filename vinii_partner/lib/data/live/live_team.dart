@@ -74,8 +74,9 @@ class LiveTeam implements TeamRepository {
       final saved = rows.isEmpty ? null : _member(rows.first);
       if (saved == null) {
         throw const AppFailure(
-          'Only an organization admin can change the team.',
+          'Only an organization admin can change the team.', // i18n-ignore: English fallback for logs/tests
           kind: FailureKind.forbidden,
+          code: 'team_not_admin',
         );
       }
       return saved;

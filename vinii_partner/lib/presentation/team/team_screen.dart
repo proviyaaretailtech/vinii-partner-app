@@ -3,9 +3,12 @@ import 'package:flutter/material.dart';
 import '../../app/app_scope.dart';
 import '../../application/team_controller.dart';
 import '../../domain/staff.dart';
+import '../../l10n/l10n.dart';
+import '../../l10n/labels.dart';
 import '../theme/staff_theme.dart';
 import '../widgets/chips.dart';
 import '../widgets/state_views.dart';
+import 'role_summary_l10n.dart';
 
 /// Team: who works here, in which role, and what that role can do.
 ///
@@ -54,17 +57,20 @@ class _TeamScreenState extends State<TeamScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Team')),
+      appBar: AppBar(title: Text(context.l10n.teamTitle)),
       body: ListenableBuilder(listenable: _c, builder: _body),
     );
   }
 
   Widget _body(BuildContext context, Widget? _) {
+    final l = context.l10n;
+    // Search and the filter order work on the name the reader sees.
+    _c.roleText = (r) => l.roleLabel(r.slug, fallback: r.name);
     if (!_canView) {
-      return const EmptyView(
+      return EmptyView(
         icon: Icons.lock_outline_rounded,
-        title: 'Not available for your role',
-        message: 'Ask an owner or admin about your team.',
+        title: l.teamNotAvailableTitle,
+        message: l.teamNotAvailableMessage,
       );
     }
     final people = _c.members;
@@ -75,7 +81,7 @@ class _TeamScreenState extends State<TeamScreen> {
           onRetry: () => _c.load(force: true),
         );
       }
-      return const LoadingView(label: 'Loading the team…');
+      return LoadingView(label: l.teamLoading);
     }
     final t = ViniiTokens.of(context);
     final visible = _c.visible;
@@ -92,19 +98,19 @@ class _TeamScreenState extends State<TeamScreen> {
             _Summary(controller: _c),
             const SizedBox(height: 12),
             if (!_c.canManage) ...[
-              const NoticeBanner(
+              NoticeBanner(
                 icon: Icons.lock_outline_rounded,
-                message: 'Only an organization admin can change roles or suspend people.',
+                message: l.teamReadOnlyNotice,
               ),
               const SizedBox(height: 12),
             ],
             if (people.isEmpty)
-              const Padding(
-                padding: EdgeInsets.only(top: 48),
+              Padding(
+                padding: const EdgeInsets.only(top: 48),
                 child: EmptyView(
                   icon: Icons.groups_outlined,
-                  title: 'No one is listed yet',
-                  message: 'People you invite from the VINII control panel show up here once they accept.',
+                  title: l.teamEmptyTitle,
+                  message: l.teamEmptyMessage,
                 ),
               )
             else ...[
@@ -114,13 +120,13 @@ class _TeamScreenState extends State<TeamScreen> {
                   controller: _search,
                   textInputAction: TextInputAction.search,
                   decoration: InputDecoration(
-                    hintText: 'Search by name, email or role',
+                    hintText: l.teamSearchHint,
                     isDense: true,
                     prefixIcon: const Icon(Icons.search_rounded),
                     suffixIcon: _c.query.isEmpty
                         ? null
                         : IconButton(
-                            tooltip: 'Clear',
+                            tooltip: l.commonClear,
                             icon: const Icon(Icons.close_rounded),
                             onPressed: () {
                               _search.clear();
@@ -139,9 +145,9 @@ class _TeamScreenState extends State<TeamScreen> {
                   padding: const EdgeInsets.only(top: 32),
                   child: EmptyView(
                     icon: Icons.person_search_outlined,
-                    title: 'Nobody matches',
-                    message: 'Try another name, or show everyone.',
-                    actionLabel: 'Show everyone',
+                    title: l.teamNoMatchTitle,
+                    message: l.teamNoMatchMessage,
+                    actionLabel: l.teamShowEveryone,
                     onAction: () {
                       _search.clear();
                       _c.clearFilters();
@@ -167,7 +173,9 @@ class _TeamScreenState extends State<TeamScreen> {
                 ),
               const SizedBox(height: 20),
               _RoleLegend(
-                roles: sortRoles([for (final r in _c.rolesPresent) r.role]),
+                roles: sortRoles([
+                  for (final r in _c.rolesPresent) r.role,
+                ], label: _c.roleText),
               ),
             ],
             const SizedBox(height: 32),
@@ -194,22 +202,28 @@ class _Summary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final total = controller.members?.length ?? 0;
     final active = controller.activeCount;
     final text = total == 0
-        ? 'No one yet'
-        : '${total == 1 ? '1 person' : '$total people'}'
-              '${active == total ? '' : ' · $active active'}';
-    return Row(
+        ? l.teamSummaryNone
+        : active == total
+        ? l.teamSummaryPeople(count: total)
+        : l.teamSummaryPeopleActive(count: total, active: active);
+    // The count and the button share a line when they fit; a longer language
+    // drops the button under the count instead of squeezing either.
+    return Wrap(
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 12,
+      runSpacing: 8,
       children: [
-        Expanded(
-          child: Text(
-            text,
-            style: TextStyle(
-              color: t.ink,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-            ),
+        Text(
+          text,
+          style: TextStyle(
+            color: t.ink,
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
           ),
         ),
         if (controller.canManage)
@@ -220,7 +234,7 @@ class _Summary extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16),
             ),
             icon: const Icon(Icons.person_add_alt_1_rounded, size: 20),
-            label: const Text('Invite staff'),
+            label: Text(l.teamInviteStaff),
             onPressed: () => showModalBottomSheet<void>(
               context: context,
               constraints: const BoxConstraints(maxWidth: 560),
@@ -240,6 +254,7 @@ class _RoleFilter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final total = controller.members?.length ?? 0;
     Widget chip(String label, bool selected, VoidCallback onTap, Key key) =>
         ChoiceChip(
@@ -257,14 +272,17 @@ class _RoleFilter extends StatelessWidget {
         );
     final chips = [
       chip(
-        'Everyone ($total)',
+        l.teamFilterEveryone(count: total),
         controller.roleFilter == null,
         () => controller.setRoleFilter(null),
         const Key('team-filter-all'),
       ),
       for (final r in controller.rolesPresent)
         chip(
-          '${r.role.name} (${r.count})',
+          l.teamFilterRole(
+            role: l.roleLabel(r.role.slug, fallback: r.role.name),
+            count: r.count,
+          ),
           controller.roleFilter == r.role.slug,
           () => controller.setRoleFilter(r.role.slug),
           Key('team-filter-${r.role.slug}'),
@@ -277,8 +295,8 @@ class _RoleFilter extends StatelessWidget {
         // A phone scrolls the chips sideways; a wider screen shows them all.
         LayoutBuilder(
           builder: (context, box) => box.maxWidth < 600
-              ? SizedBox(
-                  height: 48,
+              ? ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 48),
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
@@ -302,11 +320,11 @@ class _RoleFilter extends StatelessWidget {
               TextSpan(
                 children: [
                   TextSpan(
-                    text: chosen.name,
+                    text: l.roleLabel(chosen.slug, fallback: chosen.name),
                     style: TextStyle(color: t.ink, fontWeight: FontWeight.w700),
                   ),
                   TextSpan(
-                    text: ': ${chosen.summary}',
+                    text: ': ${roleSummaryText(l, chosen.slug)}', // i18n-ignore: punctuation between two translated parts
                     style: TextStyle(color: t.inkSecondary),
                   ),
                 ],
@@ -328,6 +346,7 @@ class _RoleLegend extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     return Card(
       key: const Key('team-roles-legend'),
       child: Padding(
@@ -336,7 +355,7 @@ class _RoleLegend extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'What each role can do',
+              l.teamLegendTitle,
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
@@ -347,14 +366,14 @@ class _RoleLegend extends StatelessWidget {
                   TextSpan(
                     children: [
                       TextSpan(
-                        text: r.name,
+                        text: l.roleLabel(r.slug, fallback: r.name),
                         style: TextStyle(
                           color: t.ink,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                       TextSpan(
-                        text: '  ${r.summary}',
+                        text: '  ${roleSummaryText(l, r.slug)}', // i18n-ignore: spacing between two translated parts
                         style: TextStyle(color: t.inkSecondary),
                       ),
                     ],
@@ -385,6 +404,7 @@ class _MemberRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final m = member;
     final showEmail = m.displayName != m.email;
     return Semantics(
@@ -415,22 +435,24 @@ class _MemberRow extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
+                      // The "You" badge drops under a long name instead of
+                      // squeezing it.
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 2,
                         children: [
-                          Flexible(
-                            child: Text(
-                              m.displayName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: m.active ? t.ink : t.inkSecondary,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 15.5,
-                              ),
+                          Text(
+                            m.displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: m.active ? t.ink : t.inkSecondary,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15.5,
                             ),
                           ),
-                          if (me) ...[
-                            const SizedBox(width: 8),
+                          if (me)
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
@@ -441,7 +463,7 @@ class _MemberRow extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(999),
                               ),
                               child: Text(
-                                'You',
+                                l.teamYou,
                                 style: TextStyle(
                                   color: t.inkSecondary,
                                   fontSize: 12,
@@ -449,7 +471,6 @@ class _MemberRow extends StatelessWidget {
                                 ),
                               ),
                             ),
-                          ],
                         ],
                       ),
                       if (showEmail)
@@ -461,9 +482,7 @@ class _MemberRow extends StatelessWidget {
                         ),
                       const SizedBox(height: 3),
                       Text(
-                        m.role.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        l.roleLabel(m.role.slug, fallback: m.role.name),
                         style: TextStyle(
                           color: t.ink,
                           fontWeight: FontWeight.w700,
@@ -487,7 +506,7 @@ class _MemberRow extends StatelessWidget {
                       )
                     else
                       StatusChip(
-                        label: m.active ? 'Active' : 'Suspended',
+                        label: m.active ? l.commonActive : l.commonSuspended,
                         color: m.active ? t.success : t.warning,
                         icon: m.active
                             ? Icons.check_circle_outline_rounded
@@ -525,9 +544,11 @@ class _MemberSheet extends StatelessWidget {
             .firstOrNull;
         if (m == null) return const SizedBox.shrink();
         final t = ViniiTokens.of(context);
+        final l = context.l10n;
         final text = Theme.of(context).textTheme;
-        final noRole = controller.whyNoRoleChange(m);
-        final noSuspend = m.active ? controller.whyNoSuspend(m) : null;
+        final roleName = l.roleLabel(m.role.slug, fallback: m.role.name);
+        final noRole = controller.blockRoleChange(m);
+        final noSuspend = m.active ? controller.blockSuspend(m) : null;
         return SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
@@ -545,13 +566,15 @@ class _MemberSheet extends StatelessWidget {
                   TextSpan(
                     children: [
                       TextSpan(
-                        text: m.role.name,
+                        text: roleName,
                         style: TextStyle(
                           color: t.ink,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      TextSpan(text: ' · ${m.role.summary}'),
+                      TextSpan(
+                        text: ' · ${roleSummaryText(l, m.role.slug)}', // i18n-ignore: separator between two translated parts
+                      ),
                     ],
                   ),
                   style: text.bodyMedium,
@@ -560,8 +583,10 @@ class _MemberSheet extends StatelessWidget {
                 _Action(
                   key: const Key('team-change-role'),
                   icon: Icons.badge_outlined,
-                  title: 'Change role',
-                  subtitle: noRole ?? 'Now ${m.role.name}',
+                  title: l.teamChangeRole,
+                  subtitle: noRole == null
+                      ? l.teamCurrentRole(role: roleName)
+                      : l.teamBlockText(noRole),
                   enabled: noRole == null,
                   onTap: () => _pickRole(context, m),
                 ),
@@ -570,8 +595,10 @@ class _MemberSheet extends StatelessWidget {
                   _Action(
                     key: const Key('team-suspend'),
                     icon: Icons.pause_circle_outline_rounded,
-                    title: 'Suspend',
-                    subtitle: noSuspend ?? 'They cannot use this restaurant until you reactivate them.',
+                    title: l.teamSuspend,
+                    subtitle: noSuspend == null
+                        ? l.teamSuspendHint
+                        : l.teamBlockText(noSuspend),
                     enabled: noSuspend == null,
                     danger: true,
                     onTap: () => _suspend(context, m),
@@ -580,8 +607,8 @@ class _MemberSheet extends StatelessWidget {
                   _Action(
                     key: const Key('team-reactivate'),
                     icon: Icons.play_circle_outline_rounded,
-                    title: 'Reactivate',
-                    subtitle: 'Let them use this restaurant again.',
+                    title: l.teamReactivate,
+                    subtitle: l.teamReactivateHint,
                     enabled: true,
                     onTap: () => _reactivate(context, m),
                   ),
@@ -601,6 +628,7 @@ class _MemberSheet extends StatelessWidget {
       builder: (context) => _RolePicker(controller: controller, member: m),
     );
     if (role == null || !context.mounted) return;
+    final l = context.l10n;
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
     try {
@@ -609,7 +637,14 @@ class _MemberSheet extends StatelessWidget {
       messenger
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          SnackBar(content: Text('${m.displayName} is now ${role.name}.')),
+          SnackBar(
+            content: Text(
+              l.teamRoleChangedDone(
+                name: m.displayName,
+                role: l.roleLabel(role.slug, fallback: role.name),
+              ),
+            ),
+          ),
         );
     } catch (e) {
       if (context.mounted) showFailure(context, e);
@@ -618,24 +653,22 @@ class _MemberSheet extends StatelessWidget {
 
   Future<void> _suspend(BuildContext context, TeamMember m) async {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final sure = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Suspend ${m.displayName}?'),
-        content: Text(
-          '${m.displayName} will not be able to use this restaurant until you '
-          'reactivate them. Nothing is deleted.',
-        ),
+        title: Text(l.teamSuspendTitle(name: m.displayName)),
+        content: Text(l.teamSuspendBody(name: m.displayName)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(l.commonCancel),
           ),
           TextButton(
             key: const Key('team-suspend-confirm'),
             style: TextButton.styleFrom(foregroundColor: t.danger),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Suspend'),
+            child: Text(l.teamSuspend),
           ),
         ],
       ),
@@ -649,7 +682,7 @@ class _MemberSheet extends StatelessWidget {
       messenger
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          SnackBar(content: Text('${m.displayName} is suspended.')),
+          SnackBar(content: Text(l.teamSuspendedDone(name: m.displayName))),
         );
     } catch (e) {
       if (context.mounted) showFailure(context, e);
@@ -657,24 +690,27 @@ class _MemberSheet extends StatelessWidget {
   }
 
   Future<void> _reactivate(BuildContext context, TeamMember m) async {
+    final l = context.l10n;
     final sure = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Reactivate ${m.displayName}?'),
+        title: Text(l.teamReactivateTitle(name: m.displayName)),
         content: Text(
-          '${m.displayName} will be able to use this restaurant again, as '
-          '${m.role.name}.',
+          l.teamReactivateBody(
+            name: m.displayName,
+            role: l.roleLabel(m.role.slug, fallback: m.role.name),
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(l.commonCancel),
           ),
           FilledButton(
             key: const Key('team-reactivate-confirm'),
             style: FilledButton.styleFrom(minimumSize: const Size(64, 48)),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Reactivate'),
+            child: Text(l.teamReactivate),
           ),
         ],
       ),
@@ -688,7 +724,7 @@ class _MemberSheet extends StatelessWidget {
       messenger
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          SnackBar(content: Text('${m.displayName} is active again.')),
+          SnackBar(content: Text(l.teamReactivatedDone(name: m.displayName))),
         );
     } catch (e) {
       if (context.mounted) showFailure(context, e);
@@ -750,18 +786,22 @@ class _RolePicker extends StatefulWidget {
 class _RolePickerState extends State<_RolePicker> {
   late StaffRole? _chosen = widget.member.role;
 
-  List<StaffRole> get _roles => sortRoles(widget.controller.roles);
+  List<StaffRole> _roles(AppLocalizations l) => sortRoles(
+    widget.controller.roles,
+    label: (r) => l.roleLabel(r.slug, fallback: r.name),
+  );
 
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final text = Theme.of(context).textTheme;
     final m = widget.member;
     final chosen = _chosen;
     final changed = chosen != null && chosen.slug != m.role.slug;
     final why = chosen == null
         ? null
-        : widget.controller.whyNoRoleChange(m, to: chosen);
+        : widget.controller.blockRoleChange(m, to: chosen);
     return SafeArea(
       child: ConstrainedBox(
         constraints: BoxConstraints(
@@ -774,7 +814,7 @@ class _RolePickerState extends State<_RolePicker> {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
               child: Text(
-                'Change role for ${m.displayName}',
+                l.teamPickRoleTitle(name: m.displayName),
                 style: text.titleLarge,
               ),
             ),
@@ -783,7 +823,7 @@ class _RolePickerState extends State<_RolePicker> {
                 shrinkWrap: true,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 children: [
-                  for (final r in _roles)
+                  for (final r in _roles(l))
                     InkWell(
                       key: Key('team-role-${r.slug}'),
                       borderRadius: BorderRadius.circular(12),
@@ -814,8 +854,13 @@ class _RolePickerState extends State<_RolePicker> {
                                 children: [
                                   Text(
                                     r.slug == m.role.slug
-                                        ? '${r.name} (now)'
-                                        : r.name,
+                                        ? l.teamRoleNow(
+                                            role: l.roleLabel(
+                                              r.slug,
+                                              fallback: r.name,
+                                            ),
+                                          )
+                                        : l.roleLabel(r.slug, fallback: r.name),
                                     style: TextStyle(
                                       color: t.ink,
                                       fontWeight: FontWeight.w700,
@@ -824,7 +869,7 @@ class _RolePickerState extends State<_RolePicker> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    r.summary,
+                                    roleSummaryText(l, r.slug),
                                     style: TextStyle(
                                       color: t.inkSecondary,
                                       fontSize: 13.5,
@@ -848,7 +893,7 @@ class _RolePickerState extends State<_RolePicker> {
                 children: [
                   if (why != null) ...[
                     Text(
-                      why,
+                      l.teamBlockText(why),
                       style: TextStyle(color: t.danger, fontSize: 13.5),
                     ),
                     const SizedBox(height: 8),
@@ -860,13 +905,18 @@ class _RolePickerState extends State<_RolePicker> {
                         : null,
                     child: Text(
                       changed
-                          ? 'Make ${chosen.name}'
-                          : 'Choose a different role',
+                          ? l.teamMakeRole(
+                              role: l.roleLabel(
+                                chosen.slug,
+                                fallback: chosen.name,
+                              ),
+                            )
+                          : l.teamChooseDifferent,
                     ),
                   ),
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel'),
+                    child: Text(l.commonCancel),
                   ),
                 ],
               ),
@@ -884,31 +934,25 @@ class _InviteSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = context.l10n;
     final text = Theme.of(context).textTheme;
     return SafeArea(
-      child: Padding(
+      // Scrolls when a longer language and a small phone leave too little room.
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Invite staff', style: text.titleLarge),
+            Text(l.teamInviteStaff, style: text.titleLarge),
             const SizedBox(height: 8),
-            Text(
-              'Invitations are sent from the VINII control panel, under Users & '
-              'Roles, because each person needs a secure link to set up their '
-              'own login.',
-              style: text.bodyMedium,
-            ),
+            Text(l.teamInviteIntro, style: text.bodyMedium),
             const SizedBox(height: 8),
-            Text(
-              'Once they accept, they appear here and you can set their role.',
-              style: text.bodyMedium,
-            ),
+            Text(l.teamInviteAfter, style: text.bodyMedium),
             const SizedBox(height: 16),
             FilledButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Got it'),
+              child: Text(l.teamGotIt),
             ),
           ],
         ),

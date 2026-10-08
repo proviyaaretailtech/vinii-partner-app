@@ -171,11 +171,16 @@ class BillSummary {
     return (serviceCharge / base * 10000).round() / 100;
   }
 
-  /// "GST (5%)"
-  String get gstLabel {
+  /// "5", "2.5": the GST percentage as a plain number, for a screen to put
+  /// into its own translated sentence ("GST ({percent}%)").
+  String get gstPercentText {
     final p = charges.gstPercent;
-    return 'GST (${p % 1 == 0 ? p.toInt() : p}%)';
+    return '${p % 1 == 0 ? p.toInt() : p}';
   }
+
+  /// "GST (5%)"
+  // i18n-ignore: English fallback for logs/tests; screens use gstPercentText
+  String get gstLabel => 'GST ($gstPercentText%)';
 }
 
 /// A table budget ("Dining with friends? Set a budget"). Pure maths so the
@@ -331,35 +336,52 @@ class BillSettings {
   static int toPaiseOf(double percent) => (percent * 100).round();
 }
 
+/// What is wrong with a field of the Bill & GST screen. A CODE, not a
+/// sentence: the screen turns it into words in the reader's language.
+enum BillProblem {
+  /// The custom GST rate is not a number from 0 to 100 with one decimal.
+  customRate,
+
+  /// The service charge is ON but its percentage is not above 0 up to the
+  /// highest allowed ([maxServiceChargePercent]).
+  servicePercent,
+
+  /// The GSTIN is not the standard 15-character shape.
+  gstinShape,
+
+  /// The FSSAI number is not 14 digits.
+  fssaiDigits,
+
+  /// The bill phone does not have 10 to 13 digits.
+  phoneDigits,
+}
+
+/// The highest service charge the screen accepts, in percent.
+const maxServiceChargePercent = 50.0;
+
 final _gstinShape = RegExp(r'^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$');
 
 /// Why a GSTIN cannot be saved, or null when it is fine (or left empty). The
 /// standard 15-character shape: state code, PAN, entity number, "Z", check
 /// character. Letters are upper-cased before the check.
-String? gstinProblem(String raw) {
+BillProblem? gstinProblem(String raw) {
   final v = raw.trim().toUpperCase();
   if (v.isEmpty) return null;
-  return _gstinShape.hasMatch(v)
-      ? null
-      : 'A GSTIN has 15 letters and numbers, like 22AAAAA0000A1Z5.';
+  return _gstinShape.hasMatch(v) ? null : BillProblem.gstinShape;
 }
 
 /// An FSSAI licence number is 14 digits.
-String? fssaiProblem(String raw) {
+BillProblem? fssaiProblem(String raw) {
   final v = raw.trim();
   if (v.isEmpty) return null;
-  return RegExp(r'^\d{14}$').hasMatch(v)
-      ? null
-      : 'An FSSAI number has 14 digits.';
+  return RegExp(r'^\d{14}$').hasMatch(v) ? null : BillProblem.fssaiDigits;
 }
 
 /// A phone for the bill header: 10 to 13 digits (with or without +91).
-String? billPhoneProblem(String raw) {
+BillProblem? billPhoneProblem(String raw) {
   if (raw.trim().isEmpty) return null;
   final digits = raw.replaceAll(RegExp(r'\D'), '').length;
-  return digits >= 10 && digits <= 13
-      ? null
-      : 'Enter a phone number with at least 10 digits.';
+  return digits >= 10 && digits <= 13 ? null : BillProblem.phoneDigits;
 }
 
 /// "2.5", "5", "7.5" — a percentage without trailing zeros (never "5.0").

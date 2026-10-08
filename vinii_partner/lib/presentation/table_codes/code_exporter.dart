@@ -13,13 +13,25 @@ class CodeCard {
     required this.tableName,
     required this.restaurant,
     required this.link,
+    this.scanLine = defaultScanLine,
+    this.fileLabel,
   });
 
+  /// The table's name in the reader's language ("Table 12" / "टेबल 12").
   final String tableName;
   final String restaurant;
 
   /// `<storefront address>/t/<code>`.
   final String link;
+
+  /// What the guest is told to do, in the reader's language. It is printed on
+  /// the card, so the screen passes the translated line.
+  final String scanLine;
+
+  /// What the picture's file name is built from. A file name is Latin letters
+  /// and digits only, so it must not depend on the language the words on the
+  /// card are in; defaults to [tableName].
+  final String? fileLabel;
 
   /// "test-kitchen-table-12-qr.png"
   String get fileName {
@@ -27,8 +39,9 @@ class CodeCard {
         .toLowerCase()
         .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
         .replaceAll(RegExp(r'^-+|-+$'), '');
-    final parts = [slug(restaurant), slug(tableName)]
+    final parts = [slug(restaurant), slug(fileLabel ?? tableName)]
       ..removeWhere((p) => p.isEmpty);
+    // i18n-ignore: file name, Latin by design
     return '${parts.isEmpty ? 'table' : parts.join('-')}-qr.png';
   }
 }
@@ -51,6 +64,7 @@ class DeviceCodeExporter implements CodeExporter {
     link: c.link,
     tableName: c.tableName,
     restaurant: c.restaurant,
+    scanLine: c.scanLine,
   );
 
   @override
@@ -60,6 +74,7 @@ class DeviceCodeExporter implements CodeExporter {
         'Saving the picture works in the browser for now. On a phone, use '
         'Print all, or take a screenshot of the code.',
         kind: FailureKind.notReady,
+        code: 'table_save_browser_only',
       );
     }
     final ok = await downloadBytes(
@@ -68,7 +83,10 @@ class DeviceCodeExporter implements CodeExporter {
       'image/png',
     );
     if (!ok) {
-      throw const AppFailure('The picture could not be saved. Try again.');
+      throw const AppFailure(
+        'The picture could not be saved. Try again.',
+        code: 'table_picture_not_saved',
+      );
     }
   }
 
@@ -82,6 +100,7 @@ class DeviceCodeExporter implements CodeExporter {
           label: await renderTableLabelPng(
             tableName: c.tableName,
             restaurant: c.restaurant,
+            scanLine: c.scanLine,
           ),
         ),
       );
@@ -94,6 +113,7 @@ class DeviceCodeExporter implements CodeExporter {
     if (!done) {
       throw const AppFailure(
         'The sheet was not printed. Check the printer and try again.',
+        code: 'table_sheet_not_printed',
       );
     }
   }

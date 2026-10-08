@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../app/app_scope.dart';
@@ -7,6 +9,9 @@ import '../../core/money.dart';
 import '../../domain/billing.dart';
 import '../../domain/menu.dart';
 import '../../domain/pos_order.dart';
+import '../../l10n/l10n.dart';
+import '../../l10n/labels.dart';
+import '../../l10n/script_fonts.dart';
 import '../orders/order_widgets.dart' show AmountRow;
 import '../theme/staff_theme.dart';
 import '../widgets/chips.dart';
@@ -29,6 +34,15 @@ SellCart sellCartOf(BuildContext context) {
   );
 }
 
+/// Why the order cannot be sent yet, in the reader's language.
+extension SellBlockerText on AppLocalizations {
+  String sellBlockerText(SellBlocker b) => switch (b) {
+    SellBlocker.empty => sellBlockerEmpty,
+    SellBlocker.noTable => sellBlockerNoTable,
+    SellBlocker.noPhone => sellBlockerNoPhone,
+  };
+}
+
 /// Dine-in · Takeaway · Delivery.
 class ServiceTypeSelector extends StatelessWidget {
   const ServiceTypeSelector({super.key, required this.cart});
@@ -38,22 +52,23 @@ class ServiceTypeSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     return SizedBox(
       width: double.infinity,
       child: SegmentedButton<ServiceType>(
-        // Each label shrinks to fit its segment, so "Takeaway" is never cut
-        // short on a narrow phone or in a half-width ticket pane.
+        // A label that does not fit its segment (a longer language, a big
+        // text size) wraps onto a second line instead of being cut short.
         segments: [
-          for (final (type, label, icon) in const [
-            (ServiceType.dineIn, 'Dine-in', Icons.table_restaurant_outlined),
-            (ServiceType.takeaway, 'Takeaway', Icons.shopping_bag_outlined),
-            (ServiceType.delivery, 'Delivery', Icons.delivery_dining_outlined),
+          for (final (type, icon) in const [
+            (ServiceType.dineIn, Icons.table_restaurant_outlined),
+            (ServiceType.takeaway, Icons.shopping_bag_outlined),
+            (ServiceType.delivery, Icons.delivery_dining_outlined),
           ])
             ButtonSegment(
               value: type,
-              label: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(label, maxLines: 1, softWrap: false),
+              label: Text(
+                l.serviceTypeLabel(type),
+                textAlign: TextAlign.center,
               ),
               icon: Icon(icon, size: 16),
             ),
@@ -69,6 +84,7 @@ class ServiceTypeSelector extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 4),
           textStyle: const TextStyle(
             fontFamily: 'Inter',
+            fontFamilyFallback: kScriptFontFallback,
             fontWeight: FontWeight.w700,
             fontSize: 12.5,
           ),
@@ -89,6 +105,7 @@ class TableChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final table = cart.table;
     final missing = table == null;
     return Material(
@@ -117,7 +134,7 @@ class TableChip extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  missing ? 'Choose table' : table.displayName,
+                  missing ? l.posChooseTable : table.nameIn(l),
                   style: TextStyle(fontWeight: FontWeight.w700, color: t.ink),
                 ),
                 Icon(Icons.arrow_drop_down_rounded, color: t.inkSecondary),
@@ -173,6 +190,7 @@ class _TableSheetState extends State<_TableSheet> {
 
   Widget _tableTile(BuildContext context, DiningTable table) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final chosen = table.id == widget.selected?.id;
     final bg = chosen
         ? t.ink
@@ -198,10 +216,9 @@ class _TableSheetState extends State<_TableSheet> {
             ),
           ),
           padding: const EdgeInsets.all(10),
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
+          child: Center(
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   table.label,
@@ -215,7 +232,8 @@ class _TableSheetState extends State<_TableSheet> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${table.seats} seats',
+                  l.posSeats(count: table.seats),
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,
                     color: chosen ? t.page : t.inkSecondary,
@@ -224,7 +242,8 @@ class _TableSheetState extends State<_TableSheet> {
                 if (table.occupied) ...[
                   const SizedBox(height: 4),
                   Text(
-                    'Occupied',
+                    l.posTableOccupied,
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w700,
@@ -243,6 +262,7 @@ class _TableSheetState extends State<_TableSheet> {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final text = Theme.of(context).textTheme;
     final tables = _tables;
     Widget body;
@@ -254,12 +274,12 @@ class _TableSheetState extends State<_TableSheet> {
     } else if (tables == null) {
       body = const SizedBox(height: 200, child: LoadingView());
     } else if (tables.isEmpty) {
-      body = const SizedBox(
+      body = SizedBox(
         height: 280,
         child: EmptyView(
           icon: Icons.table_restaurant_outlined,
-          title: 'No tables set up',
-          message: 'No tables set up. Add them in the VINII OS.',
+          title: l.posNoTablesTitle,
+          message: l.posNoTablesMessage,
         ),
       );
     } else {
@@ -279,7 +299,7 @@ class _TableSheetState extends State<_TableSheet> {
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
                     child: Text(
-                      entry.key ?? 'Other tables',
+                      entry.key ?? l.posOtherTables,
                       style: TextStyle(
                         color: t.inkSecondary,
                         fontSize: 13.5,
@@ -291,11 +311,16 @@ class _TableSheetState extends State<_TableSheet> {
               SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  // The tile grows with the text size (a longer language, a big
+                  // font) instead of squeezing its words.
+                  gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
                     maxCrossAxisExtent: 120,
                     mainAxisSpacing: 10,
                     crossAxisSpacing: 10,
-                    childAspectRatio: 1.05,
+                    mainAxisExtent: math.max(
+                      110,
+                      26 + MediaQuery.textScalerOf(context).scale(84),
+                    ),
                   ),
                   delegate: SliverChildBuilderDelegate(
                     (context, i) => _tableTile(context, entry.value[i]),
@@ -323,12 +348,9 @@ class _TableSheetState extends State<_TableSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Choose a table', style: text.titleLarge),
+                  Text(l.posChooseTableTitle, style: text.titleLarge),
                   const SizedBox(height: 4),
-                  Text(
-                    'Tables with an unpaid order are marked occupied.',
-                    style: text.bodyMedium,
-                  ),
+                  Text(l.posTablesHelp, style: text.bodyMedium),
                 ],
               ),
             ),
@@ -356,6 +378,7 @@ class QtyStepper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     Widget button(IconData icon, String label, VoidCallback? onTap) =>
         Semantics(
           button: true,
@@ -386,7 +409,7 @@ class QtyStepper extends StatelessWidget {
             qty - 1 <= 0 && min == 0
                 ? Icons.delete_outline_rounded
                 : Icons.remove_rounded,
-            'Less',
+            l.sellLess,
             qty > min ? () => onChanged(qty - 1) : null,
           ),
           SizedBox(
@@ -402,7 +425,7 @@ class QtyStepper extends StatelessWidget {
               ),
             ),
           ),
-          button(Icons.add_rounded, 'More', () => onChanged(qty + 1)),
+          button(Icons.add_rounded, l.sellMore, () => onChanged(qty + 1)),
         ],
       ),
     );
@@ -420,11 +443,12 @@ class EstimatedBill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     return Column(
       children: [
         BillLines(
           bill: bill,
-          totalLabel: 'Estimated total',
+          totalLabel: l.posBillEstimatedTotal,
           serviceCharge: serviceCharge,
         ),
         const SizedBox(height: 8),
@@ -434,7 +458,7 @@ class EstimatedBill extends StatelessWidget {
             const SizedBox(width: 6),
             Expanded(
               child: Text(
-                'Estimated. The POS confirms the final bill.',
+                l.posEstimatedNote,
                 style: TextStyle(fontSize: 12.5, color: t.inkMuted),
               ),
             ),
@@ -455,12 +479,14 @@ class BillLines extends StatelessWidget {
   const BillLines({
     super.key,
     required this.bill,
-    this.totalLabel = 'Total',
+    this.totalLabel,
     this.serviceCharge,
   });
 
   final BillSummary bill;
-  final String totalLabel;
+
+  /// The label of the last line; "Total" in the reader's language when null.
+  final String? totalLabel;
   final ServiceChargeLine? serviceCharge;
 
   ServiceChargeLine? get _serviceLine {
@@ -485,25 +511,36 @@ class BillLines extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     String pct(double p) => '${p % 1 == 0 ? p.toInt() : p}%';
     final service = _serviceLine;
     return Column(
       children: [
-        AmountRow('Items', rupees(bill.itemTotal)),
+        AmountRow(l.posBillItems, rupees(bill.itemTotal)),
         if (bill.discount > 0)
-          AmountRow('Discount', '− ${rupees(bill.discount)}'),
+          AmountRow(l.commonDiscount, '− ${rupees(bill.discount)}'),
         if (service != null) ServiceChargeRow(service),
-        AmountRow('SGST (${pct(bill.charges.sgstPercent)})', rupees(bill.sgst)),
-        AmountRow('CGST (${pct(bill.charges.cgstPercent)})', rupees(bill.cgst)),
+        AmountRow(
+          l.posBillSgst(percent: pct(bill.charges.sgstPercent)),
+          rupees(bill.sgst),
+        ),
+        AmountRow(
+          l.posBillCgst(percent: pct(bill.charges.cgstPercent)),
+          rupees(bill.cgst),
+        ),
         if (bill.roundOff != 0)
           AmountRow(
-            'Round off',
+            l.posBillRoundOff,
             bill.roundOff < 0
                 ? '− ${rupees(-bill.roundOff)}'
                 : rupees(bill.roundOff),
           ),
         Divider(height: 18, color: t.border),
-        AmountRow(totalLabel, rupees(bill.payable), strong: true),
+        AmountRow(
+          totalLabel ?? l.commonTotal,
+          rupees(bill.payable),
+          strong: true,
+        ),
       ],
     );
   }
@@ -516,14 +553,15 @@ Future<void> showNotAvailableDialog(BuildContext context, String message) =>
       context: context,
       builder: (context) {
         final t = ViniiTokens.of(context);
+        final l = context.l10n;
         return AlertDialog(
           icon: Icon(Icons.construction_rounded, color: t.warning, size: 32),
-          title: const Text('Not available yet'),
+          title: Text(l.failureTitleNotReady),
           content: Text(message),
           actions: [
             FilledButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
+              child: Text(l.commonOk),
             ),
           ],
         );
@@ -565,6 +603,7 @@ class _LineSheetState extends State<_LineSheet> {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final text = Theme.of(context).textTheme;
     final item = widget.item;
     final inCart = widget.cart.qtyOf(item.id) > 0;
@@ -588,21 +627,22 @@ class _LineSheetState extends State<_LineSheet> {
               ),
               const SizedBox(height: 4),
               Text(
-                '${rupees(item.price)} each',
+                l.sellPriceEach(price: rupees(item.price)),
                 style: TextStyle(color: t.inkSecondary),
               ),
               const SizedBox(height: 20),
               Row(
                 children: [
-                  Text(
-                    'Quantity',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: t.ink,
-                      fontSize: 15,
+                  Expanded(
+                    child: Text(
+                      l.commonQuantity,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: t.ink,
+                        fontSize: 15,
+                      ),
                     ),
                   ),
-                  const Spacer(),
                   QtyStepper(
                     qty: _qty,
                     min: 1,
@@ -615,9 +655,9 @@ class _LineSheetState extends State<_LineSheet> {
                 controller: _note,
                 maxLength: 140,
                 textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                  labelText: 'Note for the kitchen',
-                  hintText: 'e.g. Less spicy, no onion',
+                decoration: InputDecoration(
+                  labelText: l.sellKitchenNoteLabel,
+                  hintText: l.sellNoteHint,
                 ),
               ),
               const SizedBox(height: 8),
@@ -628,8 +668,9 @@ class _LineSheetState extends State<_LineSheet> {
                 },
                 child: Text(
                   inCart
-                      ? 'Update · ${rupees(item.price * _qty)}'
-                      : 'Add · ${rupees(item.price * _qty)}',
+                      ? l.sellLineUpdate(total: rupees(item.price * _qty))
+                      : l.sellLineAdd(total: rupees(item.price * _qty)),
+                  textAlign: TextAlign.center,
                 ),
               ),
               if (inCart) ...[
@@ -640,7 +681,10 @@ class _LineSheetState extends State<_LineSheet> {
                     widget.cart.setLine(item, qty: 0);
                     Navigator.pop(context);
                   },
-                  child: const Text('Remove from order'),
+                  child: Text(
+                    l.sellRemoveFromOrder,
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               ],
             ],

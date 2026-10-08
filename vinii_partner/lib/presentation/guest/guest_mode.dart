@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/storefront.dart';
+import '../../l10n/l10n.dart';
 import '../theme/guest_theme.dart';
 import '../widgets/food_art.dart';
 import 'guest_effects.dart';
@@ -19,6 +20,7 @@ class GuestModeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final l = context.l10n;
     final modes = s.definition.serviceModes;
     final photos = [
       for (final i in s.catalog.allItems)
@@ -33,7 +35,7 @@ class GuestModeScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
             child: Text(
-              'How would you like to enjoy ${s.definition.brand.displayName}?',
+              l.guestModeTitle(name: s.definition.brand.displayName),
               style: p.display(28),
             ),
           ),
@@ -52,6 +54,7 @@ class GuestModeScreen extends StatelessWidget {
                     hoverScale: 1.015,
                     child: _ModeCard(
                       mode: modes[i],
+                      // i18n-ignore: picks the illustration, never shown
                       name: art?.item.name ?? modes[i].label,
                       imageUrl: art?.item.imageUrl,
                       height: modes.length > 2 ? 170 : 230,
@@ -84,12 +87,13 @@ class _ModeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.read(context);
+    final l = context.l10n;
+    final table = l.guestTableNameOf(s);
     final subtitle = switch (mode) {
-      GuestServiceMode.dineIn when s.tableName != null =>
-        'Order fresh at ${s.tableName}',
-      GuestServiceMode.dineIn => 'Order fresh at your table',
-      GuestServiceMode.preOrder => 'Schedule a pickup for later',
-      _ => mode.hint,
+      GuestServiceMode.dineIn when table != null => l.guestModeDineInAt(
+        table: table,
+      ),
+      _ => l.guestModeHint(mode),
     };
     return SizedBox(
       height: height,
@@ -126,7 +130,7 @@ class _ModeCard extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              mode.label,
+                              l.guestModeLabel(mode),
                               style: p.display(26, color: Colors.white),
                             ),
                             const SizedBox(height: 4),

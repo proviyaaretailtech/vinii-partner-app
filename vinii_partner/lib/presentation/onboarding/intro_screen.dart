@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_scope.dart';
+import '../../l10n/l10n.dart';
+import '../settings/language_screen.dart';
 import '../theme/staff_theme.dart';
 
 /// First launch on this phone only: what the app is for, in three pages.
@@ -15,27 +17,28 @@ class _IntroScreenState extends State<IntroScreen> {
   final _pages = PageController();
   int _index = 0;
 
-  static const _content = [
+  /// The three pages, in order. The words come from the current language.
+  static List<({IconData icon, String title, String body})> _pagesFor(
+    AppLocalizations l,
+  ) => [
     (
       icon: Icons.notifications_active_rounded,
-      title: 'New orders ring here',
-      body:
-          'Delivery orders from One Local ring on every signed-in phone. Accept with a prep time, or reject '
-          'with a reason, within 60 seconds.',
+      title: l.introOrdersTitle,
+      body: l.introOrdersBody,
     ),
     (
       icon: Icons.point_of_sale_rounded,
-      title: 'Take orders at the table',
-      body: 'Pick a table, add dishes and send the ticket straight to the kitchen. The POS sees the same order.',
+      title: l.introPosTitle,
+      body: l.introPosBody,
     ),
     (
       icon: Icons.storefront_rounded,
-      title: 'Your storefront, your way',
-      body:
-          'Design the menu guests swipe through on their phones: your colours, your photos, budgets for '
-          'groups, pre-orders. Preview it, then publish.',
+      title: l.introStorefrontTitle,
+      body: l.introStorefrontBody,
     ),
   ];
+
+  static const _pageCount = 3;
 
   @override
   void dispose() {
@@ -44,7 +47,7 @@ class _IntroScreenState extends State<IntroScreen> {
   }
 
   void _next() {
-    if (_index < _content.length - 1) {
+    if (_index < _pageCount - 1) {
       _pages.nextPage(
         duration: const Duration(milliseconds: 320),
         curve: Curves.easeOutCubic,
@@ -57,78 +60,96 @@ class _IntroScreenState extends State<IntroScreen> {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
-    final last = _index == _content.length - 1;
+    final l = context.l10n;
+    final content = _pagesFor(l);
+    final last = _index == _pageCount - 1;
     final dark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       body: SafeArea(
         child: Column(
           children: [
-            Align(
-              alignment: Alignment.centerRight,
-              child: Padding(
-                padding: const EdgeInsets.only(right: 8, top: 4),
-                child: TextButton(
-                  onPressed: () => AppScope.of(context).session.finishIntro(),
-                  child: const Text('Skip'),
-                ),
+            Padding(
+              padding: const EdgeInsets.only(left: 8, right: 8, top: 4),
+              child: Row(
+                // The language can be chosen on the very first screen.
+                children: [
+                  const LanguageButton(),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () => AppScope.of(context).session.finishIntro(),
+                    child: Text(l.commonSkip),
+                  ),
+                ],
               ),
             ),
             Expanded(
               child: PageView.builder(
                 controller: _pages,
-                itemCount: _content.length,
+                itemCount: _pageCount,
                 onPageChanged: (i) => setState(() => _index = i),
                 itemBuilder: (context, i) {
-                  final c = _content[i];
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 28),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 132,
-                          height: 132,
-                          decoration: BoxDecoration(
-                            color: dark ? Colors.white : ViniiColors.ink,
-                            borderRadius: BorderRadius.circular(40),
-                          ),
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              Icon(
-                                c.icon,
-                                size: 60,
-                                color: dark ? ViniiColors.ink : Colors.white,
+                  final c = content[i];
+                  // Scrolls instead of overflowing when a longer language or a
+                  // short screen leaves too little height.
+                  return LayoutBuilder(
+                    builder: (context, box) => SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 28),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minHeight: box.maxHeight),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 132,
+                              height: 132,
+                              decoration: BoxDecoration(
+                                color: dark ? Colors.white : ViniiColors.ink,
+                                borderRadius: BorderRadius.circular(40),
                               ),
-                              Positioned(
-                                right: 22,
-                                top: 22,
-                                child: Container(
-                                  width: 18,
-                                  height: 18,
-                                  decoration: const BoxDecoration(
-                                    color: ViniiColors.brandGreen,
-                                    shape: BoxShape.circle,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  Icon(
+                                    c.icon,
+                                    size: 60,
+                                    color: dark
+                                        ? ViniiColors.ink
+                                        : Colors.white,
                                   ),
-                                ),
+                                  Positioned(
+                                    right: 22,
+                                    top: 22,
+                                    child: Container(
+                                      width: 18,
+                                      height: 18,
+                                      decoration: const BoxDecoration(
+                                        color: ViniiColors.brandGreen,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(height: 40),
+                            Text(
+                              c.title,
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.headlineMedium,
+                            ),
+                            const SizedBox(height: 14),
+                            Text(
+                              c.body,
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodyLarge
+                                  ?.copyWith(
+                                    color: t.inkSecondary,
+                                    height: 1.5,
+                                  ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 40),
-                        Text(
-                          c.title,
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.headlineMedium,
-                        ),
-                        const SizedBox(height: 14),
-                        Text(
-                          c.body,
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyLarge
-                              ?.copyWith(color: t.inkSecondary, height: 1.5),
-                        ),
-                      ],
+                      ),
                     ),
                   );
                 },
@@ -137,7 +158,7 @@ class _IntroScreenState extends State<IntroScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                for (var i = 0; i < _content.length; i++)
+                for (var i = 0; i < _pageCount; i++)
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -156,7 +177,7 @@ class _IntroScreenState extends State<IntroScreen> {
                 width: double.infinity,
                 child: FilledButton(
                   onPressed: _next,
-                  child: Text(last ? 'Get started' : 'Next'),
+                  child: Text(last ? l.introGetStarted : l.commonNext),
                 ),
               ),
             ),

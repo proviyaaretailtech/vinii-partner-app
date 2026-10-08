@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_scope.dart';
 import '../../domain/staff.dart';
+import '../../l10n/failure_text.dart';
+import '../../l10n/l10n.dart';
+import '../../l10n/labels.dart';
 import '../theme/staff_theme.dart';
 import '../widgets/chips.dart';
 import '../widgets/state_views.dart';
@@ -28,6 +31,7 @@ class _OrgPickerScreenState extends State<OrgPickerScreen> {
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
     final s = AppScope.of(context).session;
+    final l = context.l10n;
     return Scaffold(
       body: SafeArea(
         child: ListenableBuilder(
@@ -36,23 +40,23 @@ class _OrgPickerScreenState extends State<OrgPickerScreen> {
             padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
             children: [
               Text(
-                'Hi ${s.user?.displayName ?? ''}',
+                l.orgGreeting(name: s.user?.displayName ?? ''),
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
               const SizedBox(height: 4),
               Text(
-                'Choose a restaurant',
+                l.orgChooseTitle,
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
               const SizedBox(height: 6),
               Text(
-                'You can switch any time from More.',
+                l.orgChooseHint,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 20),
               if (s.switchFailure != null) ...[
                 NoticeBanner(
-                  message: s.switchFailure!.message,
+                  message: failureText(l, s.switchFailure!),
                   icon: Icons.error_outline_rounded,
                   tone: t.danger,
                 ),
@@ -69,7 +73,7 @@ class _OrgPickerScreenState extends State<OrgPickerScreen> {
               const SizedBox(height: 12),
               TextButton(
                 onPressed: () => s.signOut(),
-                child: const Text('Sign out'),
+                child: Text(l.commonSignOut),
               ),
             ],
           ),
@@ -89,6 +93,7 @@ class _OrgCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final org = membership.organization;
     return Material(
       color: t.surface,
@@ -115,16 +120,20 @@ class _OrgCard extends StatelessWidget {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 4),
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Text(
-                          membership.roleName,
+                          l.roleLabel(
+                            membership.roleSlug,
+                            fallback: membership.roleName,
+                          ),
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
-                        if (!membership.active) ...[
-                          const SizedBox(width: 8),
-                          StatusChip(label: 'Paused', color: t.danger),
-                        ],
+                        if (!membership.active)
+                          StatusChip(label: l.orgPaused, color: t.danger),
                       ],
                     ),
                   ],

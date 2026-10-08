@@ -5,8 +5,10 @@ import '../../application/outlet_mode.dart';
 import '../../core/failure.dart';
 import '../../core/time_format.dart';
 import '../../domain/staff.dart';
+import '../../l10n/l10n.dart';
 import '../theme/staff_theme.dart';
 import '../widgets/state_views.dart';
+import 'order_widgets.dart' show tracking;
 
 /// The store's status: Open, Paused or Closed for today.
 ///
@@ -35,11 +37,13 @@ class _OutletBarState extends State<OutletBar> {
     // Pause can be chosen again to change how long; the others only once.
     if (target == current && target != OutletMode.paused) return;
     final inbox = AppScope.of(context).inbox;
+    // Read before the sheets below: the confirmation is worded after an await.
+    final l = context.l10n;
     DateTime? backAt;
     String done;
     switch (target) {
       case OutletMode.open:
-        done = 'Open. Accepting orders again.';
+        done = l.outletOpenDone;
       case OutletMode.paused:
         final choice = await showModalBottomSheet<_Pause>(
           context: context,
@@ -50,8 +54,8 @@ class _OutletBarState extends State<OutletBar> {
         if (choice == null || !mounted) return;
         backAt = choice.backAt;
         done = backAt == null
-            ? 'Paused until you turn it back on.'
-            : 'Paused. Back at ${_when(backAt)}.';
+            ? l.outletPausedDoneIndefinite
+            : l.outletPausedDone(when: _when(l, backAt));
       case OutletMode.closed:
         final opening = nextOpening();
         final sure = await showModalBottomSheet<bool>(
@@ -62,7 +66,7 @@ class _OutletBarState extends State<OutletBar> {
         );
         if (sure != true || !mounted) return;
         backAt = opening;
-        done = 'Closed for today. Opens ${_when(opening)}.';
+        done = l.outletClosedDone(when: _when(l, opening));
     }
     setState(() => _saving = true);
     try {
@@ -85,6 +89,7 @@ class _OutletBarState extends State<OutletBar> {
     final services = AppScope.of(context);
     final inbox = services.inbox;
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final outlet = inbox.outlet;
     final canToggle = services.session.can(Capability.toggleOutlet);
 
@@ -94,10 +99,12 @@ class _OutletBarState extends State<OutletBar> {
         foreground: t.ink,
         border: t.border,
         icon: Icons.storefront_outlined,
-        title: inbox.outletFailure == null ? 'Checking…' : 'Status unknown',
+        title: inbox.outletFailure == null
+            ? l.outletChecking
+            : l.outletStatusUnknown,
         subtitle: inbox.outletFailure == null
-            ? 'Asking One Local whether you are open'
-            : 'Could not reach One Local',
+            ? l.outletAsking
+            : l.outletCouldNotReach,
       );
     }
 
@@ -106,24 +113,24 @@ class _OutletBarState extends State<OutletBar> {
       OutletMode.open => (
         ViniiColors.brandGreen,
         Icons.check_circle_rounded,
-        'Open',
-        'Accepting orders. New ones ring on this phone.',
+        l.outletOpenTitle,
+        l.outletOpenSubtitle,
       ),
       OutletMode.paused => (
         t.warning,
         Icons.pause_circle_rounded,
-        'Paused',
+        l.outletPausedTitle,
         outlet.backAt != null
-            ? 'Back at ${_when(outlet.backAt!)}'
-            : 'Until you turn it back on',
+            ? l.outletPausedBackAt(when: _when(l, outlet.backAt!))
+            : l.outletPausedUntilOn,
       ),
       OutletMode.closed => (
         t.danger,
         Icons.do_not_disturb_on_rounded,
-        'Closed',
+        l.outletClosedTitle,
         outlet.backAt != null
-            ? 'Closed for today. Opens ${_when(outlet.backAt!)}'
-            : 'Closed for today',
+            ? l.outletClosedOpens(when: _when(l, outlet.backAt!))
+            : l.outletClosedToday,
       ),
     };
     final fg = _readableOn(bg);
@@ -139,21 +146,21 @@ class _OutletBarState extends State<OutletBar> {
       locked: !canToggle,
       choices: canToggle
           ? [
-              const _Choice(
+              _Choice(
                 OutletMode.open,
-                'Open',
+                l.outletChoiceOpen,
                 Icons.check_circle_rounded,
                 flex: 3,
               ),
-              const _Choice(
+              _Choice(
                 OutletMode.paused,
-                'Pause',
+                l.outletChoicePause,
                 Icons.pause_circle_rounded,
                 flex: 3,
               ),
-              const _Choice(
+              _Choice(
                 OutletMode.closed,
-                'Close today',
+                l.outletChoiceClose,
                 Icons.do_not_disturb_on_rounded,
                 flex: 4,
               ),
@@ -170,15 +177,15 @@ Color _readableOn(Color bg) =>
     bg.computeLuminance() > 0.19 ? ViniiColors.ink : Colors.white;
 
 /// "3:30 PM", or "tomorrow 9:00 AM" when it is not today.
-String _when(DateTime at) {
+String _when(AppLocalizations l, DateTime at) {
   final now = DateTime.now();
   final local = at.toLocal();
   final today = DateTime(now.year, now.month, now.day);
   final day = DateTime(local.year, local.month, local.day);
   final diff = day.difference(today).inDays;
   if (diff == 0) return clockTime(local);
-  if (diff == 1) return 'tomorrow ${clockTime(local)}';
-  return '${shortDay(local)}, ${clockTime(local)}';
+  if (diff == 1) return l.outletWhenTomorrow(time: clockTime(local));
+  return l.outletWhenDay(day: shortDay(local), time: clockTime(local));
 }
 
 class _Choice {
@@ -219,9 +226,10 @@ class _StatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final l = context.l10n;
     return Semantics(
       container: true,
-      label: 'Store status: $title. $subtitle',
+      label: l.outletSemantics(title: title, subtitle: subtitle),
       child: AnimatedContainer(
         duration: reduceMotion
             ? Duration.zero
@@ -260,15 +268,13 @@ class _StatusCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
-                          letterSpacing: -0.2,
+                          letterSpacing: tracking(context, -0.2),
                           color: foreground,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         subtitle,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 13.5,
                           height: 1.3,
@@ -288,7 +294,7 @@ class _StatusCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Only a manager can change this.',
+                      l.outletOnlyManager,
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -305,22 +311,27 @@ class _StatusCard extends StatelessWidget {
                 alignment: Alignment.centerLeft,
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 520),
-                  child: Row(
-                    children: [
-                      for (final (i, c) in choices!.indexed) ...[
-                        if (i > 0) const SizedBox(width: 8),
-                        Expanded(
-                          flex: c.flex,
-                          child: _ModeButton(
-                            choice: c,
-                            selected: c.mode == selected,
-                            background: background,
-                            foreground: foreground,
-                            onTap: busy ? null : () => onChoose?.call(c.mode),
+                  // The three buttons share one height: the tallest label
+                  // (a longer Hindi word wraps) sets it.
+                  child: IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (final (i, c) in choices!.indexed) ...[
+                          if (i > 0) const SizedBox(width: 8),
+                          Expanded(
+                            flex: c.flex,
+                            child: _ModeButton(
+                              choice: c,
+                              selected: c.mode == selected,
+                              background: background,
+                              foreground: foreground,
+                              onTap: busy ? null : () => onChoose?.call(c.mode),
+                            ),
                           ),
-                        ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -365,8 +376,8 @@ class _ModeButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             onTap: onTap,
             child: Container(
-              height: 48,
-              padding: const EdgeInsets.symmetric(horizontal: 6),
+              constraints: const BoxConstraints(minHeight: 48),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
@@ -384,8 +395,7 @@ class _ModeButton extends StatelessWidget {
                   Flexible(
                     child: Text(
                       choice.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -416,25 +426,26 @@ class _PauseSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
     final text = Theme.of(context).textTheme;
+    final l = context.l10n;
     final now = DateTime.now();
     final choices = <(String, IconData, _Pause)>[
       (
-        '30 minutes',
+        l.outletPause30,
         Icons.timer_outlined,
         _Pause(now.add(const Duration(minutes: 30))),
       ),
       (
-        '1 hour',
+        l.outletPause1h,
         Icons.hourglass_bottom_rounded,
         _Pause(now.add(const Duration(hours: 1))),
       ),
       (
-        '2 hours',
+        l.outletPause2h,
         Icons.hourglass_full_rounded,
         _Pause(now.add(const Duration(hours: 2))),
       ),
       (
-        'Until I turn it back on',
+        l.outletPauseUntilOn,
         Icons.pause_circle_outline_rounded,
         const _Pause(null),
       ),
@@ -446,13 +457,9 @@ class _PauseSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Pause new orders', style: text.titleLarge),
+            Text(l.outletPauseTitle, style: text.titleLarge),
             const SizedBox(height: 6),
-            Text(
-              'Customers will not be able to order from you on One Local. '
-              'Orders you already accepted are not affected.',
-              style: text.bodyMedium,
-            ),
+            Text(l.outletPauseIntro, style: text.bodyMedium),
             const SizedBox(height: 12),
             for (final (label, icon, pause) in choices)
               ListTile(
@@ -465,14 +472,14 @@ class _PauseSheet extends StatelessWidget {
                 ),
                 subtitle: pause.backAt == null
                     ? null
-                    : Text('Back at ${_when(pause.backAt!)}'),
+                    : Text(l.outletPausedBackAt(when: _when(l, pause.backAt!))),
                 trailing: Icon(Icons.chevron_right_rounded, color: t.inkMuted),
                 onTap: () => Navigator.pop(context, pause),
               ),
             const SizedBox(height: 4),
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Keep accepting'),
+              child: Text(l.outletKeepAccepting),
             ),
           ],
         ),
@@ -491,6 +498,7 @@ class _CloseSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
     final text = Theme.of(context).textTheme;
+    final l = context.l10n;
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
@@ -498,12 +506,10 @@ class _CloseSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Close for today?', style: text.titleLarge),
+            Text(l.outletCloseTitle, style: text.titleLarge),
             const SizedBox(height: 6),
             Text(
-              'You stop getting delivery orders now and start again '
-              '${_when(opening)}. Orders you already accepted are not '
-              'affected.',
+              l.outletCloseIntro(when: _when(l, opening)),
               style: text.bodyMedium,
             ),
             const SizedBox(height: 16),
@@ -514,12 +520,12 @@ class _CloseSheet extends StatelessWidget {
                 foregroundColor: _readableOn(t.danger),
               ),
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Close for today'),
+              child: Text(l.outletCloseConfirm),
             ),
             const SizedBox(height: 4),
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Keep open'),
+              child: Text(l.outletKeepOpen),
             ),
           ],
         ),

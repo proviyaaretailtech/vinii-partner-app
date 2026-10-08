@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart' show Intl;
 
 import '../../app/app_scope.dart';
 import '../../application/sell_keys.dart';
@@ -7,6 +8,10 @@ import '../../core/failure.dart';
 import '../../core/money.dart';
 import '../../domain/billing.dart' show money;
 import '../../domain/pos_order.dart';
+import '../../l10n/failure_text.dart';
+import '../../l10n/l10n.dart';
+import '../../l10n/labels.dart';
+import '../../l10n/script_fonts.dart';
 import '../orders/order_widgets.dart' show SectionCard;
 import '../theme/staff_theme.dart';
 import '../widgets/state_views.dart';
@@ -21,12 +26,52 @@ class PaymentPart {
 }
 
 /// "Cash", "Cash + UPI": the methods used, each once, in the order taken.
-String methodsLabel(Iterable<PaymentPart> parts) {
+///
+/// The words follow [l], or, where no [BuildContext] is at hand, the app's
+/// current language (`Intl.defaultLocale`, which the language switch sets).
+String methodsLabel(Iterable<PaymentPart> parts, {AppLocalizations? l}) {
+  final words =
+      l ??
+      lookupAppLocalizations(
+        Locale(Intl.getCurrentLocale().startsWith('hi') ? 'hi' : 'en'),
+      );
   final seen = <PaymentMethod>[];
   for (final p in parts) {
     if (!seen.contains(p.method)) seen.add(p.method);
   }
-  return seen.map((m) => m.label).join(' + ');
+  return seen.map(words.paymentMethodLabel).join(' + ');
+}
+
+/// Why the Charge button is blocked. A code and the figure it names, turned
+/// into a sentence only when it is shown, in the reader's language.
+enum _ProblemKind {
+  enterAmount,
+  moreThanDue,
+  cashLess,
+  enterBothParts,
+  shortBy,
+  overBy,
+}
+
+class _Problem {
+  const _Problem(this.kind, [this.amount = 0]);
+
+  final _ProblemKind kind;
+
+  /// The rupees the sentence names (what is due, charged, short or over).
+  final double amount;
+
+  /// A split that does not add up, as opposed to a missing or wrong figure.
+  bool get isGap => kind == _ProblemKind.shortBy || kind == _ProblemKind.overBy;
+
+  String text(AppLocalizations l) => switch (kind) {
+    _ProblemKind.enterAmount => l.payEnterAmount,
+    _ProblemKind.moreThanDue => l.payMoreThanDue(due: rupees(amount)),
+    _ProblemKind.cashLess => l.payCashLess(amount: rupees(amount)),
+    _ProblemKind.enterBothParts => l.payEnterBothParts,
+    _ProblemKind.shortBy => l.payShortBy(amount: rupees(amount)),
+    _ProblemKind.overBy => l.payOverBy(amount: rupees(amount)),
+  };
 }
 
 /// Take payment: Cash, UPI, Card or Split.
@@ -144,16 +189,18 @@ class _PaymentCardState extends State<PaymentCard> {
 
   // ── Checking ───────────────────────────────────────────────────────────
 
-  String? _singleProblem(PlacedOrder o) {
+  _Problem? _singleProblem(PlacedOrder o) {
     final amount = _parse(_amount.text);
-    if (amount == null || amount <= 0) return 'Enter the amount.';
+    if (amount == null || amount <= 0) {
+      return const _Problem(_ProblemKind.enterAmount);
+    }
     if (amount > o.due + 0.009) {
-      return 'That is more than the ${rupees(o.due)} due.';
+      return _Problem(_ProblemKind.moreThanDue, o.due);
     }
     if (_method == PaymentMethod.cash) {
       final got = _parse(_received.text);
       if (got != null && got + 0.009 < amount) {
-        return 'Cash received is less than ${rupees(amount)}.';
+        return _Problem(_ProblemKind.cashLess, amount);
       }
     }
     return null;
@@ -166,13 +213,13 @@ class _PaymentCardState extends State<PaymentCard> {
     return money(o.due - total);
   }
 
-  String? _splitProblem(PlacedOrder o) {
+  _Problem? _splitProblem(PlacedOrder o) {
     final a = _parse(_partA.text) ?? 0;
     final b = _parse(_partB.text) ?? 0;
-    if (a <= 0 || b <= 0) return 'Enter an amount for both parts.';
+    if (a <= 0 || b <= 0) return const _Problem(_ProblemKind.enterBothParts);
     final gap = _gap(o);
-    if (gap > 0.005) return 'Short by ${rupees(gap)}.';
-    if (gap < -0.005) return 'Over by ${rupees(-gap)}.';
+    if (gap > 0.005) return _Problem(_ProblemKind.shortBy, gap);
+    if (gap < -0.005) return _Problem(_ProblemKind.overBy, -gap);
     return null;
   }
 
@@ -191,6 +238,7 @@ class _PaymentCardState extends State<PaymentCard> {
     final reference = _ref(method, _reference);
     final cash = method == PaymentMethod.cash ? _parse(_received.text) : null;
     final services = AppScope.of(context);
+    final l = context.l10n;
     setState(() => _paying = true);
     try {
       final updated = await PendingKeys(services.prefs).run(
@@ -213,9 +261,12 @@ class _PaymentCardState extends State<PaymentCard> {
       showDone(
         context,
         updated.isPaid
-            ? 'Paid in full.'
-            : '${rupees(amount)} received by ${method.label}. '
-                  '${rupees(updated.due)} still due.',
+            ? l.payPaidInFull
+            : l.payReceivedBy(
+                amount: rupees(amount),
+                method: l.paymentMethodLabel(method),
+                due: rupees(updated.due),
+              ),
       );
     } on AppFailure catch (e) {
       await _fail(e);
@@ -285,7 +336,7 @@ class _PaymentCardState extends State<PaymentCard> {
     });
     widget.onRecorded(done, [PaymentPart(leg.method, leg.amount)], null);
     if (!mounted) return;
-    showDone(context, 'Paid in full.');
+    showDone(context, context.l10n.payPaidInFull);
   }
 
   Future<void> _retrySecondPart() async {
@@ -306,8 +357,9 @@ class _PaymentCardState extends State<PaymentCard> {
     if (!mounted) return;
     // Stop the spinner first: the dialog waits for the cashier.
     setState(() => _paying = false);
+    final l = context.l10n;
     if (e.kind == FailureKind.notReady) {
-      await showNotAvailableDialog(context, e.message);
+      await showNotAvailableDialog(context, failureText(l, e));
     } else {
       showFailure(
         context,
@@ -316,6 +368,8 @@ class _PaymentCardState extends State<PaymentCard> {
                 'The first part was received, but the second was not '
                 'confirmed. ${e.message}',
                 kind: e.kind,
+                code: 'pay_second_part_failed',
+                args: {'reason': failureText(l, e)},
               )
             : e,
       );
@@ -327,24 +381,27 @@ class _PaymentCardState extends State<PaymentCard> {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final o = widget.order;
     final problem = _split ? _splitProblem(o) : _singleProblem(o);
     final amount = _parse(_amount.text);
     final label = _split
-        ? (problem == null ? 'Charge ${rupees(o.due)}' : 'Charge')
+        ? (problem == null
+              ? l.payChargeAmount(amount: rupees(o.due))
+              : l.payCharge)
         : (amount == null || amount <= 0
-              ? 'Charge'
-              : 'Charge ${rupees(money(amount))}');
+              ? l.payCharge
+              : l.payChargeAmount(amount: rupees(money(amount))));
     if (_retry != null) {
       return SectionCard(
         key: const Key('payment-card'),
-        title: 'Take payment',
+        title: l.payTakePayment,
         child: _retryBanner(context, _retry!),
       );
     }
     return SectionCard(
       key: const Key('payment-card'),
-      title: 'Take payment',
+      title: l.payTakePayment,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -375,10 +432,9 @@ class _PaymentCardState extends State<PaymentCard> {
     );
   }
 
-  Widget _problem(BuildContext context, String problem, PlacedOrder o) {
+  Widget _problem(BuildContext context, _Problem problem, PlacedOrder o) {
     final t = ViniiTokens.of(context);
-    final short =
-        _split && (problem.startsWith('Short') || problem.startsWith('Over'));
+    final short = _split && problem.isGap;
     return Semantics(
       liveRegion: true,
       child: Row(
@@ -391,7 +447,7 @@ class _PaymentCardState extends State<PaymentCard> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              problem,
+              problem.text(context.l10n),
               style: TextStyle(color: t.danger, fontWeight: FontWeight.w600),
             ),
           ),
@@ -402,6 +458,7 @@ class _PaymentCardState extends State<PaymentCard> {
 
   Widget _retryBanner(BuildContext context, _RetryLeg leg) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 8, 8),
       decoration: BoxDecoration(
@@ -419,9 +476,10 @@ class _PaymentCardState extends State<PaymentCard> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'The first part is recorded. The second part '
-                  '(${leg.method.label} ${rupees(leg.amount)}) was not '
-                  'confirmed.',
+                  l.payRetryBanner(
+                    method: l.paymentMethodLabel(leg.method),
+                    amount: rupees(leg.amount),
+                  ),
                   style: TextStyle(color: t.ink, fontSize: 14.5, height: 1.35),
                 ),
               ),
@@ -442,13 +500,13 @@ class _PaymentCardState extends State<PaymentCard> {
                           _split = false;
                           _amount.text = _plain(widget.order.due);
                         }),
-                  child: const Text('Take it another way'),
+                  child: Text(l.payTakeAnotherWay),
                 ),
                 TextButton(
                   key: const Key('split-retry'),
                   style: TextButton.styleFrom(minimumSize: const Size(64, 44)),
                   onPressed: _paying ? null : _retrySecondPart,
-                  child: const Text('Try again'),
+                  child: Text(l.commonTryAgain),
                 ),
               ],
             ),
@@ -459,45 +517,52 @@ class _PaymentCardState extends State<PaymentCard> {
   }
 
   Widget _tiles(BuildContext context) {
-    return Row(
-      children: [
-        for (final m in PaymentMethod.values) ...[
+    final l = context.l10n;
+    // A longer word (Hindi) may wrap to a second line: the tiles share the
+    // height of the tallest one so the row stays even.
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final m in PaymentMethod.values) ...[
+            Expanded(
+              child: _MethodTile(
+                icon: switch (m) {
+                  PaymentMethod.cash => Icons.payments_outlined,
+                  PaymentMethod.upi => Icons.qr_code_2_rounded,
+                  PaymentMethod.card => Icons.credit_card_rounded,
+                },
+                label: l.paymentMethodLabel(m),
+                selected: !_split && m == _method,
+                onTap: _paying || _retry != null
+                    ? null
+                    : () => setState(() {
+                        _method = m;
+                        _split = false;
+                      }),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
           Expanded(
             child: _MethodTile(
-              icon: switch (m) {
-                PaymentMethod.cash => Icons.payments_outlined,
-                PaymentMethod.upi => Icons.qr_code_2_rounded,
-                PaymentMethod.card => Icons.credit_card_rounded,
-              },
-              label: m.label,
-              selected: !_split && m == _method,
+              key: const Key('pay-split'),
+              icon: Icons.call_split_rounded,
+              label: l.paySplit,
+              selected: _split,
               onTap: _paying || _retry != null
                   ? null
-                  : () => setState(() {
-                      _method = m;
-                      _split = false;
-                    }),
+                  : () => setState(() => _split = true),
             ),
           ),
-          const SizedBox(width: 8),
         ],
-        Expanded(
-          child: _MethodTile(
-            key: const Key('pay-split'),
-            icon: Icons.call_split_rounded,
-            label: 'Split',
-            selected: _split,
-            onTap: _paying || _retry != null
-                ? null
-                : () => setState(() => _split = true),
-          ),
-        ),
-      ],
+      ),
     );
   }
 
   Widget _single(BuildContext context, PlacedOrder o) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final amount = _parse(_amount.text);
     final got = _parse(_received.text);
     final change =
@@ -521,8 +586,8 @@ class _PaymentCardState extends State<PaymentCard> {
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           inputFormatters: numbers,
           style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
-          decoration: const InputDecoration(
-            labelText: 'Amount',
+          decoration: InputDecoration(
+            labelText: l.commonAmount,
             prefixText: '₹ ',
           ),
           onChanged: (_) => setState(() {}),
@@ -536,16 +601,14 @@ class _PaymentCardState extends State<PaymentCard> {
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: numbers,
             decoration: InputDecoration(
-              labelText: 'Cash received (optional)',
+              labelText: l.payCashReceivedOptional,
               prefixText: '₹ ',
-              helperText: change == null
-                  ? 'Type what the guest handed over to see the change.'
-                  : null,
+              helperText: change == null ? l.payCashReceivedHelper : null,
               helperMaxLines: 2,
               suffixIcon: _received.text.isEmpty
                   ? null
                   : IconButton(
-                      tooltip: 'Clear',
+                      tooltip: l.commonClear,
                       icon: const Icon(Icons.close_rounded),
                       onPressed: () => setState(_received.clear),
                     ),
@@ -560,7 +623,7 @@ class _PaymentCardState extends State<PaymentCard> {
               for (final n in _notes)
                 _ShortcutButton(
                   key: Key('cash-$n'),
-                  label: '+₹$n',
+                  label: '+${rupees(n)}',
                   onPressed: _paying
                       ? null
                       : () => setState(() {
@@ -570,7 +633,7 @@ class _PaymentCardState extends State<PaymentCard> {
                 ),
               _ShortcutButton(
                 key: const Key('cash-exact'),
-                label: 'Exact',
+                label: l.payExact,
                 onPressed: _paying || amount == null
                     ? null
                     : () => setState(() => _received.text = _plain(amount)),
@@ -583,8 +646,8 @@ class _PaymentCardState extends State<PaymentCard> {
             enabled: !_paying,
             decoration: InputDecoration(
               labelText: _method == PaymentMethod.upi
-                  ? 'UPI reference (optional)'
-                  : 'Card slip number (optional)',
+                  ? l.payUpiReferenceOptional
+                  : l.payCardSlipOptional,
             ),
           ),
         if (change != null) ...[
@@ -601,7 +664,7 @@ class _PaymentCardState extends State<PaymentCard> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Change to return',
+                    l.payChangeToReturn,
                     style: TextStyle(fontWeight: FontWeight.w600, color: t.ink),
                   ),
                 ),
@@ -624,6 +687,7 @@ class _PaymentCardState extends State<PaymentCard> {
 
   Widget _splitParts(BuildContext context, PlacedOrder o) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final gap = _gap(o);
     final covered =
         _splitProblem(o) == null ||
@@ -675,10 +739,10 @@ class _PaymentCardState extends State<PaymentCard> {
                 Expanded(
                   child: Text(
                     covered
-                        ? 'Covered'
+                        ? l.payCovered
                         : gap > 0
-                        ? 'Short by'
-                        : 'Over by',
+                        ? l.payShortByLabel
+                        : l.payOverByLabel,
                     style: TextStyle(color: t.ink, fontWeight: FontWeight.w700),
                   ),
                 ),
@@ -732,7 +796,8 @@ class _MethodTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             onTap: onTap,
             child: Container(
-              height: 64,
+              constraints: const BoxConstraints(minHeight: 64),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
@@ -747,7 +812,7 @@ class _MethodTile extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     label,
-                    maxLines: 1,
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       color: onTap == null ? t.inkMuted : fg,
                       fontSize: 13,
@@ -782,6 +847,7 @@ class _ShortcutButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14),
         textStyle: const TextStyle(
           fontFamily: 'Inter',
+          fontFamilyFallback: kScriptFontFallback,
           fontSize: 15,
           fontWeight: FontWeight.w700,
         ),
@@ -819,12 +885,13 @@ class _SplitPart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     return Column(
       key: Key('split-part-$index'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Part $index',
+          l.payPart(index: index),
           style: TextStyle(
             color: t.inkSecondary,
             fontSize: 13,
@@ -836,7 +903,7 @@ class _SplitPart extends StatelessWidget {
           showSelectedIcon: false,
           segments: [
             for (final m in PaymentMethod.values)
-              ButtonSegment(value: m, label: Text(m.label)),
+              ButtonSegment(value: m, label: Text(l.paymentMethodLabel(m))),
           ],
           selected: {method},
           onSelectionChanged: enabled ? (s) => onMethod(s.first) : null,
@@ -849,6 +916,7 @@ class _SplitPart extends StatelessWidget {
             minimumSize: const Size(0, 44),
             textStyle: const TextStyle(
               fontFamily: 'Inter',
+              fontFamilyFallback: kScriptFontFallback,
               fontWeight: FontWeight.w700,
               fontSize: 14,
             ),
@@ -875,7 +943,7 @@ class _SplitPart extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                 ),
                 decoration: InputDecoration(
-                  labelText: 'Part $index amount',
+                  labelText: l.payPartAmount(index: index),
                   prefixText: '₹ ',
                 ),
                 onChanged: (_) => onChanged(),
@@ -889,7 +957,7 @@ class _SplitPart extends StatelessWidget {
                   minimumSize: const Size(64, 56),
                 ),
                 onPressed: enabled ? onRest : null,
-                child: const Text('Rest'),
+                child: Text(l.payRest),
               ),
             ],
           ],
@@ -901,8 +969,8 @@ class _SplitPart extends StatelessWidget {
             enabled: enabled,
             decoration: InputDecoration(
               labelText: method == PaymentMethod.upi
-                  ? 'UPI reference (optional)'
-                  : 'Card slip number (optional)',
+                  ? l.payUpiReferenceOptional
+                  : l.payCardSlipOptional,
             ),
           ),
         ],

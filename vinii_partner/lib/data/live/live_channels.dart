@@ -31,6 +31,7 @@ class LiveChannels implements ChannelsRepository {
       throw fromSupabase(
         e,
         notReady: 'Sales channels are not set up in this database yet.',
+        notReadyCode: 'channels_not_ready',
       );
     }
   }
@@ -53,6 +54,7 @@ class LiveChannels implements ChannelsRepository {
         throw const AppFailure(
           'That channel could not be changed. You may not have permission.',
           kind: FailureKind.forbidden,
+          code: 'channel_not_changed',
         );
       }
       return _channel(rows.first);
@@ -70,6 +72,7 @@ class LiveChannels implements ChannelsRepository {
       name: name.isNotEmpty
           ? name
           : key.isEmpty
+          // i18n-ignore: last-resort name when the row has neither a display name nor a key
           ? 'Channel'
           : '${key[0].toUpperCase()}${key.substring(1)}',
       connected: r['is_connected'] == true,

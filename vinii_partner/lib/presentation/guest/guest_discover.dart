@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/money.dart';
 import '../../core/time_format.dart';
 import '../../domain/guest_catalog.dart';
+import '../../l10n/l10n.dart';
 import '../theme/guest_theme.dart';
 import '../widgets/food_art.dart';
 import '../widgets/rings.dart';
@@ -25,6 +26,7 @@ class GuestDiscoverScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final l = context.l10n;
     final picks = s.catalog.chefsPicks;
     final limited = s.catalog.limitedToday;
     final shown = {...picks.map((i) => i.item.id)};
@@ -39,19 +41,22 @@ class GuestDiscoverScreen extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
-          GuestTopBar(title: waiting ? 'Discover more' : 'Specials'),
+          GuestTopBar(title: waiting ? l.guestDiscoverMore : l.guestSpecials),
           if (waiting) const Center(child: PreviewBanner()),
           if (waiting)
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
               child: Text(
-                'Keep exploring while we prepare your order.',
+                l.guestDiscoverWaiting,
                 textAlign: TextAlign.center,
                 style: p.body(14, color: p.inkMuted),
               ),
             ),
           if (picks.isNotEmpty) ...[
-            const _Heading(title: "Chef's picks", subtitle: 'Curated for you'),
+            _Heading(
+              title: l.guestDiscoverChefsPicks,
+              subtitle: l.guestDiscoverCurated,
+            ),
             _Row(items: picks, big: true),
           ],
           if (limited.isNotEmpty) ...[
@@ -61,7 +66,7 @@ class GuestDiscoverScreen extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      'Limited today',
+                      l.guestDiscoverLimited,
                       style: p.display(20, weight: FontWeight.w700),
                     ),
                   ),
@@ -77,7 +82,7 @@ class GuestDiscoverScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(99),
                       ),
                       child: Text(
-                        'Ends in ${hms(left)}',
+                        l.guestDiscoverEndsIn(time: hms(left)),
                         style: p.price(13, color: p.danger),
                       ),
                     ),
@@ -88,11 +93,11 @@ class GuestDiscoverScreen extends StatelessWidget {
             _Row(items: [for (final l in limited) l.item], big: false),
           ],
           if (recommended.isNotEmpty) ...[
-            const _Heading(title: 'Recommended for you'),
+            _Heading(title: l.guestDiscoverRecommended),
             _Row(items: recommended, big: false),
           ],
           if (picks.isEmpty && limited.isEmpty && recommended.isEmpty) ...[
-            const _Heading(title: 'From the menu'),
+            _Heading(title: l.guestDiscoverFromMenu),
             const DiscoverStrip(),
           ],
         ],
@@ -179,6 +184,7 @@ class _Card extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final l = context.l10n;
     final i = item.item;
     final liked = s.liked.contains(i.id);
     final big = width > 180;
@@ -204,7 +210,7 @@ class _Card extends StatelessWidget {
                     size: 34,
                     color: liked ? p.danger : Colors.white,
                     background: Colors.black.withValues(alpha: 0.35),
-                    tooltip: liked ? 'Saved for later' : 'Save for later',
+                    tooltip: liked ? l.guestDishSaved : l.guestDishSave,
                     onTap: () => s.toggleLike(i.id),
                   ),
                 ),
@@ -245,7 +251,7 @@ class _Card extends StatelessWidget {
                     RoundIcon(
                       icon: Icons.add_rounded,
                       size: 36,
-                      tooltip: 'Add ${i.name}',
+                      tooltip: l.guestDishAddTooltip(name: i.name),
                       background: p.accent,
                       color: p.onAccent,
                       onTap: () => addWithHaptic(context, item),

@@ -11,6 +11,7 @@ import '../../domain/menu.dart';
 import '../../domain/pos_order.dart';
 import '../../domain/staff.dart';
 import '../../domain/storefront.dart';
+import '../../l10n/l10n.dart';
 import '../widgets/state_views.dart';
 import 'guest_app.dart';
 
@@ -97,14 +98,15 @@ class _GuestHostScreenState extends State<GuestHostScreen> {
   @override
   Widget build(BuildContext context) {
     final session = AppScope.of(context).session;
+    final l = context.l10n;
     if (!session.can(Capability.handToGuest) || session.membership == null) {
       return Scaffold(
         appBar: AppBar(),
         body: EmptyView(
           icon: Icons.lock_outline_rounded,
-          title: 'Not allowed',
-          message: 'Your role cannot hand this phone to guests.',
-          actionLabel: 'Back',
+          title: l.failureTitleForbidden,
+          message: l.guestHostNotAllowedMessage,
+          actionLabel: l.commonBack,
           onAction: _leave,
         ),
       );
@@ -123,9 +125,7 @@ class _GuestHostScreenState extends State<GuestHostScreen> {
           );
         }
         if (!snap.hasData) {
-          return const Scaffold(
-            body: LoadingView(label: 'Getting the menu ready…'),
-          );
+          return Scaffold(body: LoadingView(label: l.guestHostLoading));
         }
         final data = snap.data!;
         if (data.published == null) {
@@ -133,11 +133,9 @@ class _GuestHostScreenState extends State<GuestHostScreen> {
             appBar: AppBar(),
             body: EmptyView(
               icon: Icons.storefront_outlined,
-              title: 'Publish your storefront in Studio first',
-              message:
-                  'Guests see the published storefront. Open Storefront, '
-                  'check the preview and publish it, then hand the phone over.',
-              actionLabel: 'Back',
+              title: l.guestHostPublishTitle,
+              message: l.guestHostPublishBody,
+              actionLabel: l.commonBack,
               onAction: _leave,
             ),
           );

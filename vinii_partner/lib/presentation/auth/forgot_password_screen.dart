@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_scope.dart';
 import '../../core/failure.dart';
+import '../../l10n/failure_text.dart';
+import '../../l10n/l10n.dart';
 import '../theme/staff_theme.dart';
 
 /// Sends Supabase's password-reset email. The confirmation never says
@@ -46,6 +48,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
     final text = Theme.of(context).textTheme;
+    final l = context.l10n;
     return Scaffold(
       appBar: AppBar(),
       body: SafeArea(
@@ -61,11 +64,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       color: t.success,
                     ),
                     const SizedBox(height: 20),
-                    Text('Check your email', style: text.headlineMedium),
+                    Text(l.authResetSentTitle, style: text.headlineMedium),
                     const SizedBox(height: 10),
                     Text(
-                      'If ${_email.text.trim()} has a VINII account, a link to set a new password is on its way. '
-                      'It can take a minute; check spam too.',
+                      l.authResetSentBody(email: _email.text.trim()),
                       style: text.bodyLarge?.copyWith(
                         color: t.inkSecondary,
                         height: 1.5,
@@ -76,7 +78,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       width: double.infinity,
                       child: FilledButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('Back to sign in'),
+                        child: Text(l.authBackToSignIn),
                       ),
                     ),
                   ],
@@ -86,16 +88,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text('Reset your password', style: text.headlineMedium),
+                      Text(l.authResetTitle, style: text.headlineMedium),
                       const SizedBox(height: 8),
-                      Text(
-                        'Enter your work email. We will send a link to choose a new password.',
-                        style: text.bodyMedium,
-                      ),
+                      Text(l.authResetIntro, style: text.bodyMedium),
                       const SizedBox(height: 24),
                       if (_failure != null) ...[
                         Text(
-                          _failure!.message,
+                          failureText(l, _failure!),
                           style: TextStyle(color: t.danger),
                         ),
                         const SizedBox(height: 12),
@@ -106,16 +105,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         keyboardType: TextInputType.emailAddress,
                         autofillHints: const [AutofillHints.email],
                         autocorrect: false,
-                        decoration: const InputDecoration(
-                          labelText: 'Email',
-                          prefixIcon: Icon(Icons.mail_outline_rounded),
+                        decoration: InputDecoration(
+                          labelText: l.commonEmail,
+                          prefixIcon: const Icon(Icons.mail_outline_rounded),
                         ),
                         validator: (v) {
                           final s = v?.trim() ?? '';
-                          if (s.isEmpty) return 'Enter your email';
+                          if (s.isEmpty) return l.authEmailRequired;
                           if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
                               .hasMatch(s)) {
-                            return 'That does not look like an email';
+                            return l.authEmailInvalid;
                           }
                           return null;
                         },
@@ -132,7 +131,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                   color: t.onAccent,
                                 ),
                               )
-                            : const Text('Send reset link'),
+                            : Text(l.authSendResetLink),
                       ),
                     ],
                   ),

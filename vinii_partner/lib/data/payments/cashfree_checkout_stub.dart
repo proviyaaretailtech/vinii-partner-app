@@ -11,6 +11,7 @@ class CashfreeCheckout {
       'Paying online opens in the web version for now. Please ask a member '
       'of staff to take the payment.',
       kind: FailureKind.notReady,
+      code: 'guest_pay_web_only',
     );
   }
 }

@@ -40,6 +40,7 @@ class StorefrontDefinition {
     this.chefsPicks = const [],
     this.limitedToday = const [],
     this.gstPercent = 5,
+    // i18n-ignore: stored merchant default (the word guests see before a table number)
     this.tableLabel = 'Table',
     this.theme = StorefrontTheme.empty,
     this.media = StorefrontMedia.empty,
@@ -294,6 +295,7 @@ class StorefrontDefinition {
       gstPercent: (j['gst_percent'] as num?)?.toDouble() ?? 5,
       tableLabel: (j['table_label'] as String?)?.trim().isNotEmpty == true
           ? j['table_label'] as String
+          // i18n-ignore: stored merchant default (the word guests see before a table number)
           : 'Table',
       theme: j['theme'] is Map
           ? StorefrontTheme.fromJson(_map(j['theme']))
@@ -318,6 +320,12 @@ Map<String, dynamic> _map(Object? v) => v is Map
     ? v.map((k, val) => MapEntry('$k', val))
     : const <String, dynamic>{};
 
+// i18n-ignore: template `label`s are product names; `description` is English
+// fallback text, screens use AppLocalizations.studioTemplateBlurb
+// (studio_sections.dart). The `default*` wording below is example guest copy
+// shown as a grey hint in an empty text field, never saved: it is guest
+// content in the storefront's own language, not staff UI.
+// i18n-ignore-start: template names are product names; the rest is an English fallback / example guest copy
 enum StorefrontTemplate {
   bistroNight(
     key: 'bistro_night',
@@ -394,7 +402,11 @@ enum StorefrontTemplate {
   static StorefrontTemplate? fromKey(String? k) =>
       values.where((t) => t.key == k).firstOrNull;
 }
+// i18n-ignore-end
 
+// i18n-ignore: English fallback for logs/tests; screens use
+// AppLocalizations.studioModeName (studio_sections.dart) and the hints in
+// service_section.dart.
 enum GuestServiceMode {
   dineIn('dine_in', 'Dine-in', 'Order fresh at your table'),
   takeaway('takeaway', 'Takeaway', 'Pick up at the counter'),
@@ -410,6 +422,8 @@ enum GuestServiceMode {
       values.where((m) => m.key == k).firstOrNull;
 }
 
+// i18n-ignore: English fallback for logs/tests; screens use
+// AppLocalizations.studioStyleName / studioStyleHint (studio_sections.dart).
 enum CategoryStyle {
   grid('grid', 'Tiles', 'A grid of photo tiles'),
   wheel('wheel', 'Wheel', 'A curved carousel guests swipe through');
@@ -425,6 +439,7 @@ enum CategoryStyle {
 
 /// The curated faces a storefront may use, all available both to the web
 /// (Google Fonts CSS) and here (google_fonts). The id is what is stored.
+// i18n-ignore: font family names are brand names
 enum StorefrontFont {
   plusJakartaSans('plus-jakarta-sans', 'Plus Jakarta Sans'),
   inter('inter', 'Inter'),
@@ -1019,6 +1034,8 @@ class CategoryPresentation {
 
 /// Tags guests see as chips on cards. "Bestseller" also comes automatically
 /// from the POS "recommended" flag.
+// i18n-ignore: stored merchant default (these exact words are saved on a dish
+// and shown to guests as chips)
 const storefrontTags = [
   'Bestseller',
   'Spicy',

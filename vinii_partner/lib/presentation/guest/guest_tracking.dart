@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/time_format.dart';
 import '../../domain/pos_order.dart';
+import '../../l10n/l10n.dart';
 import '../theme/guest_theme.dart';
 import '../widgets/food_art.dart';
 import '../widgets/rings.dart';
@@ -32,66 +33,82 @@ class _GuestTrackingScreenState extends State<GuestTrackingScreen> {
   static List<(GuestTrackingStep, String, String)> stepsFor(
     ServiceType t,
     GuestCopy c,
+    AppLocalizations l,
   ) {
-    final confirmed = (
-      GuestTrackingStep.confirmed,
-      c('order.confirmed'),
-      GuestTrackingStep.confirmed.subtitle,
-    );
-    final kitchen = (
-      GuestTrackingStep.inKitchen,
-      c('order.in_kitchen'),
-      GuestTrackingStep.inKitchen.subtitle,
-    );
-    return switch (t) {
-      ServiceType.dineIn => [
-        confirmed,
-        kitchen,
-        (
-          GuestTrackingStep.ready,
-          c('order.ready'),
-          GuestTrackingStep.ready.subtitle,
-        ),
-        (
-          GuestTrackingStep.onTheWay,
-          GuestTrackingStep.onTheWay.title,
-          GuestTrackingStep.onTheWay.subtitle,
-        ),
-        (
-          GuestTrackingStep.served,
-          // Its default line repeats the subtitle; only the restaurant's own.
-          c.own('order.served') ?? GuestTrackingStep.served.title,
-          GuestTrackingStep.served.subtitle,
-        ),
+    final path = switch (t) {
+      ServiceType.dineIn || ServiceType.delivery => [
+        GuestTrackingStep.confirmed,
+        GuestTrackingStep.inKitchen,
+        GuestTrackingStep.ready,
+        GuestTrackingStep.onTheWay,
+        GuestTrackingStep.served,
       ],
       ServiceType.takeaway => [
-        confirmed,
-        kitchen,
-        (
-          GuestTrackingStep.ready,
-          c('order.ready'),
-          'Collect it at the counter',
-        ),
-        (GuestTrackingStep.served, 'Picked up', 'Enjoy your meal!'),
-      ],
-      ServiceType.delivery => [
-        confirmed,
-        kitchen,
-        (GuestTrackingStep.ready, 'Packed', 'Waiting for the rider'),
-        (GuestTrackingStep.onTheWay, 'On the way', 'Heading to you'),
-        (GuestTrackingStep.served, 'Delivered', 'Enjoy your meal!'),
+        GuestTrackingStep.confirmed,
+        GuestTrackingStep.inKitchen,
+        GuestTrackingStep.ready,
+        GuestTrackingStep.served,
       ],
     };
+    return [
+      for (final st in path) (st, _stepTitle(l, c, t, st), _stepHint(l, t, st)),
+    ];
   }
+
+  /// What a step is called for this way of ordering.
+  static String _stepTitle(
+    AppLocalizations l,
+    GuestCopy c,
+    ServiceType t,
+    GuestTrackingStep st,
+  ) => switch (st) {
+    GuestTrackingStep.confirmed =>
+      c.own('order.confirmed') ?? l.guestTrackConfirmed,
+    GuestTrackingStep.inKitchen =>
+      c.own('order.in_kitchen') ?? l.guestTrackInKitchen,
+    GuestTrackingStep.ready =>
+      t == ServiceType.delivery
+          ? l.guestTrackPacked
+          : c.own('order.ready') ?? l.guestTrackReady,
+    GuestTrackingStep.onTheWay => l.guestTrackOnTheWay,
+    GuestTrackingStep.served => switch (t) {
+      // Its default line repeats the subtitle; only the restaurant's own.
+      ServiceType.dineIn => c.own('order.served') ?? l.guestTrackServed,
+      ServiceType.takeaway => l.guestTrackPickedUp,
+      ServiceType.delivery => l.guestTrackDelivered,
+    },
+  };
+
+  /// The line under a step's name.
+  static String _stepHint(
+    AppLocalizations l,
+    ServiceType t,
+    GuestTrackingStep st,
+  ) => switch (st) {
+    GuestTrackingStep.confirmed => l.guestTrackConfirmedHint,
+    GuestTrackingStep.inKitchen => l.guestTrackInKitchenHint,
+    GuestTrackingStep.ready => switch (t) {
+      ServiceType.dineIn => l.guestTrackReadyHintTable,
+      ServiceType.takeaway => l.guestTrackReadyHintCounter,
+      ServiceType.delivery => l.guestTrackPackedHint,
+    },
+    GuestTrackingStep.onTheWay =>
+      t == ServiceType.delivery
+          ? l.guestTrackOnTheWayHintDelivery
+          : l.guestTrackOnTheWayHintTable,
+    GuestTrackingStep.served => l.guestTrackEnjoy,
+  };
 
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final l = context.l10n;
     final t = GuestCopy.of(context);
     final order = s.latest!;
     final current = s.step;
-    final steps = stepsFor(order.serviceType, t);
+    final steps = stepsFor(order.serviceType, t, l);
+    final tableName = l.guestTableNameOf(s);
     // The restaurant's own heading, if it wrote one; the number then moves
     // to the line underneath.
     final heading = t.own('order.tracking');
@@ -108,15 +125,17 @@ class _GuestTrackingScreenState extends State<GuestTrackingScreen> {
       child: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
-          GuestTopBar(title: heading ?? 'Order #${order.displayNo}'),
+          GuestTopBar(
+            title: heading ?? l.guestTrackTitle(number: order.displayNo),
+          ),
           Center(
             child: Text(
               [
                 if (heading != null) '#${order.displayNo}',
                 if (order.serviceType == ServiceType.dineIn &&
-                    s.tableName != null)
-                  s.tableName!,
-                '${order.itemCount} ${order.itemCount == 1 ? 'item' : 'items'}',
+                    tableName != null)
+                  tableName,
+                l.guestPlacedItemCount(count: order.itemCount),
               ].join(' · '),
               style: p.body(13.5, color: p.inkMuted),
             ),
@@ -127,7 +146,7 @@ class _GuestTrackingScreenState extends State<GuestTrackingScreen> {
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
               child: GuestButton(
                 key: const ValueKey('preview-next'),
-                label: 'Next step (preview)',
+                label: l.guestTrackNextPreview,
                 icon: Icons.skip_next_rounded,
                 style: GuestButtonStyle.soft,
                 dense: true,
@@ -145,7 +164,7 @@ class _GuestTrackingScreenState extends State<GuestTrackingScreen> {
               child: GuestCard(
                 color: p.danger.withValues(alpha: 0.1),
                 child: Text(
-                  'This order was cancelled. Please speak to a staff member.',
+                  l.guestTrackCancelled,
                   style: p.body(15, weight: FontWeight.w700),
                 ),
               ),
@@ -188,12 +207,15 @@ class _GuestTrackingScreenState extends State<GuestTrackingScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Estimated time',
+                        l.guestTrackEstimatedTime,
                         style: p.body(14, color: p.inkMuted),
                       ),
                     ),
                     Text(
-                      '$minutes–${minutes + 5} minutes',
+                      l.guestPlacedEstimateRange(
+                        low: minutes,
+                        high: minutes + 5,
+                      ),
                       style: p.body(15, weight: FontWeight.w800),
                     ),
                   ],
@@ -207,13 +229,13 @@ class _GuestTrackingScreenState extends State<GuestTrackingScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      'Discover more',
+                      l.guestDiscoverMore,
                       style: p.display(20, weight: FontWeight.w700),
                     ),
                   ),
                   TextButton(
                     onPressed: () => GuestFlow.discover(context, waiting: true),
-                    child: Text('See all', style: p.body(14)),
+                    child: Text(l.guestTrackSeeAll, style: p.body(14)),
                   ),
                 ],
               ),
@@ -221,7 +243,7 @@ class _GuestTrackingScreenState extends State<GuestTrackingScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
               child: Text(
-                'Keep exploring while we prepare your order.',
+                l.guestDiscoverWaiting,
                 style: p.body(13.5, color: p.inkMuted),
               ),
             ),
@@ -230,7 +252,7 @@ class _GuestTrackingScreenState extends State<GuestTrackingScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
             child: GuestButton(
-              label: 'View bill',
+              label: l.guestPlacedViewBill,
               style: GuestButtonStyle.outline,
               dense: true,
               onTap: () => GuestFlow.bill(context),
@@ -292,6 +314,7 @@ class _StatusHero extends StatelessWidget {
               SizedBox.square(
                 dimension: 128,
                 child: FoodArt(
+                  // i18n-ignore: name of the painted plate, not shown as text
                   name: first?.name ?? 'plate',
                   imageUrl: first == null
                       ? null
@@ -321,7 +344,10 @@ class _StatusHero extends StatelessWidget {
               Text(now.$2, textAlign: TextAlign.center, style: p.display(22)),
               const SizedBox(height: 2),
               Text(
-                'Step ${(at < 0 ? 0 : at) + 1} of ${steps.length}',
+                context.l10n.guestTrackStepOf(
+                  step: (at < 0 ? 0 : at) + 1,
+                  total: steps.length,
+                ),
                 textAlign: TextAlign.center,
                 style: p.body(14, color: served ? p.success : active),
               ),

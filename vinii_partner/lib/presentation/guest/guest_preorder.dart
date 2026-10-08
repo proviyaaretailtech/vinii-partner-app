@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
+import '../../core/time_format.dart';
+import '../../l10n/l10n.dart';
 import '../theme/guest_theme.dart';
 import 'guest_flow.dart';
 import 'guest_widgets.dart';
@@ -49,12 +50,13 @@ class _GuestPreOrderScreenState extends State<GuestPreOrderScreen> {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final l = context.l10n;
     final settings = s.definition.preOrder;
     final all = settings.allSlotsFor(_day);
     final open = settings.slotsFor(_day).toSet();
     return GuestPage(
       bottom: GuestButton(
-        label: 'Continue',
+        label: l.commonContinue,
         trailingArrow: true,
         onTap: _slot == null
             ? null
@@ -70,15 +72,15 @@ class _GuestPreOrderScreenState extends State<GuestPreOrderScreen> {
       child: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
-          const GuestTopBar(title: 'Pre-order'),
+          GuestTopBar(title: l.guestModePreOrder),
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 12, 24, 4),
-            child: Text('Select date & time', style: p.display(28)),
+            child: Text(l.guestPreTitle, style: p.display(28)),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
             child: Text(
-              'When would you like to pick up your order?',
+              l.guestPreSubtitle,
               style: p.body(14, color: p.inkMuted),
             ),
           ),
@@ -107,7 +109,7 @@ class _GuestPreOrderScreenState extends State<GuestPreOrderScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        i == 0 ? 'Today' : DateFormat('EEE').format(d),
+                        i == 0 ? l.commonToday : dateFormat('EEE').format(d),
                         style: p.body(
                           12.5,
                           color: selected ? p.onAccent : p.inkMuted,
@@ -129,7 +131,7 @@ class _GuestPreOrderScreenState extends State<GuestPreOrderScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
             child: Text(
-              'Select a time slot',
+              l.guestPreSlotsTitle,
               style: p.display(18, weight: FontWeight.w700),
             ),
           ),
@@ -137,7 +139,7 @@ class _GuestPreOrderScreenState extends State<GuestPreOrderScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Text(
-                'No pickup times on this day.',
+                l.guestPreNoSlots,
                 style: p.body(14, color: p.inkMuted),
               ),
             )
@@ -159,7 +161,7 @@ class _GuestPreOrderScreenState extends State<GuestPreOrderScreen> {
                       onTap: () => setState(() => _slot = t),
                       child: Center(
                         child: Text(
-                          DateFormat('h:mm a').format(t),
+                          wallClock(t),
                           style: p.body(
                             14,
                             weight: FontWeight.w700,
@@ -200,7 +202,8 @@ class _Chip extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 220),
           curve: Curves.easeOutCubic,
-          width: 64,
+          constraints: const BoxConstraints(minWidth: 64),
+          padding: const EdgeInsets.symmetric(horizontal: 6),
           decoration: BoxDecoration(
             color: selected ? p.accent : p.surface,
             borderRadius: BorderRadius.circular(18),

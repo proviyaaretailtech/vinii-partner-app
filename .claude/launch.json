@@ -6,9 +6,10 @@
       "runtimeExecutable": "bash",
       "runtimeArgs": [
         "-c",
-        "cd vinii_partner && ./tool/run_local.sh -d web-server --web-port 8090 --web-hostname 127.0.0.1"
+        "cd vinii_partner && ./tool/run_local.sh -d web-server --web-port \"${PORT:-8090}\" --web-hostname 127.0.0.1"
       ],
-      "port": 8090
+      "port": 8090,
+      "autoPort": true
     },
     {
       "name": "vinii-partner-local",

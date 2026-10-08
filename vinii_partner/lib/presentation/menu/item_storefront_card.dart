@@ -3,11 +3,17 @@ import 'package:flutter/services.dart';
 
 import '../../core/failure.dart';
 import '../../domain/storefront.dart';
+import '../../l10n/failure_text.dart';
+import '../../l10n/l10n.dart';
 import '../theme/staff_theme.dart';
+import 'menu_labels.dart';
 import 'panel.dart';
 
 /// Allergens restaurants most often need to declare. Custom ones can be
-/// added; these are just the quick picks.
+/// added; these are just the quick picks. The English word is what gets
+/// stored on the dish (guests and later translations read it); the chip the
+/// staff member sees is translated by `allergenLabel`.
+// i18n-ignore: stored values, shown through allergenLabel
 const commonAllergens = [
   'Gluten',
   'Dairy',
@@ -103,6 +109,7 @@ class _ItemStorefrontCardState extends State<ItemStorefrontCard> {
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
     final text = Theme.of(context).textTheme;
+    final l = context.l10n;
     if (widget.loading) {
       return const Panel(
         children: [
@@ -121,19 +128,16 @@ class _ItemStorefrontCardState extends State<ItemStorefrontCard> {
     if (widget.failure != null) {
       return Panel(
         children: [
-          Text(
-            'Storefront details could not be loaded',
-            style: text.titleSmall,
-          ),
+          Text(l.menuStorefrontLoadFailedTitle, style: text.titleSmall),
           const SizedBox(height: 4),
-          Text(widget.failure!.message, style: text.bodyMedium),
+          Text(failureText(l, widget.failure!), style: text.bodyMedium),
           if (widget.onRetry != null) ...[
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton(
                 onPressed: widget.onRetry,
-                child: const Text('Try again'),
+                child: Text(l.commonTryAgain),
               ),
             ),
           ],
@@ -146,12 +150,7 @@ class _ItemStorefrontCardState extends State<ItemStorefrontCard> {
     final on = widget.enabled;
     return Panel(
       children: [
-        const PanelHeader(
-          title: 'Tags',
-          subtitle:
-              'Small labels on the dish card. "Bestseller" also comes '
-              'from the switch above.',
-        ),
+        PanelHeader(title: l.menuTagsTitle, subtitle: l.menuTagsHint),
         const SizedBox(height: 10),
         Wrap(
           spacing: 8,
@@ -159,7 +158,7 @@ class _ItemStorefrontCardState extends State<ItemStorefrontCard> {
           children: [
             for (final tag in storefrontTags)
               FilterChip(
-                label: Text(tag),
+                label: Text(l.storefrontTagLabel(tag)),
                 selected: widget.tags.contains(tag),
                 onSelected: on
                     ? (v) =>
@@ -169,9 +168,9 @@ class _ItemStorefrontCardState extends State<ItemStorefrontCard> {
           ],
         ),
         const SizedBox(height: 20),
-        const PanelHeader(
-          title: 'Ingredients',
-          subtitle: 'Type one and tap Add.',
+        PanelHeader(
+          title: l.menuIngredientsTitle,
+          subtitle: l.menuIngredientsHint,
         ),
         const SizedBox(height: 10),
         if (on)
@@ -183,15 +182,15 @@ class _ItemStorefrontCardState extends State<ItemStorefrontCard> {
                   textCapitalization: TextCapitalization.sentences,
                   textInputAction: TextInputAction.done,
                   onSubmitted: (_) => _addIngredient(),
-                  decoration: const InputDecoration(
-                    hintText: 'Ingredient',
+                  decoration: InputDecoration(
+                    hintText: l.menuIngredientHint,
                     isDense: true,
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               IconButton.filledTonal(
-                tooltip: 'Add ingredient',
+                tooltip: l.menuIngredientAdd,
                 onPressed: _addIngredient,
                 icon: const Icon(Icons.add_rounded),
               ),
@@ -217,12 +216,9 @@ class _ItemStorefrontCardState extends State<ItemStorefrontCard> {
             ],
           ),
         ] else if (!on)
-          Text('None added', style: text.bodySmall),
+          Text(l.menuNoneAdded, style: text.bodySmall),
         const SizedBox(height: 20),
-        const PanelHeader(
-          title: 'Allergens',
-          subtitle: 'Guests with allergies look for these first.',
-        ),
+        PanelHeader(title: l.menuAllergensTitle, subtitle: l.menuAllergensHint),
         const SizedBox(height: 10),
         Wrap(
           spacing: 8,
@@ -230,7 +226,7 @@ class _ItemStorefrontCardState extends State<ItemStorefrontCard> {
           children: [
             for (final a in [...commonAllergens, ...customAllergens])
               FilterChip(
-                label: Text(a),
+                label: Text(l.allergenLabel(a)),
                 selected: widget.allergens.contains(a),
                 onSelected: on
                     ? (v) => widget.onChanged(
@@ -249,15 +245,15 @@ class _ItemStorefrontCardState extends State<ItemStorefrontCard> {
                   controller: _allergen,
                   textCapitalization: TextCapitalization.sentences,
                   onSubmitted: (_) => _addAllergen(),
-                  decoration: const InputDecoration(
-                    hintText: 'Another allergen',
+                  decoration: InputDecoration(
+                    hintText: l.menuAllergenAnother,
                     isDense: true,
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               IconButton.filledTonal(
-                tooltip: 'Add allergen',
+                tooltip: l.menuAllergenAdd,
                 onPressed: _addAllergen,
                 icon: const Icon(Icons.add_rounded),
               ),
@@ -274,17 +270,17 @@ class _ItemStorefrontCardState extends State<ItemStorefrontCard> {
             LengthLimitingTextInputFormatter(5),
           ],
           onChanged: (_) => widget.onChanged(),
-          decoration: const InputDecoration(
-            labelText: 'Calories',
-            suffixText: 'kcal',
-            helperText: 'Optional. Shown when nutrition is switched on.',
+          decoration: InputDecoration(
+            labelText: l.menuCalories,
+            suffixText: 'kcal', // i18n-ignore: unit symbol
+            helperText: l.menuCaloriesHint,
           ),
         ),
         const SizedBox(height: 8),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          title: const Text('Hide from storefront'),
-          subtitle: const Text('Still sold in the POS and on One Local'),
+          title: Text(l.menuHideFromStorefront),
+          subtitle: Text(l.menuHideFromStorefrontHint),
           value: widget.hidden,
           onChanged: on ? (v) => widget.onChanged(hidden: v) : null,
         ),
@@ -296,7 +292,7 @@ class _ItemStorefrontCardState extends State<ItemStorefrontCard> {
             const SizedBox(width: 6),
             Expanded(
               child: Text(
-                on ? 'Shows on your storefront after you publish in Studio.' : 'Only owners, admins, managers and marketing can change these.',
+                on ? l.menuStorefrontPublishNote : l.menuStorefrontReadOnlyNote,
                 style: text.bodySmall,
               ),
             ),

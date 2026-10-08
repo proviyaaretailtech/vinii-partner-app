@@ -1,3 +1,4 @@
+import '../../application/studio_controller.dart';
 import '../../core/failure.dart';
 import '../../domain/organization.dart';
 import '../../domain/storefront.dart';
@@ -17,9 +18,11 @@ class LiveStorefront implements StorefrontRepository {
   LiveStorefront(this.b);
   final LiveBackend b;
 
-  static const _pending =
-      'Publishing needs the storefront tables, a database update waiting for approval. '
-      'Your draft is kept on this phone until then.';
+  /// English fallback for "the storefront tables are missing" (a note on the
+  /// state and the message of a `notReady` failure); the screen translates
+  /// both through the code below.
+  static const _pending = storefrontDraftOnPhoneNote;
+  static const _pendingCode = 'studio_publish_pending';
 
   @override
   Future<StorefrontState> load(Organization org) async {
@@ -69,7 +72,7 @@ class LiveStorefront implements StorefrontRepository {
         history: history,
       );
     } catch (e) {
-      final f = fromSupabase(e, notReady: _pending);
+      final f = fromSupabase(e, notReady: _pending, notReadyCode: _pendingCode);
       if (f.kind != FailureKind.notReady) throw f;
       return StorefrontState(draft: _localDraft(org), note: _pending);
     }
@@ -85,7 +88,7 @@ class LiveStorefront implements StorefrontRepository {
       }, onConflict: 'organization_id');
       await b.prefs.setStorefrontDraft(org.id, null);
     } catch (e) {
-      final f = fromSupabase(e, notReady: _pending);
+      final f = fromSupabase(e, notReady: _pending, notReadyCode: _pendingCode);
       if (f.kind != FailureKind.notReady) throw f;
       // Tables not there yet: keep the work on this phone rather than lose it.
       await b.prefs.setStorefrontDraft(org.id, draft.toJson());
@@ -140,7 +143,7 @@ class LiveStorefront implements StorefrontRepository {
         publishedBy: publishedBy,
       );
     } catch (e) {
-      throw fromSupabase(e, notReady: _pending);
+      throw fromSupabase(e, notReady: _pending, notReadyCode: _pendingCode);
     }
   }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/money.dart';
 import '../../domain/guest_catalog.dart';
+import '../../l10n/l10n.dart';
 import '../theme/guest_theme.dart';
 import '../widgets/chips.dart';
 import '../widgets/food_art.dart';
@@ -39,6 +40,7 @@ class DishRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final l = context.l10n;
     final i = item.item;
     final qty = s.qtyOf(i.id);
     final liked = s.liked.contains(i.id);
@@ -66,7 +68,7 @@ class DishRow extends StatelessWidget {
                       size: 30,
                       color: liked ? p.danger : Colors.white,
                       background: Colors.black.withValues(alpha: 0.35),
-                      tooltip: liked ? 'Saved for later' : 'Save for later',
+                      tooltip: liked ? l.guestDishSaved : l.guestDishSave,
                       onTap: () => s.toggleLike(i.id),
                     ),
                   ),
@@ -114,10 +116,11 @@ class DishRow extends StatelessWidget {
                       if (item.tags.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 6),
-                          child: SizedBox(
-                            height: 24,
-                            child: ListView(
-                              scrollDirection: Axis.horizontal,
+                          // Sizes to the chips (taller in Hindi) and scrolls
+                          // sideways when there are more than fit.
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
                               children: [
                                 for (final t in item.tags)
                                   Padding(
@@ -192,7 +195,7 @@ class _AddPill extends StatelessWidget {
               Icon(Icons.add_rounded, size: 18, color: fg),
               const SizedBox(width: 4),
               Text(
-                GuestCopy.of(context)('menu.add'),
+                GuestCopy.of(context).own('menu.add') ?? context.l10n.commonAdd,
                 style: p.body(14, weight: FontWeight.w800, color: fg),
               ),
             ],

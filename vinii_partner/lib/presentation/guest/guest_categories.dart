@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/money.dart';
 import '../../domain/guest_catalog.dart';
 import '../../domain/storefront.dart';
+import '../../l10n/l10n.dart';
 import '../theme/guest_theme.dart';
 import '../widgets/dish_art.dart';
 import '../widgets/food_art.dart';
@@ -25,6 +26,7 @@ class GuestCategoriesScreen extends StatelessWidget {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
     final t = GuestCopy.of(context);
+    final l = context.l10n;
     final wheel = s.definition.categoryStyle == CategoryStyle.wheel;
     final hasDiscover =
         s.catalog.chefsPicks.isNotEmpty || s.catalog.limitedToday.isNotEmpty;
@@ -44,14 +46,14 @@ class GuestCategoriesScreen extends StatelessWidget {
                 RoundIcon(
                   icon: Icons.auto_awesome_rounded,
                   size: 40,
-                  tooltip: 'Specials',
+                  tooltip: l.guestSpecials,
                   onTap: () => GuestFlow.discover(context),
                 ),
               const SizedBox(width: 8),
               RoundIcon(
                 icon: Icons.search_rounded,
                 size: 40,
-                tooltip: 'Search',
+                tooltip: l.commonSearch,
                 onTap: () => showGuestSearch(context),
               ),
             ],
@@ -61,9 +63,8 @@ class GuestCategoriesScreen extends StatelessWidget {
             child: Text(
               // The wheel keeps its own instruction unless the restaurant
               // wrote its own menu heading.
-              wheel
-                  ? t.own('menu.title') ?? 'Swipe to explore categories'
-                  : t('menu.title'),
+              t.own('menu.title') ??
+                  (wheel ? l.guestCategoriesSwipeHint : l.guestCategoriesTitle),
               style: wheel ? p.hero(30) : p.display(28),
             ),
           ),
@@ -176,6 +177,7 @@ class _Tile extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.read(context);
+    final l = context.l10n;
     final all = category == null;
     return Reveal(
       index: index,
@@ -206,13 +208,16 @@ class _Tile extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          all ? 'All dishes' : category!.category.name,
+                          all ? l.guestAllDishes : category!.category.name,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: p.display(17, color: Colors.white),
                         ),
                         Text(
-                          '${(category?.items ?? s.catalog.allItems).length} dishes',
+                          l.guestDishCount(
+                            count:
+                                (category?.items ?? s.catalog.allItems).length,
+                          ),
                           style: p.body(
                             12,
                             color: Colors.white.withValues(alpha: 0.75),
@@ -254,6 +259,7 @@ class _WheelState extends State<_Wheel> {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final l = context.l10n;
     final cats = <GuestCategory?>[null, ...s.catalog.categories];
     final current = cats[_index.clamp(0, cats.length - 1)];
     return Column(
@@ -303,7 +309,7 @@ class _WheelState extends State<_Wheel> {
                           right: 18,
                           bottom: 20,
                           child: Text(
-                            cats[i]?.category.name ?? 'All dishes',
+                            cats[i]?.category.name ?? l.guestAllDishes,
                             maxLines: 2,
                             style: p.display(22, color: Colors.white),
                           ),
@@ -320,7 +326,9 @@ class _WheelState extends State<_Wheel> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: GuestButton(
-            label: 'Explore ${current?.category.name ?? 'all dishes'}',
+            label: current == null
+                ? l.guestExploreAll
+                : l.guestExploreCategory(name: current.category.name),
             trailingArrow: true,
             dense: true,
             onTap: () => GuestFlow.browse(context, current),
@@ -349,7 +357,7 @@ class _WheelState extends State<_Wheel> {
                       _Glyph(category: c, active: active),
                       const SizedBox(height: 6),
                       Text(
-                        c?.category.name ?? 'All',
+                        c?.category.name ?? l.commonAll,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: p.body(
@@ -437,6 +445,7 @@ class CartBar extends StatelessWidget {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
     final t = GuestCopy.of(context);
+    final l = context.l10n;
     // Always filled: it floats over the menu. Its corners follow the theme.
     return Material(
       color: p.accent,
@@ -446,8 +455,9 @@ class CartBar extends StatelessWidget {
       shadowColor: p.accent.withValues(alpha: 0.4),
       child: InkWell(
         onTap: () => GuestFlow.toOrder(context),
-        child: SizedBox(
-          height: 58,
+        child: ConstrainedBox(
+          // At least 58 high; a longer label (Hindi) grows the bar.
+          constraints: const BoxConstraints(minHeight: 58),
           child: Row(
             children: [
               const SizedBox(width: 8),
@@ -478,9 +488,10 @@ class CartBar extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  '${t('cart.view')} (${s.itemCount})',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  l.guestCartBarLabel(
+                    label: t.own('cart.view') ?? l.guestCartView,
+                    count: s.itemCount,
+                  ),
                   style: p.body(16, weight: FontWeight.w700, color: p.onAccent),
                 ),
               ),
@@ -528,6 +539,7 @@ class _SearchSheetState extends State<_SearchSheet> {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final l = context.l10n;
     final q = _q.trim().toLowerCase();
     final results = q.isEmpty
         ? const <GuestItem>[]
@@ -551,7 +563,9 @@ class _SearchSheetState extends State<_SearchSheet> {
                 onChanged: (v) => setState(() => _q = v),
                 style: p.body(16),
                 decoration: InputDecoration(
-                  hintText: GuestCopy.of(context)('menu.search'),
+                  hintText:
+                      GuestCopy.of(context).own('menu.search') ??
+                      l.guestSearchHint,
                   prefixIcon: const Icon(Icons.search_rounded),
                 ),
               ),
@@ -585,7 +599,7 @@ class _SearchSheetState extends State<_SearchSheet> {
                     Padding(
                       padding: const EdgeInsets.all(32),
                       child: Text(
-                        'Nothing matches "$_q".',
+                        l.guestSearchNoMatch(query: _q),
                         textAlign: TextAlign.center,
                         style: p.body(14, color: p.inkMuted),
                       ),

@@ -47,6 +47,10 @@ flutter analyze
 flutter test
 ```
 
+## Languages (English + Hindi)
+
+Every user-visible string lives in `lib/l10n/app_en.arb` / `app_hi.arb` and is read with `context.l10n.someKey`; the language is app state (`services.locale`) and changes in place from More > Language. How it works, how a new screen adds a string, and the current conversion status: [`../../docs/I18N_STATUS_partner.md`](../../docs/I18N_STATUS_partner.md). Checks: `dart run tool/i18n_check.dart` (catalogue parity + a scan for hard-coded strings), `flutter test test/i18n`. Pseudo-language for layout checks: `--dart-define=PSEUDO_LOCALE=true`.
+
 ## Layout
 
 - `lib/config` build settings · `lib/domain` models and pure maths (bill parity with the OS, storefront definition, guest catalog, application definition)

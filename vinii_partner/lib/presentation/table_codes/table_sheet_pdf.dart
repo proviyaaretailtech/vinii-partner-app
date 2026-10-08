@@ -23,9 +23,13 @@ Future<Uint8List> buildTableSheetPdf({
   int columns = 3,
 }) async {
   const margin = 24.0;
+  // i18n-ignore: brand name in the PDF's metadata
   final doc = pw.Document(title: title, creator: 'VINII Partner');
   final cellWidth = (PdfPageFormat.a4.width - margin * 2) / columns;
   const cellHeight = 250.0;
+  // What is left of a cell under the code: the cell, less its padding (14 + 8),
+  // the code with its white margin (138 + 12) and the gap below the code (6).
+  const labelHeight = cellHeight - 14 - 8 - 150 - 6;
   doc.addPage(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
@@ -62,10 +66,16 @@ Future<Uint8List> buildTableSheetPdf({
                       ),
                     ),
                     pw.SizedBox(height: 6),
+                    // The words are a picture drawn by Flutter (the pdf
+                    // package cannot shape Devanagari). It is scaled to fit
+                    // the room left under the code, so a taller Hindi label
+                    // shrinks a little instead of running out of the cell.
                     pw.Image(
                       pw.MemoryImage(c.label),
                       width: cellWidth - 24,
+                      height: labelHeight,
                       fit: pw.BoxFit.contain,
+                      alignment: pw.Alignment.topCenter,
                     ),
                   ],
                 ),

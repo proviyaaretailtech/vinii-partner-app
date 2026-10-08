@@ -4,6 +4,9 @@ import '../../domain/delivery_order.dart';
 import '../../domain/menu.dart';
 import '../../domain/organization.dart';
 import '../../domain/pos_order.dart';
+import '../../l10n/l10n.dart';
+import '../../l10n/labels.dart';
+import '../menu/menu_labels.dart';
 import '../theme/staff_theme.dart';
 
 /// A small rounded status label ("New", "Preparing", "Ready").
@@ -29,7 +32,7 @@ class StatusChip extends StatelessWidget {
       DeliveryStatus.delivered => t.inkMuted,
       DeliveryStatus.cancelled => t.danger,
     };
-    return StatusChip(label: s.label, color: color);
+    return StatusChip(label: context.l10n.deliveryStatusLabel(s), color: color);
   }
 
   factory StatusChip.pos(BuildContext context, PosStatus s) {
@@ -42,7 +45,7 @@ class StatusChip extends StatelessWidget {
       PosStatus.paid || PosStatus.delivered => t.inkMuted,
       PosStatus.cancelled => t.danger,
     };
-    return StatusChip(label: s.label, color: color);
+    return StatusChip(label: context.l10n.posStatusLabel(s), color: color);
   }
 
   @override
@@ -61,12 +64,15 @@ class StatusChip extends StatelessWidget {
             Icon(icon, size: 14, color: color),
             const SizedBox(width: 4),
           ],
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
+          // Flexible: a longer label (Hindi) wraps instead of overflowing.
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],
@@ -90,7 +96,7 @@ class FoodTypeMark extends StatelessWidget {
       FoodType.egg => const Color(0xFFD97706),
     };
     return Semantics(
-      label: type!.label,
+      label: context.l10n.foodTypeLabel(type!),
       child: Container(
         width: size,
         height: size,

@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../../app/app_scope.dart';
 import '../../app/routes.dart';
 import '../../application/studio_changes.dart';
 import '../../application/studio_controller.dart';
 import '../../core/failure.dart';
+import '../../core/time_format.dart';
 import '../../domain/guest_catalog.dart';
 import '../../domain/organization.dart';
 import '../../domain/staff.dart';
+import '../../domain/storefront.dart';
+import '../../l10n/failure_text.dart';
+import '../../l10n/l10n.dart';
 import '../menu/panel.dart';
 import '../theme/staff_theme.dart';
 import '../widgets/chips.dart';
@@ -52,12 +55,13 @@ class _StudioScreenState extends State<StudioScreen> {
   );
 
   Future<void> _save() async {
+    final l = context.l10n;
     try {
       await _c.saveDraft();
       if (!mounted) return;
       showDone(
         context,
-        _c.state?.note != null ? 'Draft saved on this phone' : 'Draft saved',
+        _c.state?.note != null ? l.studioDraftSavedOnPhone : l.studioDraftSaved,
       );
     } catch (e) {
       if (mounted) showFailure(context, e);
@@ -72,14 +76,18 @@ class _StudioScreenState extends State<StudioScreen> {
     }
     final ok = await _confirmPublish();
     if (ok != true || !mounted) return;
+    final l = context.l10n;
+    // i18n-ignore: stored publisher name when the account has none
     final by = AppScope.of(context).session.user?.displayName ?? 'Staff';
     try {
       final v = await _c.publish(publishedBy: by);
-      if (mounted) showDone(context, 'Published version ${v.version}');
+      if (mounted) {
+        showDone(context, l.studioPublishedVersion(version: v.version));
+      }
     } on AppFailure catch (e) {
       if (!mounted) return;
       if (e.kind == FailureKind.notReady) {
-        await _explain('Publishing is not available yet', e.message);
+        await _explain(l.studioPublishUnavailable, failureText(l, e));
       } else {
         showFailure(context, e);
       }
@@ -88,24 +96,25 @@ class _StudioScreenState extends State<StudioScreen> {
 
   Future<void> _discard() async {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Discard changes?'),
+        title: Text(l.studioDiscardTitle),
         content: Text(
           _c.state?.published == null
-              ? 'Studio goes back to a blank storefront with your restaurant name.'
-              : 'Studio goes back to what guests see now (version ${_c.state!.published!.version}).',
+              ? l.studioDiscardBodyBlank
+              : l.studioDiscardBodyLive(version: _c.state!.published!.version),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Keep them'),
+            child: Text(l.studioDiscardKeep),
           ),
           TextButton(
             style: TextButton.styleFrom(foregroundColor: t.danger),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Discard'),
+            child: Text(l.studioDiscardConfirm),
           ),
         ],
       ),
@@ -113,7 +122,7 @@ class _StudioScreenState extends State<StudioScreen> {
     if (ok != true) return;
     try {
       await _c.discardDraft();
-      if (mounted) showDone(context, 'Changes discarded');
+      if (mounted) showDone(context, l.studioDiscarded);
     } catch (e) {
       if (mounted) showFailure(context, e);
     }
@@ -127,18 +136,19 @@ class _StudioScreenState extends State<StudioScreen> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('OK'),
+          child: Text(context.l10n.commonOk),
         ),
       ],
     ),
   );
 
-  Future<void> _showProblems(List<String> problems) =>
+  Future<void> _showProblems(List<AppFailure> problems) =>
       showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
         builder: (context) {
           final t = ViniiTokens.of(context);
+          final l = context.l10n;
           return SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
@@ -146,12 +156,12 @@ class _StudioScreenState extends State<StudioScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Almost ready to publish',
+                    l.studioProblemsTitle,
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Fix these first, so guests never land on a broken page:',
+                    l.studioProblemsIntro,
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 16),
@@ -167,14 +177,14 @@ class _StudioScreenState extends State<StudioScreen> {
                             color: t.warning,
                           ),
                           const SizedBox(width: 10),
-                          Expanded(child: Text(p)),
+                          Expanded(child: Text(failureText(l, p))),
                         ],
                       ),
                     ),
                   const SizedBox(height: 12),
                   FilledButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('OK'),
+                    child: Text(l.commonOk),
                   ),
                 ],
               ),
@@ -186,12 +196,13 @@ class _StudioScreenState extends State<StudioScreen> {
   Future<bool?> _confirmPublish() {
     final live = _c.state?.published;
     final next = (live?.version ?? 0) + 1;
-    final changes = describeStorefrontChanges(live?.definition, _c.draft);
+    final changes = storefrontChanges(live?.definition, _c.draft);
     return showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       builder: (context) {
         final t = ViniiTokens.of(context);
+        final l = context.l10n;
         final text = Theme.of(context).textTheme;
         return SafeArea(
           child: SingleChildScrollView(
@@ -199,12 +210,9 @@ class _StudioScreenState extends State<StudioScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('Publish version $next?', style: text.titleLarge),
+                Text(l.studioConfirmTitle(next: next), style: text.titleLarge),
                 const SizedBox(height: 6),
-                Text(
-                  'Every guest who opens your storefront sees this straight away.',
-                  style: text.bodyMedium,
-                ),
+                Text(l.studioConfirmIntro, style: text.bodyMedium),
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(14),
@@ -217,11 +225,11 @@ class _StudioScreenState extends State<StudioScreen> {
                     children: [
                       Text(
                         changes.isEmpty
-                            ? 'Nothing guests see has changed.'
-                            : 'What guests will see change',
+                            ? l.studioConfirmNoChange
+                            : l.studioConfirmWhatChanges,
                         style: text.labelLarge,
                       ),
-                      for (final line in changes) ...[
+                      for (final change in changes) ...[
                         const SizedBox(height: 8),
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -235,7 +243,7 @@ class _StudioScreenState extends State<StudioScreen> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            Expanded(child: Text(line)),
+                            Expanded(child: Text(_changeText(l, change))),
                           ],
                         ),
                       ],
@@ -245,12 +253,12 @@ class _StudioScreenState extends State<StudioScreen> {
                 const SizedBox(height: 20),
                 FilledButton(
                   onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Publish now'),
+                  child: Text(l.studioConfirmNow),
                 ),
                 const SizedBox(height: 8),
                 TextButton(
                   onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Not yet'),
+                  child: Text(l.studioConfirmLater),
                 ),
               ],
             ),
@@ -265,43 +273,46 @@ class _StudioScreenState extends State<StudioScreen> {
     final canSave = _can(Capability.editStorefront);
     final choice = await showModalBottomSheet<String>(
       context: context,
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'You have unsaved changes',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Save them as a draft to keep working later, or discard them.',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 20),
-              if (canSave) ...[
-                FilledButton(
-                  onPressed: () => Navigator.pop(context, 'save'),
-                  child: const Text('Save draft'),
+      builder: (context) {
+        final l = context.l10n;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  l.studioUnsavedTitle,
+                  style: Theme.of(context).textTheme.titleLarge,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
+                Text(
+                  l.studioUnsavedBody,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 20),
+                if (canSave) ...[
+                  FilledButton(
+                    onPressed: () => Navigator.pop(context, 'save'),
+                    child: Text(l.studioSaveDraft),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                OutlinedButton(
+                  onPressed: () => Navigator.pop(context, 'discard'),
+                  child: Text(l.studioDiscardChanges),
+                ),
+                const SizedBox(height: 4),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(l.studioKeepEditing),
+                ),
               ],
-              OutlinedButton(
-                onPressed: () => Navigator.pop(context, 'discard'),
-                child: const Text('Discard changes'),
-              ),
-              const SizedBox(height: 4),
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Keep editing'),
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
     if (!mounted || choice == null) return;
     if (choice == 'save') {
@@ -321,6 +332,7 @@ class _StudioScreenState extends State<StudioScreen> {
       builder: (context, _) {
         final loaded = _c.loaded;
         final canEdit = _can(Capability.editStorefront);
+        final l = context.l10n;
         return PopScope(
           canPop: !loaded || !_c.dirty,
           onPopInvokedWithResult: (didPop, _) {
@@ -328,30 +340,30 @@ class _StudioScreenState extends State<StudioScreen> {
           },
           child: Scaffold(
             appBar: AppBar(
-              title: const Text('Storefront Studio'),
+              title: Text(l.studioTitle),
               actions: [
                 if (loaded)
                   PopupMenuButton<String>(
-                    tooltip: 'More',
+                    tooltip: l.commonMore,
                     onSelected: (v) => switch (v) {
                       'discard' => _discard(),
                       'preview' => context.push(Routes.storefrontPreview),
                       _ => _c.refresh(),
                     },
                     itemBuilder: (context) => [
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'preview',
-                        child: Text('Open full preview'),
+                        child: Text(l.studioOpenFullPreview),
                       ),
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'refresh',
-                        child: Text('Refresh'),
+                        child: Text(l.commonRefresh),
                       ),
                       if (canEdit)
                         PopupMenuItem(
                           value: 'discard',
                           enabled: _c.hasUnpublishedChanges && !_c.busy,
-                          child: const Text('Discard changes'),
+                          child: Text(l.studioDiscardChanges),
                         ),
                     ],
                   ),
@@ -366,11 +378,12 @@ class _StudioScreenState extends State<StudioScreen> {
   }
 
   Widget _body() {
+    final l = context.l10n;
     if (!_c.loaded) {
       if (_c.failure != null && !_c.loading) {
         return FailureView(failure: _c.failure!, onRetry: _c.load);
       }
-      return const LoadingView(label: 'Opening your storefront…');
+      return LoadingView(label: l.studioOpening);
     }
     final t = ViniiTokens.of(context);
     final canEdit = _can(Capability.editStorefront);
@@ -385,7 +398,9 @@ class _StudioScreenState extends State<StudioScreen> {
             NoticeBanner(
               icon: Icons.construction_rounded,
               tone: t.warning,
-              message: note,
+              message: note == storefrontDraftOnPhoneNote
+                  ? l.studioNoteDraftOnPhone
+                  : note,
             ),
             const SizedBox(height: 12),
           ],
@@ -393,22 +408,24 @@ class _StudioScreenState extends State<StudioScreen> {
             NoticeBanner(
               icon: Icons.sync_problem_rounded,
               tone: t.warning,
-              message: 'Could not refresh. ${_c.failure!.message}',
+              message: l.studioRefreshFailed(
+                reason: failureText(l, _c.failure!),
+              ),
             ),
             const SizedBox(height: 12),
           ],
           if (!canEdit) ...[
-            const NoticeBanner(
+            NoticeBanner(
               icon: Icons.visibility_outlined,
-              message: 'You can look around. Owners, admins, managers and marketing can change the storefront.',
+              message: l.studioReadOnlyHome,
             ),
             const SizedBox(height: 12),
           ],
           _StatusCard(controller: _c, address: _address),
-          const PanelLabel('Live preview'),
+          PanelLabel(l.studioLivePreviewLabel),
           _PreviewCard(controller: _c, emptyMenu: emptyMenu),
           for (final group in _groups) ...[
-            PanelLabel(group.$1),
+            PanelLabel(group.$1(l)),
             Panel(
               padding: null,
               children: [
@@ -416,7 +433,7 @@ class _StudioScreenState extends State<StudioScreen> {
                   if (i > 0) const PanelDivider(indent: 72),
                   _SectionTile(
                     section: group.$2[i],
-                    summary: group.$2[i].summary(_c, address: _address),
+                    summary: group.$2[i].summary(l, _c, address: _address),
                     color: group.$3(t),
                   ),
                 ],
@@ -429,20 +446,30 @@ class _StudioScreenState extends State<StudioScreen> {
   }
 
   static final _groups =
-      <(String, List<StudioSection>, Color Function(ViniiTokens))>[
-        ('Look', [StudioSection.look, StudioSection.brand], (t) => t.info),
+      <
         (
-          'Ordering',
+          String Function(AppLocalizations),
+          List<StudioSection>,
+          Color Function(ViniiTokens),
+        )
+      >[
+        (
+          (l) => l.studioGroupLook,
+          [StudioSection.look, StudioSection.brand],
+          (t) => t.info,
+        ),
+        (
+          (l) => l.studioGroupOrdering,
           [StudioSection.service, StudioSection.features],
           (t) => t.success,
         ),
         (
-          'Menu',
+          (l) => l.commonMenu,
           [StudioSection.categories, StudioSection.highlights],
           (t) => t.warning,
         ),
         (
-          'Share',
+          (l) => l.studioGroupShare,
           [StudioSection.share, StudioSection.history],
           (t) => t.inkSecondary,
         ),
@@ -454,6 +481,7 @@ class _StudioScreenState extends State<StudioScreen> {
     final live = _c.state?.published;
     final canPublishNow =
         !_c.busy && (live == null || _c.hasUnpublishedChanges);
+    final l = context.l10n;
     return DecoratedBox(
       decoration: BoxDecoration(
         color: t.surface,
@@ -472,7 +500,7 @@ class _StudioScreenState extends State<StudioScreen> {
                   Expanded(
                     child: OutlinedButton(
                       onPressed: _c.dirty && !_c.busy ? _save : null,
-                      child: const Text('Save draft'),
+                      child: Text(l.studioSaveDraft),
                     ),
                   ),
                   if (canPublish) ...[
@@ -480,7 +508,7 @@ class _StudioScreenState extends State<StudioScreen> {
                     Expanded(
                       child: FilledButton(
                         onPressed: canPublishNow ? _publish : null,
-                        child: const Text('Publish'),
+                        child: Text(l.studioPublish),
                       ),
                     ),
                   ],
@@ -503,18 +531,23 @@ class _StatusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
     final text = Theme.of(context).textTheme;
+    final l = context.l10n;
     final c = controller;
     final live = c.state?.published;
     final name = c.draft.brand.displayName.trim();
     final accent = c.draft.accentHex;
     final status = live == null
-        ? 'Not published yet'
-        : [
-            'Live',
-            'version ${live.version}',
-            'published ${DateFormat('d MMM').format(live.publishedAt)}'
-                '${live.publishedBy == null ? '' : ' by ${live.publishedBy}'}',
-          ].join(' · ');
+        ? l.studioStatusNotPublished
+        : live.publishedBy == null
+        ? l.studioStatusLive(
+            version: live.version,
+            date: dayMonth(live.publishedAt),
+          )
+        : l.studioStatusLiveBy(
+            version: live.version,
+            date: dayMonth(live.publishedAt),
+            by: live.publishedBy!,
+          );
     return Panel(
       children: [
         Row(
@@ -545,18 +578,18 @@ class _StatusCard extends StatelessWidget {
           children: [
             live == null
                 ? StatusChip(
-                    label: 'Not live yet',
+                    label: l.studioChipNotLive,
                     color: t.inkSecondary,
                     icon: Icons.visibility_off_outlined,
                   )
                 : StatusChip(
-                    label: 'Live',
+                    label: l.studioLive,
                     color: t.success,
                     icon: Icons.circle,
                   ),
             if (c.hasUnpublishedChanges)
               StatusChip(
-                label: c.dirty ? 'Unsaved changes' : 'Unpublished changes',
+                label: c.dirty ? l.studioChipUnsaved : l.studioChipUnpublished,
                 color: t.warning,
                 icon: Icons.edit_note_rounded,
               ),
@@ -578,19 +611,16 @@ class _StatusCard extends StatelessWidget {
               ),
             ),
             IconButton(
-              tooltip: 'Copy address',
+              tooltip: l.studioCopyAddress,
               icon: const Icon(Icons.copy_rounded, size: 20),
               onPressed: () async {
                 await Clipboard.setData(ClipboardData(text: address));
-                if (context.mounted) showDone(context, 'Address copied');
+                if (context.mounted) showDone(context, l.studioAddressCopied);
               },
             ),
           ],
         ),
-        Text(
-          'This web address works once the VINII guest website is live. Until then, try it in the preview below.',
-          style: text.bodySmall,
-        ),
+        Text(l.studioAddressNote, style: text.bodySmall),
       ],
     );
   }
@@ -626,21 +656,19 @@ class _PreviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
     final text = Theme.of(context).textTheme;
+    final l = context.l10n;
     return Panel(
       children: [
-        Text(
-          'This is what guests see on their phone. Every change shows here straight away.',
-          style: text.bodyMedium,
-        ),
+        Text(l.studioPreviewIntro, style: text.bodyMedium),
         if (emptyMenu) ...[
           const SizedBox(height: 12),
           NoticeBanner(
             icon: Icons.no_food_outlined,
             tone: t.warning,
-            message: 'No dishes guests can order yet. Add dishes with a price in the Menu tab.',
+            message: l.studioPreviewNoDishes,
             action: TextButton(
               onPressed: () => context.go(Routes.menu),
-              child: const Text('Menu'),
+              child: Text(l.commonMenu),
             ),
           ),
         ],
@@ -659,11 +687,11 @@ class _PreviewCard extends StatelessWidget {
         OutlinedButton.icon(
           onPressed: () => context.push(Routes.storefrontPreview),
           icon: const Icon(Icons.open_in_full_rounded),
-          label: const Text('Open full preview'),
+          label: Text(l.studioOpenFullPreview),
         ),
         const SizedBox(height: 6),
         Text(
-          'Try ordering in the full preview. Nothing is sent to the kitchen.',
+          l.studioPreviewTryNote,
           textAlign: TextAlign.center,
           style: text.bodySmall,
         ),
@@ -688,11 +716,54 @@ class _SectionTile extends StatelessWidget {
     contentPadding: const EdgeInsets.fromLTRB(16, 6, 12, 6),
     leading: TintIcon(section.icon, color: color),
     title: Text(
-      section.title,
+      context.l10n.studioSectionTitle(section),
       style: const TextStyle(fontWeight: FontWeight.w600),
     ),
-    subtitle: Text(summary, maxLines: 1, overflow: TextOverflow.ellipsis),
+    subtitle: Text(summary, maxLines: 2, overflow: TextOverflow.ellipsis),
     trailing: const Icon(Icons.chevron_right_rounded),
     onTap: () => context.push(Routes.storefrontSection(section.key)),
   );
 }
+
+/// One line of the publish confirmation, in the reader's language. What the
+/// restaurant typed (its name, its table word) is shown as it is.
+String _changeText(AppLocalizations l, StorefrontChange c) => switch (c.kind) {
+  StorefrontChangeKind.firstPublish => l.studioChangeFirst,
+  StorefrontChangeKind.template => l.studioChangeTemplate(
+    // i18n-ignore: template name
+    from: (c.from as StorefrontTemplate).label,
+    // i18n-ignore: template name
+    to: (c.to as StorefrontTemplate).label,
+  ),
+  StorefrontChangeKind.accent => l.studioChangeAccent(
+    from: '${c.from}',
+    to: '${c.to}',
+  ),
+  StorefrontChangeKind.theme => l.studioChangeTheme,
+  StorefrontChangeKind.categoryStyle => l.studioChangeCategoryStyle(
+    from: l.studioStyleName(c.from as CategoryStyle),
+    to: l.studioStyleName(c.to as CategoryStyle),
+  ),
+  StorefrontChangeKind.name => l.studioChangeName(name: '${c.to}'),
+  StorefrontChangeKind.tagline => l.studioBrandTagline,
+  StorefrontChangeKind.locationLine => l.studioBrandLocationLine,
+  StorefrontChangeKind.heroTitle => l.studioBrandHeroTitle,
+  StorefrontChangeKind.heroSubtitle => l.studioBrandHeroText,
+  StorefrontChangeKind.logo => l.studioChangeLogo,
+  StorefrontChangeKind.pictures => l.studioChangePictures,
+  StorefrontChangeKind.guestText => l.studioChangeGuestText,
+  StorefrontChangeKind.guestLanguage => l.studioChangeGuestLanguage(
+    // i18n-ignore: language name in its own script
+    language: (c.to as CopyLanguage).label,
+  ),
+  StorefrontChangeKind.serviceModes => l.studioChangeModes(
+    modes: (c.to as List<GuestServiceMode>).map(l.studioModeName).join(', '),
+  ),
+  StorefrontChangeKind.tableLabel => l.studioChangeTableLabel(label: '${c.to}'),
+  StorefrontChangeKind.preOrder => l.studioChangePreOrder,
+  StorefrontChangeKind.features => l.studioSectionFeatures,
+  StorefrontChangeKind.categories => l.studioChangeCategories,
+  StorefrontChangeKind.itemDetails => l.studioChangeItems(count: c.count),
+  StorefrontChangeKind.chefsPicks => l.studioChangeChefsPicks,
+  StorefrontChangeKind.limitedToday => l.studioChangeLimited,
+};

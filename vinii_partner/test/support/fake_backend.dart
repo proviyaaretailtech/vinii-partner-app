@@ -108,9 +108,37 @@ class FakeBackend implements Backend {
   late final TablesRepository tableCodes = _Tables(this);
   @override
   late final ChannelsRepository channels = _Channels(this);
+  @override
+  late final FakeUserPreferences userPreferences = FakeUserPreferences();
 
   @override
   Future<void> start() async {}
+}
+
+/// `user_preferences` in memory: what the server holds, and a switch to make
+/// it unreachable (offline) so the silent-retry path can be tested.
+class FakeUserPreferences implements UserPreferencesRepository {
+  /// user id -> stored language code.
+  final stored = <String, String>{};
+  final saves = <({String userId, String locale})>[];
+  var loads = 0;
+
+  /// While true every call throws, as if the phone were offline.
+  var offline = false;
+
+  @override
+  Future<String?> loadLocale(String userId) async {
+    loads++;
+    if (offline) throw const AppFailure('offline', kind: FailureKind.offline);
+    return stored[userId];
+  }
+
+  @override
+  Future<void> saveLocale(String userId, String locale) async {
+    if (offline) throw const AppFailure('offline', kind: FailureKind.offline);
+    saves.add((userId: userId, locale: locale));
+    stored[userId] = locale;
+  }
 }
 
 class _Auth implements AuthGateway {

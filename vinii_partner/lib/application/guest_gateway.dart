@@ -73,6 +73,7 @@ class PosGuestGateway extends GuestOrderGateway {
       throw const AppFailure(
         'Guest orders must be marked as placed by the guest.',
         kind: FailureKind.rejected,
+        code: 'guest_not_marked_guest',
       );
     }
     return pos.placeOrder(draft);
@@ -111,6 +112,7 @@ class PreviewGuestGateway extends GuestOrderGateway {
   Future<PlacedOrder> place(PosOrderDraft draft) async => PlacedOrder(
     id: 'preview-${draft.idempotencyKey}',
     version: '',
+    // i18n-ignore: stand-in order number, never stored
     displayNo: 'PREVIEW',
     status: PosStatus.fresh,
     serviceType: draft.serviceType,

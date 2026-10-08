@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_scope.dart';
 import '../../application/studio_controller.dart';
+import '../../l10n/l10n.dart';
 import '../guest/guest_app.dart';
 import '../theme/guest_theme.dart';
 import '../theme/staff_theme.dart';
@@ -74,7 +75,7 @@ class PhonePreviewFrame extends StatelessWidget {
     final width = PhoneScreen.virtualSize.width * scale;
     const bezel = 7.0;
     return Semantics(
-      label: 'Preview of your storefront',
+      label: context.l10n.studioPreviewFrame,
       child: Container(
         width: width + bezel * 2,
         height: height + bezel * 2,

@@ -8,6 +8,25 @@ import '../domain/menu.dart';
 import '../domain/pos_order.dart';
 import 'sell_keys.dart';
 
+/// Why the order cannot be sent yet. Screens show it in the reader's language
+/// through `l10n.sellBlockerText`; [code] is the failure code if a send is
+/// attempted anyway, [english] the fallback for logs and tests.
+enum SellBlocker {
+  empty('sell_blocker_empty', 'Add at least one item.'),
+  noTable('sell_blocker_no_table', 'Choose a table for this dine-in order.'),
+  noPhone(
+    'sell_blocker_no_phone',
+    // i18n-ignore: English fallback for logs/tests, screens use l10n
+    "Add the customer's phone number for delivery.",
+  );
+
+  const SellBlocker(this.code, this.english);
+  final String code;
+
+  // i18n-ignore: English fallback for logs/tests, screens use l10n
+  final String english;
+}
+
 /// What happened when the cashier sent the cart.
 class PlaceResult {
   const PlaceResult(this.order, {this.earlierOrder = false});
@@ -246,18 +265,23 @@ class SellCart extends ChangeNotifier {
 
   // ── Sending ───────────────────────────────────────────────────────────
 
-  /// Why the order cannot be sent yet, in the cashier's words, or null.
-  String? get blocker {
-    if (_lines.isEmpty) return 'Add at least one item.';
+  /// Why the order cannot be sent yet, or null. Screens turn it into words
+  /// with `l10n.sellBlockerText`.
+  SellBlocker? get blockerKind {
+    if (_lines.isEmpty) return SellBlocker.empty;
     if (serviceType == ServiceType.dineIn && table == null) {
-      return 'Choose a table for this dine-in order.';
+      return SellBlocker.noTable;
     }
     if (serviceType == ServiceType.delivery &&
         _digits(customerPhone).length < 10) {
-      return "Add the customer's phone number for delivery.";
+      return SellBlocker.noPhone;
     }
     return null;
   }
+
+  /// [blockerKind] in English, for logs and tests only.
+  // i18n-ignore: English fallback for logs/tests, screens use blockerKind
+  String? get blocker => blockerKind?.english;
 
   /// The order as it would be sent. Only the fields that belong to the
   /// chosen service type go out, so a table picked before switching to
@@ -319,10 +343,16 @@ class SellCart extends ChangeNotifier {
     required PlacedBy placedBy,
   }) async {
     if (placing) {
-      throw const AppFailure('Already sending…', kind: FailureKind.rejected);
+      throw const AppFailure(
+        'Already sending…',
+        kind: FailureKind.rejected,
+        code: 'sell_already_sending',
+      );
     }
-    final why = blocker;
-    if (why != null) throw AppFailure(why, kind: FailureKind.rejected);
+    final why = blockerKind;
+    if (why != null) {
+      throw AppFailure(why.english, kind: FailureKind.rejected, code: why.code);
+    }
     placing = true;
     _notify();
     try {

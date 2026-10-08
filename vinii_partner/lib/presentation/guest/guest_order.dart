@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 
 import '../../core/money.dart';
+import '../../core/time_format.dart';
 import '../../domain/guest_catalog.dart';
 import '../../domain/pos_order.dart';
 import '../../domain/storefront.dart';
+import '../../l10n/failure_text.dart';
+import '../../l10n/l10n.dart';
 import '../theme/guest_theme.dart';
 import '../widgets/dish_art.dart';
 import '../widgets/food_art.dart';
@@ -73,8 +75,12 @@ class _GuestOrderScreenState extends State<GuestOrderScreen> {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
     final t = GuestCopy.of(context);
+    final l = context.l10n;
     final status = s.budgetStatus;
-    final blocker = s.blocker;
+    final blockerKind = s.blockerKind;
+    final blocker = blockerKind == null
+        ? null
+        : l.guestBlockerText(blockerKind, s);
     final modes = s.definition.serviceModes;
     final saved = s.features.likes
         ? <GuestItem>[
@@ -102,8 +108,11 @@ class _GuestOrderScreenState extends State<GuestOrderScreen> {
                 GuestButton(
                   key: const ValueKey('place-order'),
                   label: s.placeError == null
-                      ? '${t('cart.place')} · ${rupees(s.estimate.payable)}'
-                      : 'Try again',
+                      ? l.guestOrderPlaceTotal(
+                          label: t.own('cart.place') ?? l.guestOrderPlace,
+                          total: rupees(s.estimate.payable),
+                        )
+                      : l.commonTryAgain,
                   trailingArrow: true,
                   busy: s.placing,
                   onTap: blocker == null ? _place : null,
@@ -114,13 +123,13 @@ class _GuestOrderScreenState extends State<GuestOrderScreen> {
         padding: const EdgeInsets.only(bottom: 24),
         children: [
           GuestTopBar(
-            title: t('cart.title'),
+            title: t.own('cart.title') ?? l.guestOrderTitle,
             trailing: [
               if (s.lines.isNotEmpty)
                 TextButton(
                   onPressed: s.clearCart,
                   child: Text(
-                    'Clear all',
+                    l.guestOrderClearAll,
                     style: p.body(14, weight: FontWeight.w700, color: p.danger),
                   ),
                 ),
@@ -143,9 +152,9 @@ class _GuestOrderScreenState extends State<GuestOrderScreen> {
               child: switch (s.mode) {
                 GuestServiceMode.preOrder => const _SlotCard(),
                 GuestServiceMode.delivery => const _DeliveryFields(),
-                GuestServiceMode.takeaway => const _Note(
+                GuestServiceMode.takeaway => _Note(
                   icon: Icons.storefront_outlined,
-                  text: "We'll call your order number at the counter.",
+                  text: l.guestOrderTakeawayNote,
                 ),
                 GuestServiceMode.dineIn => const SizedBox.shrink(),
               },
@@ -153,7 +162,7 @@ class _GuestOrderScreenState extends State<GuestOrderScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
               child: Text(
-                'Special instructions (optional)',
+                l.guestOrderNotesLabel,
                 style: p.body(14, weight: FontWeight.w700),
               ),
             ),
@@ -167,7 +176,9 @@ class _GuestOrderScreenState extends State<GuestOrderScreen> {
                 maxLength: 240,
                 onChanged: (v) => s.notes = v,
                 style: p.body(15),
-                decoration: InputDecoration(hintText: t('cart.notes_hint')),
+                decoration: InputDecoration(
+                  hintText: t.own('cart.notes_hint') ?? l.guestOrderNotesHint,
+                ),
               ),
             ),
             if (s.canUseCoupons)
@@ -183,7 +194,7 @@ class _GuestOrderScreenState extends State<GuestOrderScreen> {
                   estimated: true,
                   discountLabel: s.coupon == null
                       ? null
-                      : 'Coupon ${s.coupon!.code}',
+                      : l.guestOrderCouponLine(code: s.coupon!.code),
                 ),
               ),
             ),
@@ -195,7 +206,7 @@ class _GuestOrderScreenState extends State<GuestOrderScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Table budget ${rupees(status.budget)}',
+                        l.guestOrderTableBudget(amount: rupees(status.budget)),
                         style: p.body(13, color: p.inkMuted),
                       ),
                       const SizedBox(height: 6),
@@ -223,7 +234,7 @@ class _GuestOrderScreenState extends State<GuestOrderScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        s.placeError!.message,
+                        failureText(l, s.placeError!),
                         style: p.body(14, weight: FontWeight.w600),
                       ),
                     ),
@@ -251,10 +262,13 @@ class _WhereLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
-    final table = s.mode == GuestServiceMode.dineIn ? s.tableName : null;
+    final l = context.l10n;
+    final table = s.mode == GuestServiceMode.dineIn
+        ? l.guestTableNameOf(s)
+        : null;
     if (s.mode == GuestServiceMode.dineIn && table == null) {
       if (s.lines.isEmpty) return const SizedBox.shrink();
-      final word = s.definition.tableLabel.toLowerCase();
+      final word = l.guestTableWordFor(s.definition).toLowerCase();
       return Padding(
         padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
         child: Row(
@@ -266,10 +280,8 @@ class _WhereLine extends StatelessWidget {
             Expanded(
               child: Text(
                 s.gateway.isPreview
-                    ? 'In the live storefront, your $word comes from the QR '
-                          'code on it.'
-                    : 'Your $word comes from the QR code on it. Scan it to '
-                          'order from your $word.',
+                    ? l.guestOrderQrPreview(table: word)
+                    : l.guestOrderQrScan(table: word),
                 style: p.body(13.5, color: p.inkMuted).copyWith(height: 1.4),
               ),
             ),
@@ -277,7 +289,7 @@ class _WhereLine extends StatelessWidget {
         ),
       );
     }
-    final parts = [?table, if (showMode) s.mode.label];
+    final parts = [?table, if (showMode) l.guestModeLabel(s.mode)];
     if (parts.isEmpty) return const SizedBox.shrink();
     return Center(
       child: Text(
@@ -299,63 +311,74 @@ class _ModeSwitch extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.read(context);
+    final l = context.l10n;
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: p.surfaceAlt,
         borderRadius: BorderRadius.circular(18),
       ),
-      child: Row(
-        children: [
-          for (final m in modes)
-            Expanded(
-              child: Semantics(
-                button: true,
-                selected: m == selected,
-                label: m.label,
-                child: GestureDetector(
-                  key: ValueKey('mode-${m.name}'),
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    s.update(() => s.mode = m);
-                  },
-                  child: AnimatedContainer(
-                    duration: GuestMotion.base,
-                    curve: GuestMotion.arrive,
-                    height: 44,
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    decoration: BoxDecoration(
-                      color: m == selected ? p.accent : Colors.transparent,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            modeIcon(m),
-                            size: 18,
-                            color: m == selected ? p.onAccent : p.inkMuted,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            m.label,
-                            style: p.body(
-                              14,
-                              weight: FontWeight.w700,
-                              color: m == selected ? p.onAccent : p.ink,
+      // Every segment is as tall as the tallest, so one that wraps (a longer
+      // word in Hindi) does not leave its neighbours short.
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final m in modes)
+              Expanded(
+                child: Semantics(
+                  button: true,
+                  selected: m == selected,
+                  label: l.guestModeLabel(m),
+                  child: GestureDetector(
+                    key: ValueKey('mode-${m.name}'),
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      s.update(() => s.mode = m);
+                    },
+                    child: AnimatedContainer(
+                      duration: GuestMotion.base,
+                      curve: GuestMotion.arrive,
+                      constraints: const BoxConstraints(minHeight: 44),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: m == selected ? p.accent : Colors.transparent,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Center(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              modeIcon(m),
+                              size: 18,
+                              color: m == selected ? p.onAccent : p.inkMuted,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                l.guestModeLabel(m),
+                                textAlign: TextAlign.center,
+                                style: p.body(
+                                  14,
+                                  weight: FontWeight.w700,
+                                  color: m == selected ? p.onAccent : p.ink,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -367,6 +390,7 @@ class _EmptyOrder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
+    final l = context.l10n;
     return Column(
       children: [
         Padding(
@@ -384,10 +408,14 @@ class _EmptyOrder extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              Text('Your order is empty', style: p.display(22)),
+              Text(
+                l.guestOrderEmpty,
+                textAlign: TextAlign.center,
+                style: p.display(22),
+              ),
               const SizedBox(height: 20),
               GuestButton(
-                label: 'Browse dishes',
+                label: l.guestOrderBrowse,
                 onTap: () => Navigator.of(context).maybePop(),
               ),
             ],
@@ -408,6 +436,7 @@ class _Saved extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final t = GuestCopy.of(context);
+    final l = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -417,9 +446,11 @@ class _Saved extends StatelessWidget {
             children: [
               Icon(Icons.favorite_rounded, size: 18, color: p.danger),
               const SizedBox(width: 8),
-              Text(
-                'Saved for later',
-                style: p.display(17, weight: FontWeight.w700),
+              Flexible(
+                child: Text(
+                  l.guestOrderSavedHeading,
+                  style: p.display(17, weight: FontWeight.w700),
+                ),
               ),
             ],
           ),
@@ -460,7 +491,7 @@ class _Saved extends StatelessWidget {
                     RoundIcon(
                       icon: Icons.add_rounded,
                       size: 34,
-                      tooltip: t('menu.add'),
+                      tooltip: t.own('menu.add') ?? l.commonAdd,
                       background: p.accent,
                       color: p.onAccent,
                       onTap: () => addWithHaptic(context, item),
@@ -485,6 +516,7 @@ class _LineRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final l = context.l10n;
     final item = s.catalog.item(line.itemId);
     // Slide a dish away to remove it; the steppers still work as before.
     return Reveal(
@@ -548,9 +580,7 @@ class _LineRow extends StatelessWidget {
                               const SizedBox(width: 4),
                               Flexible(
                                 child: Text(
-                                  'For all ${s.partySize}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                  l.guestOrderForAll(count: s.partySize),
                                   style: p.body(
                                     12.5,
                                     weight: FontWeight.w700,
@@ -612,6 +642,7 @@ class _CouponRowState extends State<_CouponRow> {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final l = context.l10n;
     final applied = s.coupon;
     if (applied != null) {
       return GuestCard(
@@ -626,11 +657,12 @@ class _CouponRowState extends State<_CouponRow> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${applied.code} applied',
+                    l.guestOrderCouponApplied(code: applied.code),
                     style: p.body(15, weight: FontWeight.w700),
                   ),
                   Text(
-                    applied.label ?? 'You save ${rupees(applied.discount)}',
+                    applied.label ??
+                        l.guestOrderCouponSave(amount: rupees(applied.discount)),
                     style: p.body(13, color: p.inkMuted),
                   ),
                 ],
@@ -643,7 +675,7 @@ class _CouponRowState extends State<_CouponRow> {
                 s.removeCoupon();
               },
               child: Text(
-                'Remove',
+                l.commonRemove,
                 style: p.body(14, weight: FontWeight.w700, color: p.danger),
               ),
             ),
@@ -651,7 +683,8 @@ class _CouponRowState extends State<_CouponRow> {
         ),
       );
     }
-    if (!_open && s.couponMessage == null) {
+    final note = s.couponNote;
+    if (!_open && note == null) {
       return GuestCard(
         key: const ValueKey('coupon-open'),
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -662,7 +695,7 @@ class _CouponRowState extends State<_CouponRow> {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'Have a coupon code?',
+                l.guestOrderCouponHave,
                 style: p.body(15, weight: FontWeight.w600),
               ),
             ),
@@ -691,7 +724,7 @@ class _CouponRowState extends State<_CouponRow> {
                     LengthLimitingTextInputFormatter(24),
                   ],
                   style: p.body(16, weight: FontWeight.w700),
-                  decoration: const InputDecoration(hintText: 'Coupon code'),
+                  decoration: InputDecoration(hintText: l.guestOrderCouponHint),
                   onSubmitted: s.applyCoupon,
                 ),
               ),
@@ -700,7 +733,7 @@ class _CouponRowState extends State<_CouponRow> {
                 width: 96,
                 child: GuestButton(
                   key: const ValueKey('coupon-apply'),
-                  label: 'Apply',
+                  label: l.commonApply,
                   dense: true,
                   busy: s.couponChecking,
                   onTap: () => s.applyCoupon(_field.text),
@@ -708,11 +741,11 @@ class _CouponRowState extends State<_CouponRow> {
               ),
             ],
           ),
-          if (s.couponMessage != null)
+          if (note != null)
             Padding(
               padding: const EdgeInsets.only(top: 8, right: 4),
               child: Text(
-                s.couponMessage!,
+                l.guestCouponNoteText(note),
                 key: const ValueKey('coupon-message'),
                 style: p.body(13.5, weight: FontWeight.w600, color: p.danger),
               ),
@@ -751,6 +784,7 @@ class _SlotCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final l = context.l10n;
     final at = s.scheduledFor;
     return GuestCard(
       onTap: () => Navigator.of(context)
@@ -761,14 +795,18 @@ class _SlotCard extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
+              // The slot is a wall-clock time the guest picked: no zone shift.
               at == null
-                  ? 'Choose a pickup time'
-                  : 'Pickup on ${DateFormat('EEE, d MMM').format(at)} • '
-                        '${DateFormat('h:mm a').format(at)}',
+                  ? l.guestOrderChoosePickup
+                  : l.guestOrderPickupOn(
+                      day: dateFormat('EEE, d MMM').format(at),
+                      time: wallClock(at),
+                    ),
               style: p.body(14.5, weight: FontWeight.w700),
             ),
           ),
-          Text('Change', style: p.body(13.5, color: p.inkMuted)),
+          const SizedBox(width: 8),
+          Text(l.guestOrderChange, style: p.body(13.5, color: p.inkMuted)),
         ],
       ),
     );
@@ -783,6 +821,7 @@ class _DeliveryFields extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.read(context);
+    final l = context.l10n;
     InputDecoration deco(String hint, IconData icon) =>
         InputDecoration(hintText: hint, prefixIcon: Icon(icon, size: 20));
     return Column(
@@ -791,7 +830,7 @@ class _DeliveryFields extends StatelessWidget {
           initialValue: s.customerName,
           textCapitalization: TextCapitalization.words,
           style: p.body(15),
-          decoration: deco('Your name', Icons.person_outline_rounded),
+          decoration: deco(l.guestOrderYourName, Icons.person_outline_rounded),
           onChanged: (v) => s.update(() => s.customerName = v),
         ),
         const SizedBox(height: 10),
@@ -801,7 +840,7 @@ class _DeliveryFields extends StatelessWidget {
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           maxLength: 10,
           style: p.body(15),
-          decoration: deco('Phone number', Icons.phone_outlined),
+          decoration: deco(l.commonPhoneNumber, Icons.phone_outlined),
           onChanged: (v) => s.update(() => s.customerPhone = v),
         ),
         TextFormField(
@@ -809,7 +848,7 @@ class _DeliveryFields extends StatelessWidget {
           minLines: 2,
           maxLines: 3,
           style: p.body(15),
-          decoration: deco('Address or room number', Icons.home_outlined),
+          decoration: deco(l.guestOrderAddressHint, Icons.home_outlined),
           onChanged: (v) => s.update(() => s.addressNote = v),
         ),
       ],

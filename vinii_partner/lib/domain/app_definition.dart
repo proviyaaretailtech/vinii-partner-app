@@ -9,6 +9,10 @@ enum AppTab {
   more('More', 'dashboard');
 
   const AppTab(this.label, this.moduleKey);
+
+  /// English name for logs and tests. Screens show `appTabLabel(tab)` from
+  /// lib/presentation/shell/home_shell.dart, in the reader's language.
+  // i18n-ignore: English fallback for logs/tests
   final String label;
 
   /// The OS module (`modules.key`) that must be on for this tab to appear.

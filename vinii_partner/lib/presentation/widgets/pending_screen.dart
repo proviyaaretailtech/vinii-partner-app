@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/l10n.dart';
 import 'state_views.dart';
 
 /// Placeholder while a feature screen is being built. Remove when every
@@ -11,10 +12,10 @@ class PendingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: Text(title)),
-    body: const EmptyView(
+    body: EmptyView(
       icon: Icons.construction_rounded,
-      title: 'Being built',
-      message: 'This screen is next.',
+      title: context.l10n.uiBeingBuilt,
+      message: context.l10n.uiBeingBuiltHint,
     ),
   );
 }

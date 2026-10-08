@@ -4,9 +4,11 @@ import 'package:flutter/services.dart';
 import '../../../application/studio_controller.dart';
 import '../../../domain/organization.dart';
 import '../../../domain/storefront.dart';
+import '../../../l10n/l10n.dart';
 import '../../menu/panel.dart';
 import '../../theme/guest_theme.dart';
 import '../../theme/staff_theme.dart';
+import '../studio_sections.dart';
 
 /// Hand-picked accents that read well on all three templates. Swatches,
 /// not data: the storefront only stores the one the restaurant picks.
@@ -28,7 +30,7 @@ const curatedAccents = [
 /// What the VINII OS storefront CMS has set beyond the template, in a few
 /// words, so a person knows why the preview looks the way it does. Read
 /// only: the phone has no editors for these.
-List<String> cmsLookSummary(StorefrontDefinition d) {
+List<String> cmsLookSummary(AppLocalizations l, StorefrontDefinition d) {
   final theme = d.theme;
   final shape = theme.buttonShape, style = theme.buttonStyle;
   final pictures = [
@@ -39,20 +41,31 @@ List<String> cmsLookSummary(StorefrontDefinition d) {
   ].where((r) => r != null && r.trim().isNotEmpty).length;
   final languages = d.copy.texts.keys.toList()
     ..sort((a, b) => a.index.compareTo(b.index));
-  String plural(int n, String one) => n == 1 ? '1 $one' : '$n ${one}s';
+  final outlined = style == StorefrontButtonStyle.outline;
   return [
-    if (theme.colors.isNotEmpty) plural(theme.colors.length, 'custom colour'),
+    if (theme.colors.isNotEmpty)
+      l.studioLookCustomColours(count: theme.colors.length),
     if (shape != null || style != null)
-      [
-        if (shape != null) shape.key,
-        if (style == StorefrontButtonStyle.outline) 'outlined',
-        'buttons',
-      ].join(' '),
-    if (theme.headingFont != null) '${theme.headingFont!.family} headings',
-    if (theme.bodyFont != null) '${theme.bodyFont!.family} text',
-    if (pictures > 0) plural(pictures, 'picture'),
+      if (shape != null && outlined)
+        l.studioLookButtonsShapeOutlined(shape: l.studioShapeName(shape))
+      else if (shape != null)
+        l.studioLookButtonsShape(shape: l.studioShapeName(shape))
+      else if (outlined)
+        l.studioLookButtonsOutlined
+      else
+        l.studioLookButtonsPlain,
+    // i18n-ignore: font name
+    if (theme.headingFont != null)
+      l.studioLookHeadings(font: theme.headingFont!.family),
+    // i18n-ignore: font name
+    if (theme.bodyFont != null)
+      l.studioLookBodyFont(font: theme.bodyFont!.family),
+    if (pictures > 0) l.studioLookPictures(count: pictures),
     if (languages.isNotEmpty)
-      'guest text in ${languages.map((l) => l.nativeName).join(', ')}',
+      l.studioLookGuestText(
+        // i18n-ignore: language names in their own script
+        languages: languages.map((lang) => lang.nativeName).join(', '),
+      ),
   ];
 }
 
@@ -73,13 +86,17 @@ class LookSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = context.l10n;
     final d = controller.draft;
     final text = Theme.of(context).textTheme;
     final brandColor = parseHexColor(controller.org.accentHex);
     final brand = brandColor == null ? null : toHexColor(brandColor);
     final swatches = <({String hex, String? label})>[
-      (hex: d.template.defaultAccent.toUpperCase(), label: 'Template'),
-      if (brand != null) (hex: brand, label: 'Your brand'),
+      (
+        hex: d.template.defaultAccent.toUpperCase(),
+        label: l.studioLookTemplate,
+      ),
+      if (brand != null) (hex: brand, label: l.studioLookYourBrand),
       for (final h in curatedAccents) (hex: h, label: null),
     ];
     final seen = <String>{};
@@ -90,7 +107,7 @@ class LookSection extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
       children: [
-        const PanelLabel('Template', top: 4),
+        PanelLabel(l.studioLookTemplate, top: 4),
         for (final t in StorefrontTemplate.values) ...[
           _TemplateCard(
             template: t,
@@ -106,7 +123,7 @@ class LookSection extends StatelessWidget {
           const SizedBox(height: 10),
         ],
         PanelLabel(
-          'Accent colour',
+          l.studioLookAccent,
           trailing: Text(
             d.accentHex.toUpperCase(),
             style: text.labelLarge?.copyWith(
@@ -116,10 +133,7 @@ class LookSection extends StatelessWidget {
         ),
         Panel(
           children: [
-            Text(
-              'Buttons, highlights and the budget ring use this colour.',
-              style: text.bodyMedium,
-            ),
+            Text(l.studioLookAccentNote, style: text.bodyMedium),
             const SizedBox(height: 16),
             Wrap(
               spacing: 12,
@@ -144,7 +158,7 @@ class LookSection extends StatelessWidget {
             ),
           ],
         ),
-        const PanelLabel('Category style'),
+        PanelLabel(l.studioLookCategoryStyle),
         Row(
           children: [
             for (final s in CategoryStyle.values) ...[
@@ -160,8 +174,8 @@ class LookSection extends StatelessWidget {
             ],
           ],
         ),
-        const PanelLabel('More in VINII OS'),
-        _CmsNote(summary: cmsLookSummary(d)),
+        PanelLabel(l.studioLookMoreInOs),
+        _CmsNote(summary: cmsLookSummary(l, d)),
       ],
     );
   }
@@ -177,6 +191,7 @@ class _CmsNote extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
     final text = Theme.of(context).textTheme;
+    final l = context.l10n;
     return Panel(
       children: [
         Row(
@@ -184,20 +199,13 @@ class _CmsNote extends StatelessWidget {
           children: [
             Icon(Icons.desktop_windows_outlined, color: t.inkSecondary),
             const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Colours, fonts, pictures and all guest text can also be '
-                'edited in the VINII OS storefront CMS. Both edit the same '
-                'draft, and saving here keeps what was set there.',
-                style: text.bodyMedium,
-              ),
-            ),
+            Expanded(child: Text(l.studioLookCmsNote, style: text.bodyMedium)),
           ],
         ),
         if (summary.isNotEmpty) ...[
           const SizedBox(height: 10),
           Text(
-            'Set there now: ${summary.join(' · ')}.',
+            l.studioLookSetThere(summary: summary.join(' · ')),
             key: const ValueKey('cms-look-summary'),
             style: text.bodySmall,
           ),
@@ -225,6 +233,7 @@ class _TemplateCard extends StatelessWidget {
     final t = ViniiTokens.of(context);
     final text = Theme.of(context).textTheme;
     final p = palette;
+    final l = context.l10n;
     return Semantics(
       selected: selected,
       button: true,
@@ -259,6 +268,7 @@ class _TemplateCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // i18n-ignore: type specimen, not a message
                       Text('Aa', style: p.hero(24)),
                       const Spacer(),
                       Container(
@@ -286,9 +296,13 @@ class _TemplateCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // i18n-ignore: template name
                       Text(template.label, style: text.titleMedium),
                       const SizedBox(height: 4),
-                      Text(template.description, style: text.bodySmall),
+                      Text(
+                        l.studioTemplateBlurb(template),
+                        style: text.bodySmall,
+                      ),
                     ],
                   ),
                 ),
@@ -324,15 +338,19 @@ class _Swatch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final color = parseHexColor(hex)!;
     return Semantics(
-      label: label == null ? 'Colour $hex' : '$label colour $hex',
+      label: label == null
+          ? l.studioLookSwatch(hex: hex)
+          : l.studioLookSwatchNamed(label: label!, hex: hex),
       selected: selected,
       button: true,
       child: GestureDetector(
         onTap: onTap,
-        child: SizedBox(
-          width: 52,
+        child: ConstrainedBox(
+          // A caption may need two lines, and is longer in Hindi.
+          constraints: const BoxConstraints(minWidth: 52, maxWidth: 76),
           child: Column(
             children: [
               AnimatedContainer(
@@ -366,8 +384,7 @@ class _Swatch extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   label!,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 10.5, color: t.inkSecondary),
                 ),
               ],
@@ -418,10 +435,10 @@ class _HexFieldState extends State<_HexField> {
     onChanged: (v) {
       if (v.length == 6) _apply();
     },
-    decoration: const InputDecoration(
-      labelText: 'Custom colour',
+    decoration: InputDecoration(
+      labelText: context.l10n.studioLookCustomColour,
       prefixText: '# ',
-      helperText: 'Six characters, like the code from your logo file',
+      helperText: context.l10n.studioLookCustomColourHelp,
       isDense: true,
     ),
   );
@@ -442,6 +459,7 @@ class _StyleCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
     final text = Theme.of(context).textTheme;
+    final l = context.l10n;
     return Semantics(
       selected: selected,
       button: true,
@@ -470,9 +488,9 @@ class _StyleCard extends StatelessWidget {
                   color: selected ? t.ink : t.inkSecondary,
                 ),
                 const SizedBox(height: 10),
-                Text(style.label, style: text.titleMedium),
+                Text(l.studioStyleName(style), style: text.titleMedium),
                 const SizedBox(height: 2),
-                Text(style.hint, style: text.bodySmall),
+                Text(l.studioStyleHint(style), style: text.bodySmall),
               ],
             ),
           ),

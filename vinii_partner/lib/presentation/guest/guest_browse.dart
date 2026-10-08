@@ -5,6 +5,7 @@ import '../../application/guest_session.dart';
 import '../../core/money.dart';
 import '../../domain/guest_catalog.dart';
 import '../../domain/menu.dart';
+import '../../l10n/l10n.dart';
 import '../theme/guest_theme.dart';
 import '../widgets/chips.dart';
 import 'guest_categories.dart';
@@ -46,11 +47,12 @@ class _GuestBrowseScreenState extends State<GuestBrowseScreen> {
   @override
   Widget build(BuildContext context) {
     final s = GuestScope.of(context);
+    final l = context.l10n;
     final items = [
       for (final i in _category?.items ?? s.catalog.allItems)
         if (s.diet.allows(i)) i,
     ];
-    final label = _category?.category.name ?? 'All dishes';
+    final label = _category?.category.name ?? l.guestAllDishes;
     // A wide screen keeps the order in view beside the deck.
     final wide = MediaQuery.sizeOf(context).width >= 1000;
     final browse = Column(
@@ -127,6 +129,7 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final l = context.l10n;
     final hasDiscover =
         s.catalog.chefsPicks.isNotEmpty || s.catalog.limitedToday.isNotEmpty;
     return Padding(
@@ -136,7 +139,7 @@ class _Header extends StatelessWidget {
           RoundIcon(
             icon: Icons.arrow_back_ios_new_rounded,
             size: 40,
-            tooltip: 'Back',
+            tooltip: l.commonBack,
             onTap: () => Navigator.of(context).maybePop(),
           ),
           const SizedBox(width: 10),
@@ -169,14 +172,14 @@ class _Header extends StatelessWidget {
             RoundIcon(
               icon: Icons.auto_awesome_rounded,
               size: 40,
-              tooltip: 'Specials',
+              tooltip: l.guestSpecials,
               onTap: () => GuestFlow.discover(context),
             ),
           const SizedBox(width: 6),
           RoundIcon(
             icon: Icons.search_rounded,
             size: 40,
-            tooltip: 'Search',
+            tooltip: l.commonSearch,
             onTap: () => showGuestSearch(context),
           ),
           const GuestExitButton(),
@@ -195,6 +198,7 @@ class _BudgetStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
+    final l = context.l10n;
     final status = GuestScope.of(context).budgetStatus!;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 2, 20, 6),
@@ -219,7 +223,7 @@ class _BudgetStrip extends StatelessWidget {
                       style: p.price(15),
                     ),
                     Text(
-                      '${status.percentUsed}% used',
+                      l.guestBudgetUsed(percent: status.percentUsed),
                       style: p.body(12.5, color: budgetTextColor(p, status)),
                     ),
                   ],
@@ -244,6 +248,7 @@ class _DietBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final l = context.l10n;
     Widget mark(GuestDiet d) => switch (d) {
       GuestDiet.veg => const FoodTypeMark(FoodType.veg, size: 14),
       GuestDiet.nonVeg => const FoodTypeMark(FoodType.nonVeg, size: 14),
@@ -262,7 +267,7 @@ class _DietBar extends StatelessWidget {
               child: Semantics(
                 button: true,
                 selected: s.diet == d,
-                label: d.label,
+                label: l.guestDietLabel(d),
                 child: GestureDetector(
                   key: ValueKey('diet-${d.name}'),
                   behavior: HitTestBehavior.opaque,
@@ -287,7 +292,7 @@ class _DietBar extends StatelessWidget {
                           const SizedBox(width: 6),
                         ],
                         Text(
-                          d.label,
+                          l.guestDietLabel(d),
                           style: p.body(
                             13.5,
                             weight: FontWeight.w700,
@@ -313,6 +318,7 @@ class _NoMatch extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final l = context.l10n;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -320,7 +326,8 @@ class _NoMatch extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Nothing ${s.diet.label.toLowerCase()} here',
+              l.guestNothingForDiet(diet: s.diet.name),
+              textAlign: TextAlign.center,
               style: p.display(20),
             ),
             const SizedBox(height: 12),
@@ -328,7 +335,7 @@ class _NoMatch extends StatelessWidget {
               key: const ValueKey('diet-clear'),
               onPressed: () => s.setDiet(GuestDiet.all),
               child: Text(
-                'Show everything',
+                l.guestShowEverything,
                 style: p.body(15, weight: FontWeight.w700),
               ),
             ),
@@ -350,6 +357,7 @@ class _ViewSwitch extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final l = context.l10n;
     Widget option(GuestBrowseView v, IconData icon, String label) {
       final on = s.browseView == v;
       return Semantics(
@@ -390,8 +398,12 @@ class _ViewSwitch extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          option(GuestBrowseView.swipe, Icons.style_rounded, 'Swipe dishes'),
-          option(GuestBrowseView.menu, Icons.view_agenda_rounded, 'Menu view'),
+          option(GuestBrowseView.swipe, Icons.style_rounded, l.guestViewSwipe),
+          option(
+            GuestBrowseView.menu,
+            Icons.view_agenda_rounded,
+            l.guestViewMenu,
+          ),
         ],
       ),
     );
@@ -408,6 +420,7 @@ class _CategoryStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final l = context.l10n;
     final cats = <GuestCategory?>[null, ...s.catalog.categories];
     final list = ListView.builder(
       scrollDirection: Axis.horizontal,
@@ -425,7 +438,7 @@ class _CategoryStrip extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  c?.category.name ?? 'All',
+                  c?.category.name ?? l.commonAll,
                   style: p.body(
                     14,
                     weight: active ? FontWeight.w800 : FontWeight.w500,

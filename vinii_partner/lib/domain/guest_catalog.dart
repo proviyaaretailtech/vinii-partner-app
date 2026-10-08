@@ -78,6 +78,8 @@ class GuestCatalog {
   GuestItem _guestItem(MenuItem i, MenuCategory c) {
     final p = definition.presentationOf(i.id);
     final tags = [
+      // i18n-ignore: the stored tag word; chips translate it with
+      // AppLocalizations.storefrontTagLabel
       if (i.isRecommended && !p.tags.contains('Bestseller')) 'Bestseller',
       ...p.tags,
     ];

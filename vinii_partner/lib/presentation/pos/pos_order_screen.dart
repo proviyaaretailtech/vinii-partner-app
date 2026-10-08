@@ -9,6 +9,9 @@ import '../../core/time_format.dart';
 import '../../domain/billing.dart';
 import '../../domain/pos_order.dart';
 import '../../domain/staff.dart';
+import '../../l10n/failure_text.dart';
+import '../../l10n/l10n.dart';
+import '../../l10n/labels.dart';
 import '../orders/order_widgets.dart' show AmountRow, SectionCard;
 import '../theme/staff_theme.dart';
 import '../widgets/chips.dart';
@@ -213,6 +216,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
   }) async {
     if (_adjusting) return false;
     final services = AppScope.of(context);
+    final l = context.l10n;
     setState(() => _adjusting = true);
     try {
       final updated = await services.backend.pos.adjustBill(
@@ -224,14 +228,14 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
       setState(() => _order = updated);
       showDone(
         context,
-        waive ? 'Service charge removed.' : 'Service charge added back.',
+        waive ? l.posServiceChargeRemoved : l.posServiceChargeAdded,
       );
       return true;
     } on AppFailure catch (e) {
       if (!mounted) return false;
       setState(() => _adjusting = false);
       if (e.kind == FailureKind.notReady) {
-        await showNotAvailableDialog(context, e.message);
+        await showNotAvailableDialog(context, failureText(l, e));
       } else {
         showFailure(context, e);
         if (e.isConflict) await _load();
@@ -266,19 +270,20 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = context.l10n;
     final o = _order;
     return Scaffold(
       appBar: AppBar(
-        title: Text(o?.displayNo ?? 'Order'),
+        title: Text(o?.displayNo ?? l.commonOrder),
         actions: [
           IconButton(
-            tooltip: 'Refresh',
+            tooltip: l.commonRefresh,
             onPressed: _loading ? null : _load,
             icon: const Icon(Icons.refresh_rounded),
           ),
           TextButton(
             onPressed: () => context.go(Routes.sell),
-            child: const Text('New order'),
+            child: Text(l.posNewOrder),
           ),
           const SizedBox(width: 4),
         ],
@@ -286,7 +291,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
       body: o == null
           ? (_failure != null && !_loading
                 ? FailureView(failure: _failure!, onRetry: _load)
-                : const LoadingView(label: 'Loading order…'))
+                : LoadingView(label: l.posLoadingOrder))
           : RefreshIndicator(
               onRefresh: _load,
               child: LayoutBuilder(
@@ -351,9 +356,10 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
   /// Who and where.
   List<Widget> _header(BuildContext context, PlacedOrder o) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final where = [
-      o.serviceType.label,
-      if (o.table != null) o.table!.displayName,
+      l.serviceTypeLabel(o.serviceType),
+      if (o.table != null) o.table!.nameIn(l),
       clockTime(o.createdAt),
     ].join(' · ');
     return [
@@ -361,15 +367,16 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            // Wraps under the number when the status word is long.
+            Wrap(
+              spacing: 10,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Flexible(
-                  child: Text(
-                    o.displayNo,
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
+                Text(
+                  o.displayNo,
+                  style: Theme.of(context).textTheme.headlineSmall,
                 ),
-                const SizedBox(width: 10),
                 StatusChip.pos(context, o.status),
               ],
             ),
@@ -392,22 +399,23 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
   /// What was ordered, and the bill.
   List<Widget> _lines(BuildContext context, PlacedOrder o) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final cancelled = o.status == PosStatus.cancelled;
     return [
       SectionCard(
-        title: o.itemCount == 1 ? '1 item' : '${o.itemCount} items',
+        title: l.posItemCount(count: o.itemCount),
         child: Column(
           children: [
-            for (final l in o.lines)
+            for (final line in o.lines)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(
-                      width: 36,
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(minWidth: 36),
                       child: Text(
-                        '${l.qty}×',
+                        '${line.qty}×',
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
                           color: t.ink,
@@ -419,15 +427,15 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            l.name,
+                            line.name,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               color: t.ink,
                             ),
                           ),
-                          if (l.notes != null && l.notes!.isNotEmpty)
+                          if (line.notes != null && line.notes!.isNotEmpty)
                             Text(
-                              l.notes!,
+                              line.notes!,
                               style: TextStyle(
                                 fontSize: 13,
                                 fontStyle: FontStyle.italic,
@@ -438,7 +446,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                       ),
                     ),
                     Text(
-                      rupees(l.lineTotal),
+                      rupees(line.lineTotal),
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: t.ink,
@@ -452,13 +460,13 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
       ),
       const SizedBox(height: 12),
       SectionCard(
-        title: 'Bill',
+        title: l.commonBill,
         child: Column(
           children: [
             BillLines(bill: o.bill, serviceCharge: _serviceLine(o)),
             if (!cancelled) ...[
-              AmountRow('Paid', rupees(o.paidAmount)),
-              AmountRow('Due', rupees(o.due), strong: o.due > 0),
+              AmountRow(l.posBillPaid, rupees(o.paidAmount)),
+              AmountRow(l.posBillDue, rupees(o.due), strong: o.due > 0),
             ],
           ],
         ),
@@ -474,6 +482,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
     required bool gapFirst,
   }) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final canPay = AppScope.of(context).session.can(Capability.takePayment);
     final gap = gapFirst ? const SizedBox(height: 12) : const SizedBox.shrink();
     if (o.status == PosStatus.cancelled) {
@@ -482,7 +491,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
         NoticeBanner(
           icon: Icons.cancel_outlined,
           tone: t.danger,
-          message: 'This order was cancelled. Nothing is due.',
+          message: l.posCancelledNotice,
         ),
       ];
     }
@@ -492,8 +501,11 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
         gap,
         PaymentSuccess(
           headline: _taken.isEmpty
-              ? 'Paid · $total'
-              : 'Paid · $total by ${methodsLabel(_taken)}',
+              ? l.posPaidHeadline(total: total)
+              : l.posPaidByHeadline(
+                  total: total,
+                  methods: methodsLabel(_taken, l: l),
+                ),
           changeDue: _change,
           onNewOrder: () => context.go(Routes.sell),
         ),
@@ -503,7 +515,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
       return [
         const SizedBox(height: 12),
         Text(
-          'A biller or manager takes the payment for this order.',
+          l.posPaymentByBiller,
           textAlign: TextAlign.center,
           style: TextStyle(color: t.inkMuted),
         ),

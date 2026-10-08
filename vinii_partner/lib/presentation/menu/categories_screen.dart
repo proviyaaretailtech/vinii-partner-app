@@ -4,6 +4,8 @@ import '../../app/app_scope.dart';
 import '../../application/menu_editor.dart';
 import '../../domain/menu.dart';
 import '../../domain/staff.dart';
+import '../../l10n/failure_text.dart';
+import '../../l10n/l10n.dart';
 import '../theme/staff_theme.dart';
 import '../widgets/state_views.dart';
 import 'menu_scope.dart';
@@ -34,11 +36,12 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   bool get _canEdit => AppScope.of(context).session.can(Capability.editMenu);
 
   Future<void> _add() async {
-    final name = await _askName(context, title: 'New category');
+    final l = context.l10n;
+    final name = await _askName(context, title: l.menuCategoryNewTitle);
     if (name == null) return;
     try {
       await _c.addCategory(name);
-      if (mounted) showDone(context, 'Added $name');
+      if (mounted) showDone(context, l.menuCategoryAdded(name: name));
     } catch (e) {
       if (mounted) showFailure(context, e);
     }
@@ -47,7 +50,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   Future<void> _rename(MenuCategory c) async {
     final name = await _askName(
       context,
-      title: 'Rename category',
+      title: context.l10n.menuCategoryRenameTitle,
       initial: c.name,
     );
     if (name == null || name == c.name) return;
@@ -60,26 +63,26 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
   Future<void> _delete(MenuCategory c) async {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final count = _c.countIn(c.id);
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Delete "${c.name}"?'),
+        title: Text(l.menuCategoryDeleteTitle(name: c.name)),
         content: Text(
           count == 0
-              ? 'There are no dishes in it.'
-              : 'Items in it stay on your menu as Uncategorised '
-                    '($count ${count == 1 ? 'dish' : 'dishes'}).',
+              ? l.menuCategoryDeleteEmpty
+              : l.menuCategoryDeleteKeeps(count: count),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(l.commonCancel),
           ),
           TextButton(
             style: TextButton.styleFrom(foregroundColor: t.danger),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
+            child: Text(l.commonDelete),
           ),
         ],
       ),
@@ -87,7 +90,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     if (ok != true) return;
     try {
       await _c.deleteCategory(c);
-      if (mounted) showDone(context, 'Deleted ${c.name}');
+      if (mounted) showDone(context, l.menuCategoryDeleted(name: c.name));
     } catch (e) {
       if (mounted) showFailure(context, e);
     }
@@ -111,14 +114,15 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     return ListenableBuilder(
       listenable: _c,
       builder: (context, _) {
+        final l = context.l10n;
         final menu = _c.menu;
         return Scaffold(
-          appBar: AppBar(title: const Text('Categories')),
+          appBar: AppBar(title: Text(l.menuCategories)),
           floatingActionButton: canEdit && menu != null
               ? FloatingActionButton.extended(
                   onPressed: _add,
                   icon: const Icon(Icons.add_rounded),
-                  label: const Text('Add category'),
+                  label: Text(l.menuAddCategory),
                 )
               : null,
           body: _body(menu, canEdit),
@@ -134,13 +138,14 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       }
       return const LoadingView();
     }
+    final l = context.l10n;
     final list = _c.categories;
     if (list.isEmpty) {
       return EmptyView(
         icon: Icons.segment_rounded,
-        title: 'No categories yet',
-        message: 'Categories group your dishes on the POS, on One Local and on your storefront.',
-        actionLabel: canEdit ? 'Add a category' : null,
+        title: l.menuCategoriesEmptyTitle,
+        message: l.menuCategoriesEmptyMessage,
+        actionLabel: canEdit ? l.menuAddACategory : null,
         onAction: canEdit ? _add : null,
       );
     }
@@ -152,9 +157,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
           child: Text(
-            canEdit
-                ? 'Drag to change the order everyone sees: the POS, One Local and your storefront.'
-                : 'The order everyone sees: the POS, One Local and your storefront.',
+            canEdit ? l.menuCategoriesDragHint : l.menuCategoriesOrderHint,
             style: text.bodyMedium,
           ),
         ),
@@ -164,7 +167,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
             child: NoticeBanner(
               icon: Icons.sync_problem_rounded,
               tone: t.warning,
-              message: 'Could not refresh. ${_c.failure!.message}',
+              message: l.menuRefreshFailed(reason: failureText(l, _c.failure!)),
             ),
           ),
         Expanded(
@@ -198,7 +201,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                               child: Icon(
                                 Icons.drag_indicator_rounded,
                                 color: t.inkMuted,
-                                semanticLabel: 'Drag to reorder',
+                                semanticLabel: l.menuDragToReorder,
                               ),
                             ),
                           )
@@ -216,21 +219,21 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                       c.name,
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
-                    subtitle: Text(count == 1 ? '1 dish' : '$count dishes'),
+                    subtitle: Text(l.menuDishCount(count: count)),
                     trailing: canEdit
                         ? PopupMenuButton<String>(
-                            tooltip: 'More for ${c.name}',
+                            tooltip: l.menuCategoryMoreFor(name: c.name),
                             onSelected: (v) =>
                                 v == 'rename' ? _rename(c) : _delete(c),
                             itemBuilder: (context) => [
-                              const PopupMenuItem(
+                              PopupMenuItem(
                                 value: 'rename',
-                                child: Text('Rename'),
+                                child: Text(l.menuRename),
                               ),
                               PopupMenuItem(
                                 value: 'delete',
                                 child: Text(
-                                  'Delete',
+                                  l.commonDelete,
                                   style: TextStyle(color: t.danger),
                                 ),
                               ),
@@ -290,16 +293,16 @@ class _NameDialogState extends State<_NameDialog> {
       textCapitalization: TextCapitalization.words,
       onChanged: (_) => setState(() {}),
       onSubmitted: (_) => _done(),
-      decoration: const InputDecoration(labelText: 'Category name'),
+      decoration: InputDecoration(labelText: context.l10n.menuCategoryName),
     ),
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context),
-        child: const Text('Cancel'),
+        child: Text(context.l10n.commonCancel),
       ),
       TextButton(
         onPressed: _text.text.trim().isEmpty ? null : _done,
-        child: const Text('Save'),
+        child: Text(context.l10n.commonSave),
       ),
     ],
   );

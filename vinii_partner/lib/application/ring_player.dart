@@ -32,7 +32,7 @@ class RingPlayer {
       await _player!.setReleaseMode(ReleaseMode.loop);
       await _player!.play(AssetSource('sounds/new_order.wav'), volume: 1);
     } catch (e) {
-      debugPrint('Ring could not play: $e');
+      debugPrint('Ring could not play: $e'); // i18n-ignore: debug output
     }
   }
 
@@ -43,7 +43,7 @@ class RingPlayer {
     try {
       await _player?.stop();
     } catch (e) {
-      debugPrint('Ring could not stop: $e');
+      debugPrint('Ring could not stop: $e'); // i18n-ignore: debug output
     }
   }
 
@@ -56,7 +56,7 @@ class RingPlayer {
         Future<void>.delayed(const Duration(seconds: 3), () => p.dispose()),
       );
     } catch (e) {
-      debugPrint('Ring test could not play: $e');
+      debugPrint('Ring test could not play: $e'); // i18n-ignore: debug output
     }
   }
 

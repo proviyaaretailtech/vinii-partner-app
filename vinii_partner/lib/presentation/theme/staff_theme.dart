@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/script_fonts.dart';
+
 /// VINII colours, the same tokens as proviyaa-pos (`vinii_theme.dart`),
 /// sampled from the approved POS reference screens.
 class ViniiColors {
@@ -141,10 +143,14 @@ ThemeData staffTheme({required Brightness brightness, Color? accent}) {
     brightness: brightness,
     colorScheme: scheme,
     fontFamily: 'Inter',
+    // Inter has no Devanagari: Hindi text falls through to Noto Sans
+    // Devanagari once the language has loaded it (lib/l10n/script_fonts.dart).
+    fontFamilyFallback: kScriptFontFallback,
   );
   final text = base.textTheme.apply(
     bodyColor: tokens.ink,
     displayColor: tokens.ink,
+    fontFamilyFallback: kScriptFontFallback,
   );
   final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(14));
   return base.copyWith(
@@ -185,6 +191,7 @@ ThemeData staffTheme({required Brightness brightness, Color? accent}) {
       centerTitle: false,
       titleTextStyle: TextStyle(
         fontFamily: 'Inter',
+        fontFamilyFallback: kScriptFontFallback,
         fontSize: 20,
         fontWeight: FontWeight.w700,
         color: tokens.ink,
@@ -207,6 +214,7 @@ ThemeData staffTheme({required Brightness brightness, Color? accent}) {
         shape: shape,
         textStyle: const TextStyle(
           fontFamily: 'Inter',
+          fontFamilyFallback: kScriptFontFallback,
           fontSize: 16,
           fontWeight: FontWeight.w700,
         ),
@@ -220,6 +228,7 @@ ThemeData staffTheme({required Brightness brightness, Color? accent}) {
         shape: shape,
         textStyle: const TextStyle(
           fontFamily: 'Inter',
+          fontFamilyFallback: kScriptFontFallback,
           fontSize: 16,
           fontWeight: FontWeight.w600,
         ),
@@ -230,6 +239,7 @@ ThemeData staffTheme({required Brightness brightness, Color? accent}) {
         foregroundColor: tokens.ink,
         textStyle: const TextStyle(
           fontFamily: 'Inter',
+          fontFamilyFallback: kScriptFontFallback,
           fontSize: 15,
           fontWeight: FontWeight.w600,
         ),
@@ -265,11 +275,13 @@ ThemeData staffTheme({required Brightness brightness, Color? accent}) {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
       labelStyle: TextStyle(
         fontFamily: 'Inter',
+        fontFamilyFallback: kScriptFontFallback,
         color: tokens.ink,
         fontWeight: FontWeight.w600,
       ),
       secondaryLabelStyle: TextStyle(
         fontFamily: 'Inter',
+        fontFamilyFallback: kScriptFontFallback,
         color: tokens.page,
         fontWeight: FontWeight.w600,
       ),
@@ -283,6 +295,7 @@ ThemeData staffTheme({required Brightness brightness, Color? accent}) {
       labelTextStyle: WidgetStateProperty.resolveWith(
         (s) => TextStyle(
           fontFamily: 'Inter',
+          fontFamilyFallback: kScriptFontFallback,
           fontSize: 12,
           fontWeight: s.contains(WidgetState.selected)
               ? FontWeight.w700
@@ -313,6 +326,7 @@ ThemeData staffTheme({required Brightness brightness, Color? accent}) {
       backgroundColor: tokens.ink,
       contentTextStyle: TextStyle(
         fontFamily: 'Inter',
+        fontFamilyFallback: kScriptFontFallback,
         color: tokens.page,
         fontWeight: FontWeight.w500,
       ),

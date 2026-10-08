@@ -1,9 +1,16 @@
+import '../l10n/app_localizations.dart';
 import 'billing.dart';
 
 /// How the food reaches the guest. Maps to POS `orders.channel`.
+///
+/// [label] and [hint] are the English fallback for logs and tests; screens
+/// show `l10n.serviceTypeLabel(type)` / `serviceTypeHint(type)` instead.
 enum ServiceType {
+  // i18n-ignore: English fallback for logs/tests, screens use l10n labels
   dineIn('dine_in', 'Dine-in', 'Served at the table'),
+  // i18n-ignore: English fallback for logs/tests, screens use l10n labels
   takeaway('pickup', 'Takeaway', 'Picked up at the counter'),
+  // i18n-ignore: English fallback for logs/tests, screens use l10n labels
   delivery('delivery', 'Delivery', 'Delivered to an address');
 
   const ServiceType(this.channel, this.label, this.hint);
@@ -33,6 +40,7 @@ enum PosStatus {
       PosStatus.values.where((s) => s.dbValue == v).firstOrNull ??
       PosStatus.fresh;
 
+  // i18n-ignore: English fallback for logs/tests, screens use posStatusLabel
   String get label => switch (this) {
     PosStatus.fresh => 'New',
     PosStatus.inBilling => 'In billing',
@@ -48,9 +56,15 @@ enum PosStatus {
 }
 
 /// `payments.method` values the phone offers.
+///
+/// [label] is the English fallback for logs and tests; screens show
+/// `l10n.paymentMethodLabel(method)`.
 enum PaymentMethod {
+  // i18n-ignore: English fallback for logs/tests, screens use l10n labels
   cash('cash', 'Cash'),
+  // i18n-ignore: English fallback for logs/tests, screens use l10n labels
   upi('upi', 'UPI'),
+  // i18n-ignore: English fallback for logs/tests, screens use l10n labels
   card('card', 'Card');
 
   const PaymentMethod(this.dbValue, this.label);
@@ -76,6 +90,13 @@ class DiningTable {
   /// Has an open (unpaid) order right now.
   final bool occupied;
 
+  /// "Table 12" in the reader's language; a name that is not a number
+  /// ("Counter", "T12") is shown as the restaurant typed it.
+  String nameIn(AppLocalizations l) => RegExp(r'^\d+$').hasMatch(label)
+      ? l.posTableNumber(number: label)
+      : label;
+
+  // i18n-ignore: English fallback for logs/tests, screens use nameIn(l)
   String get displayName =>
       RegExp(r'^\d+$').hasMatch(label) ? 'Table $label' : label;
 }
@@ -304,6 +325,13 @@ class TableCode {
 
   bool get hasCode => qrToken != null && qrToken!.isNotEmpty;
 
+  /// "Table 12" in the reader's language; a name that is not a number
+  /// ("Counter", "T12") is shown as the restaurant typed it.
+  String nameIn(AppLocalizations l) => RegExp(r'^\d+$').hasMatch(label)
+      ? l.posTableNumber(number: label)
+      : label;
+
+  // i18n-ignore: English fallback for logs/tests, screens use nameIn(l)
   String get displayName =>
       RegExp(r'^\d+$').hasMatch(label) ? 'Table $label' : label;
 

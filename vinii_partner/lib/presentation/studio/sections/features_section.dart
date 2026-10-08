@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../application/studio_controller.dart';
 import '../../../core/money.dart';
 import '../../../domain/storefront.dart';
+import '../../../l10n/l10n.dart';
 import '../../menu/panel.dart';
 import '../../theme/staff_theme.dart';
 
@@ -55,97 +56,96 @@ class _FeaturesSectionState extends State<FeaturesSection> {
 
   @override
   Widget build(BuildContext context) {
+    final l = context.l10n;
     final f = _c.draft.features;
     final groups = <(String, List<_Flag>)>[
       (
-        'Browsing the menu',
+        l.studioFeatGroupBrowse,
         [
           (
-            title: 'Swipe cards',
-            subtitle: 'Guests swipe through dishes like cards. Off: a simple scrolling list with Add buttons.',
+            title: l.studioFeatSwipeTitle,
+            subtitle: l.studioFeatSwipeHint,
             value: f.swipeDeck,
             set: (f, v) => f.copyWith(swipeDeck: v),
           ),
           (
-            title: 'Save for later',
-            subtitle: 'Guests heart dishes and come back to them.',
+            title: l.studioFeatLikesTitle,
+            subtitle: l.studioFeatLikesHint,
             value: f.likes,
             set: (f, v) => f.copyWith(likes: v),
           ),
           (
-            title: "Chef's picks",
-            subtitle: "A row of dishes you choose, at the top. Pick them in Chef's picks & offers.",
+            title: l.studioFeatChefsPicksTitle,
+            subtitle: l.studioFeatChefsPicksHint,
             value: f.chefsPicks,
             set: (f, v) => f.copyWith(chefsPicks: v),
           ),
           (
-            title: 'Limited today',
-            subtitle: 'Dishes on offer until a time you set, with a countdown.',
+            title: l.studioFeatLimitedTitle,
+            subtitle: l.studioFeatLimitedHint,
             value: f.limitedToday,
             set: (f, v) => f.copyWith(limitedToday: v),
           ),
         ],
       ),
       (
-        'Groups',
+        l.studioFeatGroupGroups,
         [
           (
-            title: 'Split between people',
-            subtitle: 'Guests say how many are eating; the budget and bill show each share.',
+            title: l.studioFeatSplitPartyTitle,
+            subtitle: l.studioFeatSplitPartyHint,
             value: f.splitParty,
             set: (f, v) => f.copyWith(splitParty: v),
           ),
           (
-            title: 'Split the bill',
-            subtitle: 'Guests see the bill divided equally when paying.',
+            title: l.studioFeatSplitBillTitle,
+            subtitle: l.studioFeatSplitBillHint,
             value: f.splitBill,
             set: (f, v) => f.copyWith(splitBill: v),
           ),
         ],
       ),
       (
-        'After ordering',
+        l.studioFeatGroupAfter,
         [
           (
-            title: 'Live order tracking',
-            subtitle:
-                'Guests see when the kitchen starts and finishes their order.',
+            title: l.studioFeatTrackingTitle,
+            subtitle: l.studioFeatTrackingHint,
             value: f.liveTracking,
             set: (f, v) => f.copyWith(liveTracking: v),
           ),
           (
-            title: 'Discover while waiting',
-            subtitle: 'While the food cooks, guests can browse desserts and drinks to add.',
+            title: l.studioFeatDiscoverTitle,
+            subtitle: l.studioFeatDiscoverHint,
             value: f.discoverWhileWaiting,
             set: (f, v) => f.copyWith(discoverWhileWaiting: v),
           ),
           (
-            title: 'Feedback',
-            subtitle: 'Guests rate their meal. Feedback is collected once feedback storage exists; until then guests are not asked.',
+            title: l.studioFeatFeedbackTitle,
+            subtitle: l.studioFeatFeedbackHint,
             value: f.feedback,
             set: (f, v) => f.copyWith(feedback: v),
           ),
         ],
       ),
       (
-        'Dish details',
+        l.studioFeatGroupDish,
         [
           (
-            title: 'Ingredients',
-            subtitle:
-                'Shows the ingredients you add to a dish in the Menu tab.',
+            title: l.studioFeatIngredientsTitle,
+            subtitle: l.studioFeatIngredientsHint,
             value: f.showIngredients,
             set: (f, v) => f.copyWith(showIngredients: v),
           ),
           (
-            title: 'Allergens',
-            subtitle: 'Shows the allergens you mark on each dish.',
+            title: l.studioFeatAllergensTitle,
+            subtitle: l.studioFeatAllergensHint,
             value: f.showAllergens,
             set: (f, v) => f.copyWith(showAllergens: v),
           ),
           (
-            title: 'Calories',
-            subtitle: 'Shows the kcal you enter for a dish.',
+            title: l.studioFeatCaloriesTitle,
+            subtitle: l.studioFeatCaloriesHint,
             value: f.showNutrition,
             set: (f, v) => f.copyWith(showNutrition: v),
           ),
@@ -155,7 +155,7 @@ class _FeaturesSectionState extends State<FeaturesSection> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
       children: [
-        const PanelLabel('Budget', top: 4),
+        PanelLabel(l.studioFeatBudgetTitle, top: 4),
         _budgetPanel(f.budget),
         for (final g in groups) ...[
           PanelLabel(g.$1),
@@ -183,6 +183,7 @@ class _FeaturesSectionState extends State<FeaturesSection> {
 
   Widget _budgetPanel(BudgetSettings b) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final text = Theme.of(context).textTheme;
     final valid =
         b.min > 0 && b.min <= b.defaultAmount && b.defaultAmount <= b.max;
@@ -204,7 +205,7 @@ class _FeaturesSectionState extends State<FeaturesSection> {
         },
         decoration: InputDecoration(
           labelText: label,
-          prefixText: '₹',
+          prefixText: '₹', // i18n-ignore: currency symbol
           isDense: true,
         ),
       ),
@@ -213,13 +214,11 @@ class _FeaturesSectionState extends State<FeaturesSection> {
       padding: null,
       children: [
         SwitchListTile(
-          title: const Text(
-            'Budget',
-            style: TextStyle(fontWeight: FontWeight.w600),
+          title: Text(
+            l.studioFeatBudgetTitle,
+            style: const TextStyle(fontWeight: FontWeight.w600),
           ),
-          subtitle: const Text(
-            'Guests set how much they want to spend and see what fits.',
-          ),
+          subtitle: Text(l.studioFeatBudgetHint),
           value: b.enabled,
           onChanged: (v) =>
               _set((f) => f.copyWith(budget: f.budget.copyWith(enabled: v))),
@@ -232,22 +231,25 @@ class _FeaturesSectionState extends State<FeaturesSection> {
               children: [
                 Row(
                   children: [
-                    field('Minimum', _min, (v) => _budget(min: v)),
+                    field(l.studioFeatBudgetMin, _min, (v) => _budget(min: v)),
                     const SizedBox(width: 8),
                     field(
-                      'Starts at',
+                      l.studioFeatBudgetStart,
                       _default,
                       (v) => _budget(defaultAmount: v),
                     ),
                     const SizedBox(width: 8),
-                    field('Maximum', _max, (v) => _budget(max: v)),
+                    field(l.studioFeatBudgetMax, _max, (v) => _budget(max: v)),
                   ],
                 ),
                 const SizedBox(height: 8),
                 Text(
                   valid
-                      ? 'Guests start at ${rupees(b.defaultAmount)} and move in steps of ${rupees(b.step)}.'
-                      : 'Keep minimum ≤ starts at ≤ maximum, and the minimum above ₹0.',
+                      ? l.studioFeatBudgetSummary(
+                          start: rupees(b.defaultAmount),
+                          step: rupees(b.step),
+                        )
+                      : l.studioFeatBudgetInvalid,
                   style: valid
                       ? text.bodySmall
                       : TextStyle(color: t.danger, fontSize: 13),

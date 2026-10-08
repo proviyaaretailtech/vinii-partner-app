@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../domain/pos_order.dart';
+import '../../../l10n/l10n.dart';
 import '../../theme/guest_theme.dart';
 import '../../widgets/food_art.dart';
 import '../guest_widgets.dart';
@@ -20,6 +21,7 @@ class DishTray extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final l = context.l10n;
     if (lines.isEmpty) return const SizedBox.shrink();
     final shown = lines.take(5).toList();
     final step = size * 0.7;
@@ -35,7 +37,7 @@ class DishTray extends StatelessWidget {
             child: Stack(
               clipBehavior: Clip.none,
               children: [
-                for (final (i, l) in shown.indexed)
+                for (final (i, line) in shown.indexed)
                   Positioned(
                     left: i * step,
                     top: 0,
@@ -52,13 +54,16 @@ class DishTray extends StatelessWidget {
                         children: [
                           Positioned.fill(
                             child: FoodArt(
-                              name: l.name,
-                              imageUrl: s.catalog.item(l.itemId)?.item.imageUrl,
+                              name: line.name,
+                              imageUrl: s.catalog
+                                  .item(line.itemId)
+                                  ?.item
+                                  .imageUrl,
                               radius: size,
                               animate: false,
                             ),
                           ),
-                          if (l.qty > 1)
+                          if (line.qty > 1)
                             Positioned(
                               right: -4,
                               top: -4,
@@ -76,7 +81,8 @@ class DishTray extends StatelessWidget {
                                   ),
                                 ),
                                 child: Text(
-                                  '×${l.qty}',
+                                  // i18n-ignore: quantity mark, digits only
+                                  '×${line.qty}',
                                   style: p.price(11.5, color: p.onAccent),
                                 ),
                               ),
@@ -92,7 +98,7 @@ class DishTray extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(
-                '+${lines.length - shown.length} more',
+                l.guestTrayMore(count: lines.length - shown.length),
                 style: p.body(12.5, color: p.inkMuted),
               ),
             ),

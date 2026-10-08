@@ -82,12 +82,14 @@ class TableCodesController extends ChangeNotifier {
       throw const AppFailure(
         'Only an admin or manager can issue table codes.',
         kind: FailureKind.forbidden,
+        code: 'table_issue_forbidden',
       );
     }
     if (busy.contains(table.id)) {
       throw const AppFailure(
         'Already working on it…',
         kind: FailureKind.rejected,
+        code: 'table_issue_busy',
       );
     }
     busy.add(table.id);

@@ -2,23 +2,95 @@ import 'package:flutter/material.dart';
 
 import '../../core/money.dart';
 import '../../domain/delivery_order.dart';
+import '../../l10n/l10n.dart';
 import '../theme/staff_theme.dart';
 import '../widgets/rings.dart';
 
 /// Small pieces shared by the Orders list, the order detail and the
 /// new-order alert, so the three always describe an order the same way.
 
-/// "Priya" from "Priya Deshmukh" — staff see first names only (PRD §6).
-String firstName(String full) {
+/// "Priya" from "Priya Deshmukh" — staff see first names only (PRD §6). A
+/// missing name (or the "Customer" One Local sends for it) reads "Customer"
+/// in the reader's language.
+String firstName(AppLocalizations l, String full) {
   final parts = full.trim().split(RegExp(r'\s+'));
-  return parts.isEmpty || parts.first.isEmpty ? 'Customer' : parts.first;
+  return parts.isEmpty ||
+          parts.first.isEmpty ||
+          parts.first == customerNameFallback
+      ? l.commonCustomer
+      : parts.first;
 }
+
+/// The customer's name as written, or "Customer" in the reader's language
+/// when One Local sent none.
+String customerDisplayName(AppLocalizations l, String full) {
+  final name = full.trim();
+  return name.isEmpty || name == customerNameFallback ? l.commonCustomer : full;
+}
+
+/// How the customer pays. One Local's default "Cash on delivery" is shown in
+/// the reader's language; any other text is shown as stored.
+String orderPaymentLabel(AppLocalizations l, String payment) =>
+    payment == paymentCashOnDelivery ? l.ordersPaymentCod : payment;
+
+/// A timeline step by its code (`order_events.kind`). A code this build does
+/// not know shows as readable words, never blank.
+String orderEventLabel(AppLocalizations l, OrderEvent e) => switch (e.kind) {
+  'placed' => l.ordersEventPlaced,
+  'accepted' => l.ordersEventAccepted,
+  'kot_fired' => l.ordersEventKotFired,
+  'kot_preparing' => l.ordersEventKotPreparing,
+  'kot_ready' => l.ordersEventKotReady,
+  'out_for_delivery' => l.ordersEventOutForDelivery,
+  'delivered' => l.ordersEventDelivered,
+  'paid' => l.ordersEventPaid,
+  'rejected' => l.ordersEventRejected,
+  'timed_out' => l.ordersEventTimedOut,
+  _ => e.kind.replaceAll('_', ' '),
+};
+
+/// A reject reason in the reader's language. [reason] is one of
+/// [rejectReasons] (the English text One Local receives).
+String rejectReasonLabel(AppLocalizations l, String reason) => switch (reason) {
+  'Item out of stock' => l.ordersReasonOutOfStock,
+  'Kitchen busy' => l.ordersReasonKitchenBusy,
+  'Closing soon' => l.ordersReasonClosingSoon,
+  'Other' => l.ordersReasonOther,
+  _ => reason,
+};
+
+/// Why an order was cancelled, as One Local stored it. The restaurant's own
+/// reject reasons (with or without a "Restaurant: " prefix) are shown in the
+/// reader's language; any other text is shown as stored.
+String cancelReasonLabel(AppLocalizations l, String stored) {
+  const prefix = 'Restaurant: ';
+  final byRestaurant = stored.startsWith(prefix);
+  final reason = byRestaurant ? stored.substring(prefix.length) : stored;
+  final shown = rejectReasonLabel(l, reason);
+  if (shown == reason && !byRestaurant) return stored;
+  return byRestaurant ? l.ordersCancelReasonByRestaurant(reason: shown) : shown;
+}
+
+/// The message under "Delivery orders are not connected": the build's reason
+/// (translated when it is the known "no server address" one), else a default.
+String inboxUnavailableText(AppLocalizations l, String? reason) {
+  if (reason == null) return l.ordersNotConnectedFallback;
+  return reason == partnerApiUnavailableReason
+      ? l.failOrdersUnavailable
+      : reason;
+}
+
+/// Letter spacing for a Latin heading. Devanagari joins letters into
+/// conjuncts, so tracking it (positive or negative) breaks the shapes: Hindi
+/// gets none.
+double tracking(BuildContext context, double latin) =>
+    Localizations.maybeLocaleOf(context)?.languageCode == 'hi' ? 0 : latin;
 
 /// "2 × Chicken Biryani, 1 × Coke".
 String itemsSummary(DeliveryOrder o) =>
     o.items.map((l) => '${l.qty} × ${l.name}').join(', ');
 
-String itemCountLabel(int n) => n == 1 ? '1 item' : '$n items';
+String itemCountLabel(AppLocalizations l, int n) => l.ordersItemCount(count: n);
 
 /// The accept-by deadline, or placed time + the outlet's accept window when
 /// the server did not send one, so the countdown is never missing.
@@ -110,7 +182,7 @@ class PrepTimeChips extends StatelessWidget {
       children: [
         for (final m in prepTimeChoices)
           ChoiceChip(
-            label: Text('$m min'),
+            label: Text(context.l10n.ordersMinutesShort(minutes: m)),
             selected: m == value,
             showCheckmark: false,
             onSelected: (_) => onChanged(m),
@@ -240,7 +312,8 @@ class _RejectSheetState extends State<_RejectSheet> {
   String _reason = rejectReasons.first;
   final _other = TextEditingController();
 
-  bool get _isOther => _reason == 'Other';
+  bool get _isOther =>
+      _reason == 'Other'; // i18n-ignore: code sent to One Local
   String? get _result {
     if (!_isOther) return _reason;
     final text = _other.text.trim();
@@ -257,6 +330,7 @@ class _RejectSheetState extends State<_RejectSheet> {
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
     final text = Theme.of(context).textTheme;
+    final l = context.l10n;
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.only(
@@ -268,12 +342,9 @@ class _RejectSheetState extends State<_RejectSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Reject this order?', style: text.titleLarge),
+              Text(l.ordersRejectTitle, style: text.titleLarge),
               const SizedBox(height: 6),
-              Text(
-                'The customer sees the reason on One Local. Pick the closest one.',
-                style: text.bodyMedium,
-              ),
+              Text(l.ordersRejectIntro, style: text.bodyMedium),
               const SizedBox(height: 12),
               RadioGroup<String>(
                 groupValue: _reason,
@@ -284,7 +355,7 @@ class _RejectSheetState extends State<_RejectSheet> {
                       RadioListTile<String>(
                         value: r,
                         title: Text(
-                          r,
+                          rejectReasonLabel(l, r),
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                         contentPadding: EdgeInsets.zero,
@@ -300,9 +371,9 @@ class _RejectSheetState extends State<_RejectSheet> {
                   autofocus: true,
                   maxLength: 120,
                   textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                    labelText: 'Reason',
-                    hintText: 'e.g. Gas cylinder finished',
+                  decoration: InputDecoration(
+                    labelText: l.commonReason,
+                    hintText: l.ordersRejectHint,
                   ),
                   onChanged: (_) => setState(() {}),
                 ),
@@ -316,12 +387,12 @@ class _RejectSheetState extends State<_RejectSheet> {
                 onPressed: _result == null
                     ? null
                     : () => Navigator.pop(context, _result),
-                child: const Text('Reject order'),
+                child: Text(l.ordersRejectConfirm),
               ),
               const SizedBox(height: 4),
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Keep the order'),
+                child: Text(l.ordersKeepOrder),
               ),
             ],
           ),

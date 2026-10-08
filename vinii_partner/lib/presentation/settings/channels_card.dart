@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../app/app_scope.dart';
 import '../../core/failure.dart';
 import '../../domain/pos_order.dart';
+import '../../l10n/failure_text.dart';
+import '../../l10n/l10n.dart';
 import '../menu/panel.dart';
 import '../theme/staff_theme.dart';
 import '../widgets/setting_rows.dart';
@@ -67,20 +69,20 @@ class _ChannelsCardState extends State<ChannelsCard> {
   /// channel off by accident costs orders.
   void _announce(SalesChannel channel, bool on) {
     final messenger = ScaffoldMessenger.of(context);
+    final l = context.l10n;
     messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
           content: Text(
             on
-                ? '${channel.name} is ON.'
-                : '${channel.name} is OFF. You will not get ${channel.name} '
-                      'orders until you turn it on.',
+                ? l.channelsOn(name: channel.name)
+                : l.channelsOff(name: channel.name),
           ),
           action: on
               ? null
               : SnackBarAction(
-                  label: 'Undo',
+                  label: l.channelsUndo,
                   onPressed: () => _switch(channel, true),
                 ),
         ),
@@ -90,6 +92,7 @@ class _ChannelsCardState extends State<ChannelsCard> {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final channels = _channels;
     final Widget body;
     if (_failure != null && channels == null) {
@@ -100,10 +103,10 @@ class _ChannelsCardState extends State<ChannelsCard> {
               ? Icons.construction_rounded
               : Icons.cloud_off_rounded,
           tone: _failure!.kind == FailureKind.notReady ? t.warning : t.danger,
-          message: _failure!.message,
+          message: failureText(l, _failure!),
           action: _failure!.kind == FailureKind.notReady
               ? null
-              : TextButton(onPressed: _load, child: const Text('Retry')),
+              : TextButton(onPressed: _load, child: Text(l.channelsRetry)),
         ),
       );
     } else if (channels == null) {
@@ -120,8 +123,7 @@ class _ChannelsCardState extends State<ChannelsCard> {
       body = Padding(
         padding: const EdgeInsets.all(16),
         child: Text(
-          'No sales channels are set up yet. Swiggy and Zomato show here once '
-          'they are connected to this restaurant.',
+          l.channelsEmpty,
           style: Theme.of(context).textTheme.bodyMedium,
         ),
       );
@@ -134,10 +136,10 @@ class _ChannelsCardState extends State<ChannelsCard> {
               key: Key('channel-${c.key}'),
               title: c.name,
               subtitle: !c.connected
-                  ? 'Not connected yet'
+                  ? l.channelsNotConnected
                   : c.accepting
-                  ? 'Taking orders'
-                  : 'Not taking orders',
+                  ? l.channelsTaking
+                  : l.channelsNotTaking,
               value: c.connected && c.accepting,
               onChanged: c.connected && !_busy.contains(c.id)
                   ? (on) => _switch(c, on)

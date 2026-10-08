@@ -17,6 +17,9 @@ const servicePresets = [5.0, 7.5, 10.0];
 /// What is shown if switching the service charge ON has nothing to restore.
 const defaultServiceCharge = 5.0;
 
+/// The example bill on the screen is worked out for this much food (rupees).
+const exampleFoodAmount = 1000;
+
 double? parsePercent(String raw) =>
     double.tryParse(raw.trim().replaceAll(',', '.'));
 
@@ -253,24 +256,24 @@ class BillSettingsController extends ChangeNotifier {
 
   // ── Checking ───────────────────────────────────────────────────────────
 
-  /// Plain-words problems by field. Empty means the draft can be saved.
-  Map<BillField, String> get errors {
-    final out = <BillField, String>{};
+  /// What is wrong, by field (the screen words each problem in the reader's
+  /// language). Empty means the draft can be saved.
+  Map<BillField, BillProblem> get errors {
+    final out = <BillField, BillProblem>{};
     if (customGst) {
       final total = parsePercent(customGstText);
       final oneDecimal = RegExp(r'^\d{1,3}([.,]\d)?$')
           .hasMatch(customGstText.trim());
       if (total == null || total < 0 || total > 100 || !oneDecimal) {
-        out[BillField.customGst] =
-            'Enter a rate from 0 to 100, like 5 or 12.5.';
+        out[BillField.customGst] = BillProblem.customRate;
       }
     }
     final gstinError = gstinProblem(gstin);
     if (gstinError != null) out[BillField.gstin] = gstinError;
     if (serviceOn) {
       final v = serviceValue;
-      if (v == null || v <= 0 || v > 50) {
-        out[BillField.service] = 'Enter a percentage above 0 and up to 50, or switch the service charge off.';
+      if (v == null || v <= 0 || v > maxServiceChargePercent) {
+        out[BillField.service] = BillProblem.servicePercent;
       }
     }
     final fssaiError = fssaiProblem(fssai);
@@ -287,7 +290,9 @@ class BillSettingsController extends ChangeNotifier {
   /// someone is mid-way through typing.
   BillSettings get draft {
     final base = saved ?? BillSettings.defaults;
-    final service = serviceOn ? (serviceValue ?? 0).clamp(0, 50) : 0;
+    final service = serviceOn
+        ? (serviceValue ?? 0).clamp(0, maxServiceChargePercent)
+        : 0;
     return BillSettings(
       legalName: legalName.trim(),
       address: address.trim(),
@@ -308,9 +313,11 @@ class BillSettingsController extends ChangeNotifier {
   bool get canSave =>
       canEdit && saved != null && isDirty && isValid && !saving && !stale;
 
-  /// The example bill: ₹1,000 of food with the draft's rates.
-  BillSummary get example =>
-      BillSummary.of([(unitPrice: 1000, qty: 1)], charges: draft.charges);
+  /// The example bill: [exampleFoodAmount] rupees of food with the draft's
+  /// rates.
+  BillSummary get example => BillSummary.of([
+    (unitPrice: exampleFoodAmount, qty: 1),
+  ], charges: draft.charges);
 
   // ── Saving ─────────────────────────────────────────────────────────────
 

@@ -8,6 +8,8 @@ import '../../core/money.dart';
 import '../../domain/billing.dart';
 import '../../domain/guest_catalog.dart';
 import '../../domain/storefront.dart';
+import '../../l10n/l10n.dart';
+import '../menu/menu_labels.dart';
 import '../theme/guest_theme.dart';
 import '../widgets/rings.dart';
 import 'guest_nearby.dart';
@@ -280,43 +282,49 @@ class GuestButton extends StatelessWidget {
                   onTap!();
                 }
               : null,
+          // At least the button's height, taller when a longer label (Hindi)
+          // wraps onto a second line.
           child: SizedBox(
-            height: dense ? 46 : 56,
             width: double.infinity,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (busy)
-                  SizedBox.square(
-                    dimension: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.4,
-                      color: fg,
-                    ),
-                  )
-                else ...[
-                  if (icon != null) ...[
-                    Icon(icon, size: 20, color: fg),
-                    const SizedBox(width: 8),
-                  ],
-                  Flexible(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: p.body(
-                        dense ? 14.5 : 16,
-                        weight: FontWeight.w700,
-                        color: fg,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: dense ? 46 : 56),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (busy)
+                      SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.4,
+                          color: fg,
+                        ),
+                      )
+                    else ...[
+                      if (icon != null) ...[
+                        Icon(icon, size: 20, color: fg),
+                        const SizedBox(width: 8),
+                      ],
+                      Flexible(
+                        child: Text(
+                          label,
+                          textAlign: TextAlign.center,
+                          style: p.body(
+                            dense ? 14.5 : 16,
+                            weight: FontWeight.w700,
+                            color: fg,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  if (trailingArrow) ...[
-                    const SizedBox(width: 8),
-                    Icon(Icons.arrow_forward_rounded, size: 20, color: fg),
+                      if (trailingArrow) ...[
+                        const SizedBox(width: 8),
+                        Icon(Icons.arrow_forward_rounded, size: 20, color: fg),
+                      ],
+                    ],
                   ],
-                ],
-              ],
+                ),
+              ),
             ),
           ),
         ),
@@ -388,7 +396,7 @@ class GuestTopBar extends StatelessWidget {
             RoundIcon(
               icon: Icons.arrow_back_ios_new_rounded,
               size: 40,
-              tooltip: 'Back',
+              tooltip: context.l10n.commonBack,
               onTap: onBack ?? () => Navigator.of(context).maybePop(),
             )
           else
@@ -397,7 +405,7 @@ class GuestTopBar extends StatelessWidget {
             child: Text(
               title ?? '',
               textAlign: TextAlign.center,
-              maxLines: 1,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: p.display(17, weight: FontWeight.w700),
             ),
@@ -422,8 +430,9 @@ class GuestExitButton extends StatelessWidget {
     final onExit = GuestScope.exitOf(context);
     if (onExit == null) return const SizedBox.shrink();
     final p = GuestPalette.of(context);
+    final l = context.l10n;
     return Tooltip(
-      message: 'Staff: press and hold to leave',
+      message: l.guestWidgetExitTooltip,
       child: GestureDetector(
         key: const ValueKey('guest-exit'),
         onLongPress: () async {
@@ -433,20 +442,23 @@ class GuestExitButton extends StatelessWidget {
             useRootNavigator: false,
             builder: (context) => AlertDialog(
               backgroundColor: p.surface,
-              title: Text('Return to staff mode?', style: p.display(20)),
+              title: Text(l.guestWidgetExitTitle, style: p.display(20)),
               content: Text(
-                'The guest menu will close on this phone.',
+                l.guestWidgetExitBody,
                 style: p.body(14, color: p.inkMuted),
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(false),
-                  child: Text('Stay', style: p.body(15, color: p.ink)),
+                  child: Text(
+                    l.guestWidgetExitStay,
+                    style: p.body(15, color: p.ink),
+                  ),
                 ),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(true),
                   child: Text(
-                    'Return',
+                    l.guestWidgetExitReturn,
                     style: p.body(15, weight: FontWeight.w700, color: p.ink),
                   ),
                 ),
@@ -561,6 +573,12 @@ class TagChip extends StatelessWidget {
         : p.surfaceAlt;
     final fg = hot || onImage ? Colors.white : p.ink;
     final icon = iconFor(tag);
+    final l = context.l10n;
+    // The tag is stored in English (see storefrontTags); the chip says it in
+    // the reader's language. A tag the owner invented shows as written.
+    final word = tag == 'Vegetarian'
+        ? l.guestWidgetTagVegetarian
+        : l.storefrontTagLabel(tag);
     return Container(
       padding: EdgeInsets.fromLTRB(icon == null ? 10 : 8, 5, 10, 5),
       decoration: BoxDecoration(
@@ -577,9 +595,11 @@ class TagChip extends StatelessWidget {
             Icon(icon, size: 14, color: fg),
             const SizedBox(width: 4),
           ],
-          Text(
-            tag,
-            style: p.body(12, weight: FontWeight.w700, color: fg),
+          Flexible(
+            child: Text(
+              word,
+              style: p.body(12, weight: FontWeight.w700, color: fg),
+            ),
           ),
         ],
       ),
@@ -629,7 +649,7 @@ class QtyStepper extends StatelessWidget {
         children: [
           btn(
             Icons.remove_rounded,
-            'Less',
+            context.l10n.guestWidgetQtyLess,
             qty > min ? () => onChanged(qty - 1) : null,
           ),
           SizedBox(
@@ -640,7 +660,11 @@ class QtyStepper extends StatelessWidget {
               style: p.price(compact ? 14 : 17),
             ),
           ),
-          btn(Icons.add_rounded, 'More', () => onChanged(qty + 1)),
+          btn(
+            Icons.add_rounded,
+            context.l10n.guestWidgetQtyMore,
+            () => onChanged(qty + 1),
+          ),
         ],
       ),
     );
@@ -719,7 +743,7 @@ class BudgetBar extends StatelessWidget {
               ),
             ),
             Text(
-              '${status.percentUsed}% used',
+              context.l10n.guestBudgetUsed(percent: status.percentUsed),
               style: p.body(13, color: p.inkMuted),
             ),
           ],
@@ -754,14 +778,15 @@ class BudgetNote extends StatelessWidget {
     final p = GuestPalette.of(context);
     final c = budgetColor(p, status);
     final text = budgetTextColor(p, status);
+    final l = context.l10n;
     final (icon, title) = status.over
-        ? (Icons.error_outline_rounded, "You're over your budget")
+        ? (Icons.error_outline_rounded, l.guestBudgetOverTitle)
         : status.close
-        ? (Icons.info_outline_rounded, 'Getting close to your budget')
-        : (Icons.check_circle_rounded, "You're well within your budget!");
+        ? (Icons.info_outline_rounded, l.guestBudgetCloseTitle)
+        : (Icons.check_circle_rounded, l.guestBudgetWithinTitle);
     final line = status.over
-        ? '${rupees(-status.remaining)} over'
-        : '${rupees(status.remaining)} remaining';
+        ? l.guestBudgetOverBy(amount: rupees(-status.remaining))
+        : l.guestBudgetRemaining(amount: rupees(status.remaining));
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -857,7 +882,7 @@ class PreviewBanner extends StatelessWidget {
           const SizedBox(width: 8),
           Flexible(
             child: Text(
-              'Preview — nothing was sent to the kitchen',
+              context.l10n.guestWidgetPreview,
               style: p.body(12.5, weight: FontWeight.w600, color: p.inkMuted),
             ),
           ),

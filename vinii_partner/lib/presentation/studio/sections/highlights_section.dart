@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../../../app/routes.dart';
 import '../../../application/studio_controller.dart';
 import '../../../core/money.dart';
+import '../../../core/time_format.dart';
 import '../../../domain/menu.dart';
 import '../../../domain/storefront.dart';
+import '../../../l10n/l10n.dart';
 import '../../menu/panel.dart';
 import '../../theme/staff_theme.dart';
 import '../../widgets/chips.dart';
@@ -26,7 +27,7 @@ class HighlightsSection extends StatelessWidget {
     final item = await pickMenuItem(
       context,
       controller.menu,
-      title: "Add a chef's pick",
+      title: context.l10n.studioHighPickTitle,
       exclude: d.chefsPicks.toSet(),
     );
     if (item == null) return;
@@ -38,7 +39,7 @@ class HighlightsSection extends StatelessWidget {
     final item = await pickMenuItem(
       context,
       controller.menu,
-      title: 'Add a limited offer',
+      title: context.l10n.studioHighOfferTitle,
       exclude: {for (final o in d.limitedToday) o.itemId},
     );
     if (item == null || !context.mounted) return;
@@ -58,7 +59,7 @@ class HighlightsSection extends StatelessWidget {
     final now = TimeOfDay.now();
     final picked = await showTimePicker(
       context: context,
-      helpText: 'Offer ends at',
+      helpText: context.l10n.studioHighEndsHelp,
       initialTime: current == null
           ? TimeOfDay(hour: (now.hour + 3).clamp(0, 23), minute: 0)
           : TimeOfDay(
@@ -74,15 +75,16 @@ class HighlightsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final text = Theme.of(context).textTheme;
     final menu = controller.menu;
     final d = controller.draft;
     if (menu.items.isEmpty) {
       return EmptyView(
         icon: Icons.restaurant_menu_rounded,
-        title: 'Add dishes first',
-        message: "Chef's picks and offers come from your menu. Add dishes in the Menu tab.",
-        actionLabel: 'Open Menu',
+        title: l.studioHighEmptyTitle,
+        message: l.studioHighEmptyMessage,
+        actionLabel: l.studioHighEmptyAction,
         onAction: () => context.go(Routes.menu),
       );
     }
@@ -90,17 +92,16 @@ class HighlightsSection extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
       children: [
         PanelLabel(
-          "Chef's picks",
+          l.studioFeatChefsPicksTitle,
           top: 4,
           trailing: Text(
-            '${d.chefsPicks.length} of $maxPicks',
+            l.studioHighPicksCount(count: d.chefsPicks.length, max: maxPicks),
             style: text.bodySmall,
           ),
         ),
         if (!d.features.chefsPicks) ...[
           _OffBanner(
-            message:
-                "Chef's picks are switched off, so guests do not see them.",
+            message: l.studioHighChefsOff,
             onTurnOn: () => controller.edit(
               (d) =>
                   d.copyWith(features: d.features.copyWith(chefsPicks: true)),
@@ -114,12 +115,10 @@ class HighlightsSection extends StatelessWidget {
             if (d.chefsPicks.isEmpty)
               ListTile(
                 title: Text(
-                  'No picks yet',
+                  l.studioHighNoPicks,
                   style: TextStyle(color: t.inkMuted),
                 ),
-                subtitle: const Text(
-                  'Pick up to six dishes you are proud of. They show first.',
-                ),
+                subtitle: Text(l.studioHighNoPicksHint),
               )
             else
               ReorderableListView(
@@ -144,7 +143,7 @@ class HighlightsSection extends StatelessWidget {
                           child: Icon(
                             Icons.drag_indicator_rounded,
                             color: t.inkMuted,
-                            semanticLabel: 'Drag to reorder',
+                            semanticLabel: l.studioHighDragToReorder,
                           ),
                         ),
                       ),
@@ -159,17 +158,16 @@ class HighlightsSection extends StatelessWidget {
             const PanelDivider(indent: 0),
             ListTile(
               leading: const Icon(Icons.add_rounded),
-              title: const Text('Add a dish'),
+              title: Text(l.studioHighAddDish),
               enabled: d.chefsPicks.length < maxPicks,
               onTap: () => _addPick(context),
             ),
           ],
         ),
-        const PanelLabel('Limited today'),
+        PanelLabel(l.studioFeatLimitedTitle),
         if (!d.features.limitedToday) ...[
           _OffBanner(
-            message:
-                'Limited today is switched off, so guests do not see offers.',
+            message: l.studioHighLimitedOff,
             onTurnOn: () => controller.edit(
               (d) =>
                   d.copyWith(features: d.features.copyWith(limitedToday: true)),
@@ -183,12 +181,10 @@ class HighlightsSection extends StatelessWidget {
             if (d.limitedToday.isEmpty)
               ListTile(
                 title: Text(
-                  'No offers yet',
+                  l.studioHighNoOffers,
                   style: TextStyle(color: t.inkMuted),
                 ),
-                subtitle: const Text(
-                  'Guests see a countdown until the time you set.',
-                ),
+                subtitle: Text(l.studioHighNoOffersHint),
               ),
             for (var i = 0; i < d.limitedToday.length; i++) ...[
               if (i > 0) const PanelDivider(indent: 72),
@@ -197,7 +193,7 @@ class HighlightsSection extends StatelessWidget {
                 leading: const SizedBox(width: 8),
                 trailing: ActionChip(
                   avatar: const Icon(Icons.schedule_rounded, size: 16),
-                  label: Text(_until(d.limitedToday[i].endsAt)),
+                  label: Text(_until(l, d.limitedToday[i].endsAt)),
                   onPressed: () async {
                     final ends = await _askTime(
                       context,
@@ -226,24 +222,30 @@ class HighlightsSection extends StatelessWidget {
             const PanelDivider(indent: 0),
             ListTile(
               leading: const Icon(Icons.add_rounded),
-              title: const Text('Add a dish'),
+              title: Text(l.studioHighAddDish),
               onTap: () => _addOffer(context),
             ),
           ],
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(4, 10, 4, 0),
-          child: Text(
-            'Offers repeat every day until you remove them. After the end time guests no longer see them that day.',
-            style: text.bodySmall,
-          ),
+          child: Text(l.studioHighRepeatNote, style: text.bodySmall),
         ),
       ],
     );
   }
 
-  static String _until(String hm) =>
-      'Until ${DateFormat('h:mm a').format(DateTime(2000, 1, 1, int.parse(hm.substring(0, 2)), int.parse(hm.substring(3))))}';
+  static String _until(AppLocalizations l, String hm) => l.studioHighUntil(
+    time: wallClock(
+      DateTime(
+        2000,
+        1,
+        1,
+        int.parse(hm.substring(0, 2)),
+        int.parse(hm.substring(3)),
+      ),
+    ),
+  );
 }
 
 class _OffBanner extends StatelessWidget {
@@ -256,7 +258,10 @@ class _OffBanner extends StatelessWidget {
     icon: Icons.toggle_off_outlined,
     tone: ViniiTokens.of(context).warning,
     message: message,
-    action: TextButton(onPressed: onTurnOn, child: const Text('Turn on')),
+    action: TextButton(
+      onPressed: onTurnOn,
+      child: Text(context.l10n.studioHighTurnOn),
+    ),
   );
 }
 
@@ -278,6 +283,7 @@ class _PickedRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final i = item;
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
@@ -307,7 +313,7 @@ class _PickedRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  i?.name ?? 'No longer on the menu',
+                  i?.name ?? l.studioHighGone,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -317,21 +323,27 @@ class _PickedRow extends StatelessWidget {
                 ),
                 Text(
                   i == null
-                      ? 'Guests do not see it. Remove it.'
+                      ? l.studioHighGoneHint
                       : !i.isAvailable
-                      ? 'Sold out, so guests do not see it'
+                      ? l.studioHighSoldOutHint
                       : rupees(i.price),
                   style: TextStyle(
                     fontSize: 12.5,
                     color: i == null || !i.isAvailable ? t.warning : t.inkMuted,
                   ),
                 ),
+                // Under the text rather than beside it, so a longer chip
+                // (the end time in Hindi) does not squeeze the dish name.
+                if (trailing != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: trailing,
+                  ),
               ],
             ),
           ),
-          ?trailing,
           IconButton(
-            tooltip: 'Remove',
+            tooltip: l.commonRemove,
             onPressed: onRemove,
             icon: Icon(Icons.close_rounded, color: t.inkSecondary),
           ),
@@ -383,6 +395,7 @@ class _ItemPickerState extends State<_ItemPicker> {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final items =
         widget.menu.items
             .where((i) => !widget.exclude.contains(i.id))
@@ -402,9 +415,9 @@ class _ItemPickerState extends State<_ItemPicker> {
               const SizedBox(height: 12),
               TextField(
                 onChanged: (v) => setState(() => _q = v.trim().toLowerCase()),
-                decoration: const InputDecoration(
-                  hintText: 'Search dishes',
-                  prefixIcon: Icon(Icons.search_rounded),
+                decoration: InputDecoration(
+                  hintText: l.studioHighSearchHint,
+                  prefixIcon: const Icon(Icons.search_rounded),
                   isDense: true,
                 ),
               ),
@@ -413,9 +426,9 @@ class _ItemPickerState extends State<_ItemPicker> {
         ),
         Expanded(
           child: items.isEmpty
-              ? const EmptyView(
+              ? EmptyView(
                   icon: Icons.search_off_rounded,
-                  title: 'No dishes to pick',
+                  title: l.studioHighNoDishes,
                 )
               : ListView.separated(
                   controller: widget.scroll,
@@ -452,7 +465,9 @@ class _ItemPickerState extends State<_ItemPicker> {
                       subtitle: Text(
                         item.isAvailable
                             ? rupees(item.price)
-                            : '${rupees(item.price)} · sold out',
+                            : l.studioHighPriceSoldOut(
+                                price: rupees(item.price),
+                              ),
                       ),
                       onTap: () => Navigator.pop(context, item),
                     );

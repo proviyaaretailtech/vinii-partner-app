@@ -9,6 +9,10 @@ import '../../application/inbox_controller.dart';
 import '../../core/money.dart';
 import '../../core/time_format.dart';
 import '../../domain/delivery_order.dart';
+import '../../l10n/failure_text.dart';
+import '../../l10n/l10n.dart';
+import '../../l10n/labels.dart';
+import '../../l10n/script_fonts.dart';
 import '../theme/staff_theme.dart';
 import '../widgets/chips.dart';
 import '../widgets/state_views.dart';
@@ -96,19 +100,20 @@ class _OrdersScreenState extends State<OrdersScreen>
     final org = services.session.membership?.organization;
     final t = ViniiTokens.of(context);
     final text = Theme.of(context).textTheme;
+    final l = context.l10n;
     final appBar = AppBar(
       toolbarHeight: 68,
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            org?.name ?? 'Orders',
+            org?.name ?? l.commonOrders,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 2),
           Text(
-            'Delivery orders · One Local',
+            l.ordersSubtitle,
             style: text.bodySmall?.copyWith(fontWeight: FontWeight.w500),
           ),
         ],
@@ -119,10 +124,8 @@ class _OrdersScreenState extends State<OrdersScreen>
         appBar: appBar,
         body: EmptyView(
           icon: Icons.delivery_dining_outlined,
-          title: 'Delivery orders are not connected',
-          message:
-              _inbox.unavailableReason ??
-              'This build cannot reach One Local right now.',
+          title: l.ordersNotConnected,
+          message: inboxUnavailableText(l, _inbox.unavailableReason),
         ),
       );
     }
@@ -161,20 +164,23 @@ class _OrdersScreenState extends State<OrdersScreen>
                   dividerColor: Colors.transparent,
                   labelStyle: const TextStyle(
                     fontFamily: 'Inter',
+                    fontFamilyFallback: kScriptFontFallback,
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
                   ),
                   unselectedLabelStyle: const TextStyle(
                     fontFamily: 'Inter',
+                    fontFamilyFallback: kScriptFontFallback,
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
                   ),
                   tabs: [
                     for (final tab in InboxTab.values)
                       Tab(
-                        height: 48,
+                        // Tall enough for a two-line Hindi label.
+                        height: 56,
                         child: _TabLabel(
-                          label: tab.label,
+                          label: l.inboxTabLabel(tab),
                           count: _inbox.lists[tab]?.length,
                           urgent: tab == InboxTab.fresh,
                         ),
@@ -199,6 +205,7 @@ class _OrdersScreenState extends State<OrdersScreen>
 
   List<Widget> _banners(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final outlet = _inbox.outlet;
     final failure = _inbox.outletFailure;
     final banners = <Widget>[
@@ -206,26 +213,22 @@ class _OrdersScreenState extends State<OrdersScreen>
         NoticeBanner(
           icon: Icons.cloud_off_rounded,
           tone: t.danger,
-          message: failure.message,
+          message: failureText(l, failure),
           action: TextButton(
             onPressed: _inbox.refreshOutlet,
-            child: const Text('Retry'),
+            child: Text(l.ordersRetry),
           ),
         ),
       if (outlet != null && !outlet.setUp)
-        const NoticeBanner(
+        NoticeBanner(
           icon: Icons.storefront_outlined,
-          message:
-              'Not set up on One Local yet. Orders appear here once One Local '
-              'adds this restaurant.',
+          message: l.ordersNotSetUp,
         ),
       if (outlet != null && outlet.missedInARow > 0)
         NoticeBanner(
           icon: Icons.warning_amber_rounded,
           tone: t.warning,
-          message:
-              '${outlet.missedInARow == 1 ? '1 order' : '${outlet.missedInARow} orders'} '
-              'missed in a row. After 3, One Local pauses the restaurant.',
+          message: l.ordersMissedInARow(count: outlet.missedInARow),
         ),
     ];
     return [
@@ -246,34 +249,33 @@ class _TabLabel extends StatelessWidget {
     final t = ViniiTokens.of(context);
     final n = count ?? 0;
     final hot = urgent && n > 0;
-    return FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(label),
-          if (n > 0) ...[
-            const SizedBox(width: 6),
-            Container(
-              constraints: const BoxConstraints(minWidth: 20),
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-              decoration: BoxDecoration(
-                color: hot ? t.info : t.surfaceMuted,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                '$n',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: hot ? Colors.white : t.inkSecondary,
-                ),
+    // The label wraps to a second line when the language needs the room (a
+    // longer Hindi word), instead of shrinking or being cut off.
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(child: Text(label, textAlign: TextAlign.center, maxLines: 2)),
+        if (n > 0) ...[
+          const SizedBox(width: 6),
+          Container(
+            constraints: const BoxConstraints(minWidth: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+            decoration: BoxDecoration(
+              color: hot ? t.info : t.surfaceMuted,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              '$n',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: hot ? Colors.white : t.inkSecondary,
               ),
             ),
-          ],
+          ),
         ],
-      ),
+      ],
     );
   }
 }
@@ -284,33 +286,35 @@ class _OrderList extends StatelessWidget {
 
   final InboxTab tab;
 
-  static const _empty = {
-    InboxTab.fresh: (
-      Icons.notifications_none_rounded,
-      'No new orders',
-      'When a customer orders, this phone rings.',
-    ),
-    InboxTab.preparing: (
-      Icons.soup_kitchen_outlined,
-      'Nothing cooking right now',
-      'Accepted orders stay here until they are ready.',
-    ),
-    InboxTab.ready: (
-      Icons.shopping_bag_outlined,
-      'Nothing waiting for pickup',
-      'Ready and out-for-delivery orders show here.',
-    ),
-    InboxTab.past: (
-      Icons.history_rounded,
-      'No past orders',
-      'Orders from the last 3 days show here.',
-    ),
-  };
+  static (IconData, String, String) _empty(AppLocalizations l, InboxTab tab) =>
+      switch (tab) {
+        InboxTab.fresh => (
+          Icons.notifications_none_rounded,
+          l.ordersEmptyNewTitle,
+          l.ordersEmptyNewMessage,
+        ),
+        InboxTab.preparing => (
+          Icons.soup_kitchen_outlined,
+          l.ordersEmptyPreparingTitle,
+          l.ordersEmptyPreparingMessage,
+        ),
+        InboxTab.ready => (
+          Icons.shopping_bag_outlined,
+          l.ordersEmptyReadyTitle,
+          l.ordersEmptyReadyMessage,
+        ),
+        InboxTab.past => (
+          Icons.history_rounded,
+          l.ordersEmptyPastTitle,
+          l.ordersEmptyPastMessage,
+        ),
+      };
 
   @override
   Widget build(BuildContext context) {
     final inbox = AppScope.of(context).inbox;
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final rows = inbox.lists[tab];
     final failure = inbox.failures[tab];
     final loading = inbox.loading.contains(tab);
@@ -319,7 +323,7 @@ class _OrderList extends StatelessWidget {
       if (failure != null && !loading) {
         return FailureView(failure: failure, onRetry: () => inbox.refresh(tab));
       }
-      return const LoadingView(label: 'Loading orders…');
+      return LoadingView(label: l.ordersLoading);
     }
 
     return RefreshIndicator(
@@ -328,7 +332,7 @@ class _OrderList extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, c) {
           if (rows.isEmpty) {
-            final (icon, title, message) = _empty[tab]!;
+            final (icon, title, message) = _empty(l, tab);
             return ListView(
               physics: const AlwaysScrollableScrollPhysics(),
               children: [
@@ -338,7 +342,7 @@ class _OrderList extends StatelessWidget {
                     child: NoticeBanner(
                       icon: Icons.cloud_off_rounded,
                       tone: t.danger,
-                      message: failure.message,
+                      message: failureText(l, failure),
                     ),
                   ),
                 SizedBox(
@@ -359,8 +363,9 @@ class _OrderList extends StatelessWidget {
                   return NoticeBanner(
                     icon: Icons.cloud_off_rounded,
                     tone: t.danger,
-                    message:
-                        '${failure.message} Showing the last list this phone saw.',
+                    message: l.ordersShowingLastList(
+                      message: failureText(l, failure),
+                    ),
                   );
                 }
                 i -= 1;
@@ -387,10 +392,11 @@ class OrderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final outlet = AppScope.of(context).inbox.outlet;
     final o = order;
     final who = [
-      firstName(o.customerName),
+      firstName(l, o.customerName),
       if (o.area != null && o.area!.trim().isNotEmpty) o.area!,
     ].join(' · ');
     return Material(
@@ -430,8 +436,8 @@ class OrderCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          '${timeAgo(o.placedAt)} · $who',
-                          maxLines: 1,
+                          '${timeAgo(l, o.placedAt)} · $who',
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 13.5,
@@ -463,20 +469,29 @@ class OrderCard extends StatelessWidget {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  StatusChip.delivery(context, o.status),
-                  const SizedBox(width: 10),
-                  Text(
-                    itemCountLabel(o.itemCount),
-                    style: TextStyle(fontSize: 13, color: t.inkMuted),
-                  ),
-                  if (o.prepMinutes != null &&
-                      o.status == DeliveryStatus.accepted) ...[
-                    Text(
-                      ' · ${o.prepMinutes} min prep',
-                      style: TextStyle(fontSize: 13, color: t.inkMuted),
+                  // A wrap, so a longer status word and the count move onto
+                  // a second line instead of overflowing.
+                  Expanded(
+                    child: Wrap(
+                      spacing: 10,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        StatusChip.delivery(context, o.status),
+                        Text(
+                          o.prepMinutes != null &&
+                                  o.status == DeliveryStatus.accepted
+                              ? l.ordersItemsPrep(
+                                  count: o.itemCount,
+                                  minutes: o.prepMinutes!,
+                                )
+                              : itemCountLabel(l, o.itemCount),
+                          style: TextStyle(fontSize: 13, color: t.inkMuted),
+                        ),
+                      ],
                     ),
-                  ],
-                  const Spacer(),
+                  ),
+                  const SizedBox(width: 8),
                   if (showCountdown && o.status == DeliveryStatus.placed)
                     MiniCountdown(
                       deadline: acceptDeadline(o, outlet),

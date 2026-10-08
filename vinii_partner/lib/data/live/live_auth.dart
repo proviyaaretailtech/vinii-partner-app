@@ -39,6 +39,7 @@ class LiveAuth implements AuthGateway {
         throw const AppFailure(
           'Could not sign in. Please try again.',
           kind: FailureKind.auth,
+          code: 'sign_in_failed',
         );
       }
       return user;

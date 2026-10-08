@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +12,8 @@ import '../../domain/app_definition.dart';
 import '../../domain/menu.dart';
 import '../../domain/pos_order.dart';
 import '../../domain/staff.dart';
+import '../../l10n/l10n.dart';
+import '../../l10n/labels.dart';
 import '../theme/staff_theme.dart';
 import '../widgets/chips.dart';
 import '../widgets/food_art.dart';
@@ -68,6 +72,7 @@ class _SellScreenState extends State<SellScreen> {
       builder: (context, _) {
         final services = AppScope.of(context);
         final session = services.session;
+        final l = context.l10n;
         final cart = _cart;
         final canHand =
             session.can(Capability.handToGuest) &&
@@ -75,17 +80,17 @@ class _SellScreenState extends State<SellScreen> {
             cart.table != null;
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Sell'),
+            title: Text(l.sellTitle),
             actions: [
               if (canHand)
                 IconButton(
-                  tooltip: 'Hand to guest',
+                  tooltip: l.sellHandToGuest,
                   icon: const Icon(Icons.send_to_mobile_outlined),
                   onPressed: () =>
                       context.push(Routes.guest(tableId: cart.table!.id)),
                 ),
               IconButton(
-                tooltip: 'Open orders',
+                tooltip: l.posOpenOrders,
                 icon: const Icon(Icons.receipt_long_outlined),
                 onPressed: () => showOpenOrders(context),
               ),
@@ -119,6 +124,7 @@ class _SellScreenState extends State<SellScreen> {
   /// table above them; the wide layout has those in the order pane instead.
   Widget _menuPane(BuildContext context, {required bool showTop}) {
     final cart = _cart;
+    final l = context.l10n;
     final menu = cart.menu;
     if (menu == null) {
       if (cart.menuFailure != null && !cart.loadingMenu) {
@@ -127,7 +133,7 @@ class _SellScreenState extends State<SellScreen> {
           onRetry: () => cart.load(force: true),
         );
       }
-      return const LoadingView(label: 'Loading the menu…');
+      return LoadingView(label: l.sellLoadingMenu);
     }
     if (menu.items.isEmpty) {
       final session = AppScope.of(context).session;
@@ -143,9 +149,9 @@ class _SellScreenState extends State<SellScreen> {
                 height: c.maxHeight,
                 child: EmptyView(
                   icon: Icons.restaurant_menu_rounded,
-                  title: 'No menu items yet',
-                  message: 'No menu items yet. Add dishes in the Menu tab.',
-                  actionLabel: hasMenuTab ? 'Open the Menu tab' : null,
+                  title: l.sellNoMenuTitle,
+                  message: l.sellNoMenuMessage,
+                  actionLabel: hasMenuTab ? l.sellOpenMenuTab : null,
                   onAction: hasMenuTab ? () => context.go(Routes.menu) : null,
                 ),
               ),
@@ -199,13 +205,13 @@ class _SellScreenState extends State<SellScreen> {
                     controller: _search,
                     textInputAction: TextInputAction.search,
                     decoration: InputDecoration(
-                      hintText: 'Search dishes',
+                      hintText: l.sellSearchHint,
                       isDense: true,
                       prefixIcon: const Icon(Icons.search_rounded),
                       suffixIcon: _query.isEmpty
                           ? null
                           : IconButton(
-                              tooltip: 'Clear',
+                              tooltip: l.commonClear,
                               icon: const Icon(Icons.close_rounded),
                               onPressed: () {
                                 _search.clear();
@@ -219,13 +225,17 @@ class _SellScreenState extends State<SellScreen> {
               ),
               SliverToBoxAdapter(
                 child: SizedBox(
-                  height: 60,
+                  // Grows with the text size so a taller script is not cut.
+                  height: math.max(
+                    60,
+                    12 + MediaQuery.textScalerOf(context).scale(48),
+                  ),
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
                     children: [
                       _CategoryChip(
-                        label: 'All',
+                        label: l.commonAll,
                         selected: _category == null,
                         onTap: () => setState(() => _category = null),
                       ),
@@ -237,7 +247,7 @@ class _SellScreenState extends State<SellScreen> {
                         ),
                       if (hasOther)
                         _CategoryChip(
-                          label: 'Other',
+                          label: l.sellCategoryOther,
                           selected: _category == _otherKey,
                           onTap: () => setState(() => _category = _otherKey),
                         ),
@@ -246,12 +256,12 @@ class _SellScreenState extends State<SellScreen> {
                 ),
               ),
               if (items.isEmpty)
-                const SliverFillRemaining(
+                SliverFillRemaining(
                   hasScrollBody: false,
                   child: EmptyView(
                     icon: Icons.search_off_rounded,
-                    title: 'No dishes match',
-                    message: 'Try another name or pick "All".',
+                    title: l.sellNoMatchTitle,
+                    message: l.sellNoMatchMessage,
                   ),
                 )
               else
@@ -262,7 +272,12 @@ class _SellScreenState extends State<SellScreen> {
                       crossAxisCount: columns,
                       mainAxisSpacing: 12,
                       crossAxisSpacing: 12,
-                      mainAxisExtent: cardWidth / 1.3 + 82,
+                      // Picture, then room for a two-line name and the price;
+                      // the room grows with the text size.
+                      mainAxisExtent:
+                          cardWidth / 1.3 +
+                          36 +
+                          MediaQuery.textScalerOf(context).scale(46),
                     ),
                     delegate: SliverChildBuilderDelegate(
                       (context, i) => _ItemCard(item: items[i], cart: cart),
@@ -286,6 +301,7 @@ class _Top extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
       child: Column(
@@ -301,7 +317,7 @@ class _Top extends StatelessWidget {
                 if (cart.table == null)
                   Expanded(
                     child: Text(
-                      'Dine-in orders need a table.',
+                      l.sellDineInNeedsTable,
                       style: TextStyle(color: t.inkSecondary, fontSize: 13),
                     ),
                   ),
@@ -309,7 +325,7 @@ class _Top extends StatelessWidget {
             )
           else
             Text(
-              cart.serviceType.hint,
+              l.serviceTypeHint(cart.serviceType),
               style: TextStyle(color: t.inkSecondary, fontSize: 13.5),
             ),
         ],
@@ -363,6 +379,7 @@ class _ItemCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final qty = cart.qtyOf(item.id);
     final soldOut = !item.isAvailable;
     void add() {
@@ -373,8 +390,14 @@ class _ItemCard extends StatelessWidget {
     return Semantics(
       button: true,
       label: soldOut
-          ? '${item.name}, sold out'
-          : '${item.name}, ${rupees(item.price)}${qty > 0 ? ', $qty in order' : ''}',
+          ? l.sellItemSoldOutSemantics(name: item.name)
+          : qty > 0
+          ? l.sellItemInOrderSemantics(
+              name: item.name,
+              price: rupees(item.price),
+              qty: qty,
+            )
+          : l.sellItemSemantics(name: item.name, price: rupees(item.price)),
       child: Material(
         color: t.surface,
         borderRadius: BorderRadius.circular(18),
@@ -382,7 +405,7 @@ class _ItemCard extends StatelessWidget {
         child: InkWell(
           onTap: () {
             if (soldOut) {
-              showDone(context, '${item.name} is sold out.');
+              showDone(context, l.sellItemSoldOutNotice(name: item.name));
               return;
             }
             add();
@@ -426,9 +449,9 @@ class _ItemCard extends StatelessWidget {
                               color: t.danger,
                               borderRadius: BorderRadius.circular(999),
                             ),
-                            child: const Text(
-                              'Sold out',
-                              style: TextStyle(
+                            child: Text(
+                              l.sellSoldOut,
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w700,
                                 fontSize: 12,
@@ -518,7 +541,7 @@ class _AddButton extends StatelessWidget {
     return Semantics(
       container: true,
       button: true,
-      label: 'Add $name',
+      label: context.l10n.sellAddItem(name: name),
       child: InkResponse(
         onTap: onTap,
         radius: 26,
@@ -564,6 +587,7 @@ class _TileStepper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     Widget button(IconData icon, String label, VoidCallback onTap) => Semantics(
       container: true,
       button: true,
@@ -595,7 +619,7 @@ class _TileStepper extends StatelessWidget {
         children: [
           button(
             qty <= 1 ? Icons.delete_outline_rounded : Icons.remove_rounded,
-            'Less',
+            l.sellLess,
             onLess,
           ),
           SizedBox(
@@ -611,7 +635,7 @@ class _TileStepper extends StatelessWidget {
               ),
             ),
           ),
-          button(Icons.add_rounded, 'More', onMore),
+          button(Icons.add_rounded, l.sellMore, onMore),
         ],
       ),
     );
@@ -627,6 +651,7 @@ class _CartBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final n = cart.itemCount;
     return Container(
       decoration: BoxDecoration(
@@ -645,7 +670,10 @@ class _CartBar extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${n == 1 ? '1 item' : '$n items'} · ${rupees(cart.estimate.payable)}',
+                      l.sellCartSummary(
+                        count: n,
+                        total: rupees(cart.estimate.payable),
+                      ),
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 18,
@@ -655,7 +683,7 @@ class _CartBar extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '(estimated)',
+                      l.sellEstimatedNote,
                       style: TextStyle(color: t.inkMuted, fontSize: 12.5),
                     ),
                   ],
@@ -666,7 +694,7 @@ class _CartBar extends StatelessWidget {
                 onPressed: () => context.push(Routes.sellCheckout),
                 icon: const Icon(Icons.arrow_forward_rounded),
                 iconAlignment: IconAlignment.end,
-                label: const Text('Review'),
+                label: Text(l.sellReview, textAlign: TextAlign.center),
               ),
             ],
           ),

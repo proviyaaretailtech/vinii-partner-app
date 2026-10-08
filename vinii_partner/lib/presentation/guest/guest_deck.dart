@@ -7,6 +7,8 @@ import 'package:flutter/services.dart';
 import '../../application/guest_session.dart';
 import '../../core/money.dart';
 import '../../domain/guest_catalog.dart';
+import '../../l10n/l10n.dart';
+import '../menu/menu_labels.dart';
 import '../theme/guest_theme.dart';
 import '../widgets/chips.dart';
 import '../widgets/dish_art.dart';
@@ -87,7 +89,7 @@ class _SwipeDeckState extends State<SwipeDeck>
     final s = GuestScope.read(context);
     if (add) {
       addWithHaptic(context, item);
-      _showToast('Added · ${item.item.name}');
+      _showToast(context.l10n.guestDeckAdded(name: item.item.name));
       unawaited(_flyPrice(item));
     } else {
       unawaited(HapticFeedback.selectionClick());
@@ -163,7 +165,9 @@ class _SwipeDeckState extends State<SwipeDeck>
     }
     // A handwritten hint only when there is a handwritten face.
     final artisan = p.scriptFamily != null;
-    final hint = GuestCopy.of(context)('menu.swipe_hint');
+    final hint =
+        GuestCopy.of(context).own('menu.swipe_hint') ??
+        context.l10n.guestDeckSwipeHint;
     // At a keyboard the deck answers the arrow keys, as the buttons do.
     return CallbackShortcuts(
       bindings: {
@@ -229,7 +233,11 @@ class _SwipeDeckState extends State<SwipeDeck>
         ),
         const SizedBox(height: 8),
         artisan
-            ? Text(hint, style: p.hero(20, color: p.inkMuted))
+            ? Text(
+                hint,
+                textAlign: TextAlign.center,
+                style: p.hero(20, color: p.inkMuted),
+              )
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -238,8 +246,7 @@ class _SwipeDeckState extends State<SwipeDeck>
                   Flexible(
                     child: Text(
                       hint,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
                       style: p.body(13.5, weight: FontWeight.w600),
                     ),
                   ),
@@ -255,14 +262,14 @@ class _SwipeDeckState extends State<SwipeDeck>
               key: const ValueKey('deck-skip'),
               icon: Icons.close_rounded,
               color: p.danger,
-              tooltip: 'Skip',
+              tooltip: context.l10n.commonSkip,
               onTap: () => _decide(left.first, add: false),
             ),
             const SizedBox(width: 22),
             RoundIcon(
               icon: Icons.keyboard_arrow_up_rounded,
               size: 46,
-              tooltip: 'Details',
+              tooltip: context.l10n.guestDeckDetails,
               onTap: () => GuestFlow.openItem(context, left.first),
             ),
             const SizedBox(width: 22),
@@ -270,7 +277,7 @@ class _SwipeDeckState extends State<SwipeDeck>
               key: const ValueKey('deck-add'),
               icon: Icons.favorite_rounded,
               color: p.success,
-              tooltip: 'Add to order',
+              tooltip: context.l10n.guestDeckAddToOrder,
               onTap: () => _decide(left.first, add: true),
             ),
           ],
@@ -290,6 +297,7 @@ class _SwipeDeckState extends State<SwipeDeck>
     // The card rises a touch as it is pulled, and the dish slides against it.
     final pulled = (o.distance / (_size.width * 0.5)).clamp(0.0, 1.0);
     final qty = GuestScope.of(context).qtyOf(item.item.id);
+    final l = context.l10n;
     return Positioned.fill(
       key: ValueKey('deck-card-${item.item.id}'),
       child: Semantics(
@@ -298,16 +306,16 @@ class _SwipeDeckState extends State<SwipeDeck>
         label: [
           item.item.name,
           rupees(item.item.price),
-          if (item.item.foodType != null) item.item.foodType!.label,
-          ...item.tags.take(3),
-          if (qty > 0) 'in your order, $qty',
+          if (item.item.foodType != null) l.foodTypeLabel(item.item.foodType!),
+          ...item.tags.take(3).map(l.storefrontTagLabel),
+          if (qty > 0) l.guestDeckInOrderLabel(qty: qty),
         ].join(', '),
-        hint: 'Double tap for details',
+        hint: l.guestDeckDetailsHint,
         onTap: () => unawaited(GuestFlow.openItem(context, item)),
         customSemanticsActions: {
-          const CustomSemanticsAction(label: 'Add to order'): () =>
+          CustomSemanticsAction(label: l.guestDeckAddToOrder): () =>
               unawaited(_decide(item, add: true)),
-          const CustomSemanticsAction(label: 'Skip this dish'): () =>
+          CustomSemanticsAction(label: l.guestDeckSkipDish): () =>
               unawaited(_decide(item, add: false)),
         },
         child: GestureDetector(
@@ -418,6 +426,7 @@ class DishCard extends StatelessWidget {
     final i = item.item;
     final qty = s.qtyOf(i.id);
     final liked = s.liked.contains(i.id);
+    final l = context.l10n;
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
@@ -475,7 +484,7 @@ class DishCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(99),
                         ),
                         child: Text(
-                          'In order ×$qty',
+                          l.guestDeckInOrder(qty: qty),
                           style: p.body(
                             12,
                             weight: FontWeight.w700,
@@ -498,7 +507,7 @@ class DishCard extends StatelessWidget {
                       : Icons.favorite_border_rounded,
                   color: liked ? p.danger : Colors.white,
                   background: Colors.black.withValues(alpha: 0.35),
-                  tooltip: liked ? 'Saved for later' : 'Save for later',
+                  tooltip: liked ? l.guestDishSaved : l.guestDishSave,
                   onTap: interactive ? () => s.toggleLike(i.id) : null,
                 ),
               ),
@@ -553,8 +562,9 @@ class DishCard extends StatelessWidget {
                           size: 18,
                           color: Colors.white.withValues(alpha: 0.7),
                         ),
+                        const SizedBox(width: 4),
                         Text(
-                          ' Details',
+                          l.guestDeckDetails,
                           style: p.body(
                             12.5,
                             color: Colors.white.withValues(alpha: 0.7),
@@ -580,6 +590,7 @@ class _KeyHints extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
+    final l = context.l10n;
     Widget hint(IconData icon, String label) => Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -597,14 +608,15 @@ class _KeyHints extends StatelessWidget {
         Text(label, style: p.body(12.5, color: p.inkMuted)),
       ],
     );
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Wrap(
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 18,
+      runSpacing: 6,
       children: [
-        hint(Icons.arrow_back_rounded, 'Skip'),
-        const SizedBox(width: 18),
-        hint(Icons.arrow_forward_rounded, 'Add'),
-        const SizedBox(width: 18),
-        hint(Icons.arrow_upward_rounded, 'Details'),
+        hint(Icons.arrow_back_rounded, l.commonSkip),
+        hint(Icons.arrow_forward_rounded, l.commonAdd),
+        hint(Icons.arrow_upward_rounded, l.guestDeckDetails),
       ],
     );
   }
@@ -619,6 +631,12 @@ class _Stamp extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final c = add ? p.success : p.danger;
+    final l = context.l10n;
+    // Wide letter spacing is a Latin habit; it would pull Devanagari marks
+    // away from their letters.
+    final tracking = Localizations.maybeLocaleOf(context)?.languageCode == 'hi'
+        ? 0.0
+        : 3.0;
     return Align(
       alignment: add
           ? const Alignment(-0.8, -0.75)
@@ -646,8 +664,10 @@ class _Stamp extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    add ? 'ADD' : 'SKIP',
-                    style: p.display(26, color: c).copyWith(letterSpacing: 3),
+                    add ? l.guestDeckStampAdd : l.guestDeckStampSkip,
+                    style: p
+                        .display(26, color: c)
+                        .copyWith(letterSpacing: tracking),
                   ),
                 ],
               ),
@@ -719,7 +739,7 @@ class _Toast extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 220),
             child: Text(
               text,
-              maxLines: 1,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: p.body(13, weight: FontWeight.w700, color: Colors.white),
             ),
@@ -740,6 +760,7 @@ class _EndOfDeck extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
+    final l = context.l10n;
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(28),
@@ -758,29 +779,32 @@ class _EndOfDeck extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              "You've seen every dish in $categoryName",
+              l.guestDeckSeenAll(category: categoryName),
               textAlign: TextAlign.center,
               style: p.display(24),
             ),
             const SizedBox(height: 8),
             Text(
               s.lines.isEmpty
-                  ? 'Go round again, or try another category.'
-                  : '${s.itemCount} in your order so far.',
+                  ? l.guestDeckGoRound
+                  : l.guestDeckInOrderSoFar(count: s.itemCount),
               textAlign: TextAlign.center,
               style: p.body(14.5, color: p.inkMuted),
             ),
             const SizedBox(height: 24),
             if (s.lines.isNotEmpty) ...[
               GuestButton(
-                label: '${GuestCopy.of(context)('cart.view')} (${s.itemCount})',
+                label: l.guestCartBarLabel(
+                  label: GuestCopy.of(context).own('cart.view') ?? l.guestCartView,
+                  count: s.itemCount,
+                ),
                 trailingArrow: true,
                 onTap: () => GuestFlow.toOrder(context),
               ),
               const SizedBox(height: 12),
             ],
             GuestButton(
-              label: 'Start over',
+              label: l.guestDeckStartOver,
               icon: Icons.replay_rounded,
               style: GuestButtonStyle.outline,
               onTap: () => s.resetSeen(items.map((i) => i.item.id)),

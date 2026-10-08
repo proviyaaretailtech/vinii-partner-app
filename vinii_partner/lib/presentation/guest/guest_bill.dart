@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/money.dart';
 import '../../domain/billing.dart';
 import '../../domain/pos_order.dart';
+import '../../l10n/l10n.dart';
 import '../theme/guest_theme.dart';
 import 'guest_flow.dart';
 import 'guest_widgets.dart';
@@ -26,6 +27,7 @@ class BillLines extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
+    final l = context.l10n;
     Widget row(String label, double v, {bool strong = false}) => Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -51,14 +53,20 @@ class BillLines extends StatelessWidget {
     );
     return Column(
       children: [
-        row('Subtotal', bill.itemTotal),
-        if (bill.discount > 0) row(discountLabel ?? 'Discount', -bill.discount),
-        if (bill.serviceCharge > 0) row('Service charge', bill.serviceCharge),
-        if (bill.gst > 0) row(bill.gstLabel, bill.gst),
-        if (bill.roundOff != 0) row('Round off', bill.roundOff),
+        row(l.commonSubtotal, bill.itemTotal),
+        if (bill.discount > 0)
+          row(discountLabel ?? l.commonDiscount, -bill.discount),
+        if (bill.serviceCharge > 0)
+          row(l.guestBillServiceCharge, bill.serviceCharge),
+        if (bill.gst > 0)
+          row(l.guestBillGst(percent: bill.gstPercentText), bill.gst),
+        if (bill.roundOff != 0) row(l.guestBillRoundOff, bill.roundOff),
         Divider(color: p.border, height: 20),
         row(
-          estimated ? GuestCopy.of(context)('cart.estimated') : 'Total',
+          estimated
+              ? GuestCopy.of(context).own('cart.estimated') ??
+                    l.guestOrderEstimatedTotal
+              : l.commonTotal,
           bill.payable,
           strong: true,
         ),
@@ -102,6 +110,7 @@ class _GuestBillScreenState extends State<GuestBillScreen> {
     final p = GuestPalette.of(context);
     final s = GuestScope.of(context);
     final t = GuestCopy.of(context);
+    final l = context.l10n;
     final orders = s.placed;
     final bill = combinedBill(orders);
     final merged = <String, CartLine>{};
@@ -118,25 +127,17 @@ class _GuestBillScreenState extends State<GuestBillScreen> {
         : BudgetStatus(budget: s.budget!, spent: bill.payable);
     final dineIn =
         orders.isNotEmpty && orders.last.serviceType == ServiceType.dineIn;
+    final table = l.guestTableNameOf(s);
     final subtitle = [
-      if (dineIn && s.tableName != null) s.tableName!,
-      for (final o in orders) 'Order #${o.displayNo}',
+      if (dineIn && table != null) table,
+      for (final o in orders) l.guestBillOrderNo(number: o.displayNo),
     ].join(' · ');
     // Online payment, when the server offers it for this restaurant. Paying
     // staff at the table or the counter always stays possible.
     final online = s.gateway.payments?.available == true;
     final payNote = dineIn
-        ? (online
-              ? 'Prefer to pay at the table? Let a member of staff know '
-                    "you're ready for the bill. Calling staff from this "
-                    "screen isn't available yet."
-              : 'To pay at the table, let a member of staff know '
-                    "you're ready for the bill. Calling staff from this "
-                    "screen isn't available yet.")
-        : (online
-              ? 'Prefer to pay at the counter? You can pay when you collect '
-                    'your order.'
-              : 'Please pay at the counter when you collect your order.');
+        ? (online ? l.guestBillPayTableOnline : l.guestBillPayTable)
+        : (online ? l.guestBillPayCounterOnline : l.guestBillPayCounter);
     final due = orders.fold<double>(0, (a, o) => a + o.due);
     return GuestPage(
       bottom: Row(
@@ -144,7 +145,7 @@ class _GuestBillScreenState extends State<GuestBillScreen> {
           if (s.features.splitBill && !online) ...[
             Expanded(
               child: GuestButton(
-                label: t('bill.split'),
+                label: t.own('bill.split') ?? l.guestBillSplit,
                 style: GuestButtonStyle.outline,
                 onTap: () => _split(bill.payable),
               ),
@@ -156,13 +157,15 @@ class _GuestBillScreenState extends State<GuestBillScreen> {
             child: online
                 ? GuestButton(
                     key: const ValueKey('pay-online'),
-                    label: due <= 0 ? 'Paid' : 'Pay ${rupees(due)}',
+                    label: due <= 0
+                        ? l.statusPaid
+                        : l.guestBillPay(amount: rupees(due)),
                     icon: Icons.lock_outline_rounded,
                     onTap: due <= 0 ? null : () => GuestFlow.pay(context),
                   )
                 : GuestButton(
                     key: const ValueKey('order-more'),
-                    label: 'Order more',
+                    label: l.guestBillOrderMore,
                     icon: Icons.add_rounded,
                     onTap: () => GuestFlow.orderMore(context),
                   ),
@@ -173,14 +176,14 @@ class _GuestBillScreenState extends State<GuestBillScreen> {
         padding: const EdgeInsets.only(bottom: 24),
         children: [
           GuestTopBar(
-            title: t('bill.title'),
+            title: t.own('bill.title') ?? l.guestBillTitle,
             trailing: [
               // Without online payment "Order more" is the bottom button.
               if (online)
                 TextButton(
                   onPressed: () => GuestFlow.orderMore(context),
                   child: Text(
-                    'Order more',
+                    l.guestBillOrderMore,
                     style: p.body(14, weight: FontWeight.w700),
                   ),
                 ),
@@ -246,8 +249,10 @@ class _GuestBillScreenState extends State<GuestBillScreen> {
                   children: [
                     Text(
                       status.over
-                          ? 'You went ${rupees(-status.remaining)} over your budget.'
-                          : 'Great! You stayed within your budget.',
+                          ? l.guestBillOverBudget(
+                              amount: rupees(-status.remaining),
+                            )
+                          : l.guestBillWithinBudget,
                       style: p.body(15, weight: FontWeight.w700),
                     ),
                     const SizedBox(height: 10),
@@ -261,7 +266,7 @@ class _GuestBillScreenState extends State<GuestBillScreen> {
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
               child: GuestButton(
                 key: const ValueKey('repeat-order'),
-                label: 'Order the same again',
+                label: l.guestBillRepeat,
                 icon: Icons.replay_rounded,
                 style: GuestButtonStyle.soft,
                 dense: true,
@@ -307,13 +312,18 @@ class _GuestBillScreenState extends State<GuestBillScreen> {
       builder: (context) => StatefulBuilder(
         builder: (context, set) {
           final p = GuestPalette.of(context);
+          final l = context.l10n;
           return SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('Split the bill', style: p.display(22)),
+                  Text(
+                    l.guestBillSplitTitle,
+                    textAlign: TextAlign.center,
+                    style: p.display(22),
+                  ),
                   const SizedBox(height: 16),
                   QtyStepper(
                     qty: people,
@@ -322,17 +332,19 @@ class _GuestBillScreenState extends State<GuestBillScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '$people ${people == 1 ? 'person' : 'people'}',
+                    l.guestBillPeople(count: people),
                     style: p.body(14, color: p.inkMuted),
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    '${rupees(money(total / people))} each',
+                    l.guestBillEach(amount: rupees(money(total / people))),
+                    textAlign: TextAlign.center,
                     style: p.price(30),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Staff will settle the bill at the table.',
+                    l.guestBillStaffSettle,
+                    textAlign: TextAlign.center,
                     style: p.body(13, color: p.inkMuted),
                   ),
                 ],
@@ -353,44 +365,74 @@ class _Feedback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = GuestPalette.of(context);
+    final l = context.l10n;
     final faces = [
-      (Icons.sentiment_very_satisfied_rounded, 'Loved it', p.success),
-      (Icons.sentiment_satisfied_rounded, 'Good', const Color(0xFF84CC16)),
-      (Icons.sentiment_neutral_rounded, 'Okay', const Color(0xFFF59E0B)),
-      (Icons.sentiment_dissatisfied_rounded, 'Could be better', p.danger),
+      (
+        Icons.sentiment_very_satisfied_rounded,
+        l.guestBillFeedbackLoved,
+        p.success,
+      ),
+      (
+        Icons.sentiment_satisfied_rounded,
+        l.guestBillFeedbackGood,
+        const Color(0xFF84CC16),
+      ),
+      (
+        Icons.sentiment_neutral_rounded,
+        l.guestBillFeedbackOkay,
+        const Color(0xFFF59E0B),
+      ),
+      (
+        Icons.sentiment_dissatisfied_rounded,
+        l.guestBillFeedbackBetter,
+        p.danger,
+      ),
     ];
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       child: Column(
         children: [
-          Text('How was your experience?', style: p.display(18)),
+          Text(
+            l.guestBillFeedbackTitle,
+            textAlign: TextAlign.center,
+            style: p.display(18),
+          ),
           const SizedBox(height: 12),
+          // Four equal columns, so a longer word (Hindi) wraps under its
+          // face instead of pushing the others off the screen.
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               for (final (i, f) in faces.indexed)
-                Semantics(
-                  button: true,
-                  selected: selected == i,
-                  label: f.$2,
-                  child: GestureDetector(
-                    onTap: () => onPick(i),
-                    child: AnimatedScale(
-                      scale: selected == i ? 1.18 : 1,
-                      duration: GuestMotion.base,
-                      curve: Curves.easeOutBack,
-                      child: Column(
-                        children: [
-                          Icon(
-                            f.$1,
-                            size: 40,
-                            color: selected == null || selected == i
-                                ? f.$3
-                                : p.inkMuted.withValues(alpha: 0.5),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(f.$2, style: p.body(11, color: p.inkMuted)),
-                        ],
+                Expanded(
+                  child: Semantics(
+                    button: true,
+                    selected: selected == i,
+                    label: f.$2,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => onPick(i),
+                      child: AnimatedScale(
+                        scale: selected == i ? 1.18 : 1,
+                        duration: GuestMotion.base,
+                        curve: Curves.easeOutBack,
+                        child: Column(
+                          children: [
+                            Icon(
+                              f.$1,
+                              size: 40,
+                              color: selected == null || selected == i
+                                  ? f.$3
+                                  : p.inkMuted.withValues(alpha: 0.5),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              f.$2,
+                              textAlign: TextAlign.center,
+                              style: p.body(11, color: p.inkMuted),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),

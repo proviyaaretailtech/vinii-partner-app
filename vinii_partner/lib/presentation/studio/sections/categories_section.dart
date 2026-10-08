@@ -5,6 +5,7 @@ import '../../../app/routes.dart';
 import '../../../application/studio_controller.dart';
 import '../../../domain/menu.dart';
 import '../../../domain/storefront.dart';
+import '../../../l10n/l10n.dart';
 import '../../theme/staff_theme.dart';
 import '../../widgets/state_views.dart';
 
@@ -81,7 +82,7 @@ class CategoriesSection extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Emoji for ${c.name}',
+                context.l10n.studioCatsEmojiTitle(name: c.name),
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 12),
@@ -106,7 +107,7 @@ class CategoriesSection extends StatelessWidget {
               TextButton.icon(
                 onPressed: () => Navigator.pop(context, ''),
                 icon: const Icon(Icons.block_rounded),
-                label: const Text('No emoji'),
+                label: Text(context.l10n.studioCatsNoEmoji),
               ),
             ],
           ),
@@ -125,15 +126,16 @@ class CategoriesSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final text = Theme.of(context).textTheme;
     final menu = controller.menu;
     final d = controller.draft;
     if (menu.categories.isEmpty) {
       return EmptyView(
         icon: Icons.segment_rounded,
-        title: 'No categories on your menu yet',
-        message: 'Add categories and dishes in the Menu tab, then choose here how guests see them.',
-        actionLabel: 'Open Menu',
+        title: l.studioCatsNone,
+        message: l.studioCatsNoneMessage,
+        actionLabel: l.studioCatsOpenMenu,
         onAction: () => context.go(Routes.menu),
       );
     }
@@ -143,10 +145,7 @@ class CategoriesSection extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(4, 4, 4, 12),
-          child: Text(
-            'Drag to set the order guests see. Hidden categories stay on the POS and One Local.',
-            style: text.bodyMedium,
-          ),
+          child: Text(l.studioCatsIntro, style: text.bodyMedium),
         ),
         ReorderableListView(
           shrinkWrap: true,
@@ -208,6 +207,7 @@ class _CategoryRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = tokens;
+    final l = context.l10n;
     final visible = presentation?.visible ?? true;
     final emoji = presentation?.emoji;
     return Card(
@@ -222,13 +222,13 @@ class _CategoryRow extends StatelessWidget {
                 child: Icon(
                   Icons.drag_indicator_rounded,
                   color: t.inkMuted,
-                  semanticLabel: 'Drag to reorder',
+                  semanticLabel: l.studioCatsDragHandle,
                 ),
               ),
             ),
             Semantics(
               button: true,
-              label: 'Choose emoji',
+              label: l.studioCatsChooseEmoji,
               child: InkWell(
                 borderRadius: BorderRadius.circular(14),
                 onTap: onEmoji,
@@ -268,8 +268,8 @@ class _CategoryRow extends StatelessWidget {
                   ),
                   Text(
                     [
-                      dishes == 1 ? '1 dish' : '$dishes dishes',
-                      if (!visible) 'hidden from guests',
+                      l.studioCatsDishCount(count: dishes),
+                      if (!visible) l.studioCatsHidden,
                     ].join(' · '),
                     style: TextStyle(fontSize: 12.5, color: t.inkMuted),
                   ),

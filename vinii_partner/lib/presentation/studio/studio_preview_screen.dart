@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/app_scope.dart';
 import '../../application/studio_controller.dart';
 import '../../domain/staff.dart';
+import '../../l10n/l10n.dart';
 import '../guest/guest_app.dart';
 import '../widgets/state_views.dart';
 import 'phone_preview.dart';
@@ -50,13 +51,14 @@ class _StudioPreviewScreenState extends State<StudioPreviewScreen> {
   @override
   Widget build(BuildContext context) {
     final c = _c;
+    final l = context.l10n;
     if (c == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Preview')),
-        body: const EmptyView(
+        appBar: AppBar(title: Text(l.commonPreview)),
+        body: EmptyView(
           icon: Icons.lock_outline_rounded,
-          title: 'Not allowed',
-          message: 'Your role cannot see the storefront.',
+          title: l.failureTitleForbidden,
+          message: l.studioPreviewNoAccess,
         ),
       );
     }
@@ -65,10 +67,10 @@ class _StudioPreviewScreenState extends State<StudioPreviewScreen> {
       builder: (context, _) {
         if (!c.loaded) {
           return Scaffold(
-            appBar: AppBar(title: const Text('Preview')),
+            appBar: AppBar(title: Text(l.commonPreview)),
             body: c.failure != null && !c.loading
                 ? FailureView(failure: c.failure!, onRetry: c.load)
-                : const LoadingView(label: 'Opening the preview…'),
+                : LoadingView(label: l.studioPreviewOpening),
           );
         }
         // The preview label sits in its own bar above the guest runtime, so
@@ -124,12 +126,10 @@ class _PreviewPill extends StatelessWidget {
         children: [
           const Icon(Icons.visibility_outlined, size: 16, color: Colors.white),
           const SizedBox(width: 8),
-          const Flexible(
+          Flexible(
             child: Text(
-              'Preview · orders are not sent',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
+              context.l10n.studioPreviewPill,
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -137,7 +137,7 @@ class _PreviewPill extends StatelessWidget {
             ),
           ),
           IconButton(
-            tooltip: 'Close preview',
+            tooltip: context.l10n.studioPreviewClose,
             visualDensity: VisualDensity.compact,
             onPressed: onClose,
             icon: const Icon(

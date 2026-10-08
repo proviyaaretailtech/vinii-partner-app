@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import '../../../application/studio_controller.dart';
+import '../../../core/time_format.dart';
 import '../../../domain/storefront.dart';
+import '../../../l10n/l10n.dart';
 import '../../menu/panel.dart';
 import '../../theme/staff_theme.dart';
 import '../../widgets/state_views.dart';
+import '../studio_sections.dart';
 
 /// How guests order: which ways are offered and in what order, what a
 /// "table" is called, and when pre-orders can be picked up.
@@ -18,6 +20,8 @@ class ServiceSection extends StatefulWidget {
 }
 
 class _ServiceSectionState extends State<ServiceSection> {
+  // i18n-ignore: stored merchant default (these exact words are saved as the
+  // storefront's table label and shown to guests as "Table 12")
   static const _presetLabels = ['Table', 'Room'];
   late bool _customLabel = !_presetLabels.contains(
     widget.controller.draft.tableLabel,
@@ -37,7 +41,7 @@ class _ServiceSectionState extends State<ServiceSection> {
   void _toggle(GuestServiceMode m, bool on) {
     final modes = _c.draft.serviceModes;
     if (!on && modes.length == 1 && modes.contains(m)) {
-      showDone(context, 'Keep at least one way to order switched on.');
+      showDone(context, context.l10n.studioSvcKeepOne);
       return;
     }
     _c.edit(
@@ -79,6 +83,7 @@ class _ServiceSectionState extends State<ServiceSection> {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final text = Theme.of(context).textTheme;
     final d = _c.draft;
     final order = [
@@ -88,13 +93,10 @@ class _ServiceSectionState extends State<ServiceSection> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
       children: [
-        const PanelLabel('Ways to order', top: 4),
+        PanelLabel(l.studioSvcWaysTitle, top: 4),
         Padding(
           padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
-          child: Text(
-            'Guests choose one when they start. Drag to change the order they see.',
-            style: text.bodyMedium,
-          ),
+          child: Text(l.studioSvcWaysHint, style: text.bodyMedium),
         ),
         ReorderableListView(
           shrinkWrap: true,
@@ -122,15 +124,15 @@ class _ServiceSectionState extends State<ServiceSection> {
                         child: Icon(
                           Icons.drag_indicator_rounded,
                           color: t.inkMuted,
-                          semanticLabel: 'Drag to reorder',
+                          semanticLabel: l.studioHighDragToReorder,
                         ),
                       ),
                     ),
                     title: Text(
-                      order[i].label,
+                      l.studioModeName(order[i]),
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
-                    subtitle: Text(order[i].hint),
+                    subtitle: Text(_modeHint(l, order[i])),
                     trailing: Switch(
                       value: d.serviceModes.contains(order[i]),
                       onChanged: (v) => _toggle(order[i], v),
@@ -140,7 +142,7 @@ class _ServiceSectionState extends State<ServiceSection> {
               ),
           ],
         ),
-        const PanelLabel('What you call a table', top: 12),
+        PanelLabel(l.studioSvcTableTitle, top: 12),
         Panel(
           children: [
             Wrap(
@@ -157,7 +159,7 @@ class _ServiceSectionState extends State<ServiceSection> {
                     },
                   ),
                 ChoiceChip(
-                  label: const Text('Something else'),
+                  label: Text(l.studioSvcTableOther),
                   selected: _customLabel,
                   onSelected: (_) => setState(() => _customLabel = true),
                 ),
@@ -174,29 +176,22 @@ class _ServiceSectionState extends State<ServiceSection> {
                     _c.edit((d) => d.copyWith(tableLabel: v.trim()));
                   }
                 },
-                decoration: const InputDecoration(
-                  labelText: 'Label',
-                  hintText: 'Cabin, Tent, Lounge…',
+                decoration: InputDecoration(
+                  labelText: l.studioSvcTableField,
+                  hintText: l.studioSvcTableExamples,
                 ),
               ),
             ],
             const SizedBox(height: 10),
             Text(
-              'Guests see "${d.tableLabel} 12" on their order.',
+              l.studioSvcTableSample(label: d.tableLabel),
               style: text.bodySmall,
             ),
           ],
         ),
-        const PanelLabel('Pre-order'),
+        PanelLabel(l.studioModeName(GuestServiceMode.preOrder)),
         if (!d.offers(GuestServiceMode.preOrder))
-          Panel(
-            children: [
-              Text(
-                'Switch on Pre-order above to let guests schedule a pickup, and set the days and times here.',
-                style: text.bodyMedium,
-              ),
-            ],
-          )
+          Panel(children: [Text(l.studioSvcPreOff, style: text.bodyMedium)])
         else
           _PreOrderPanel(
             settings: d.preOrder,
@@ -223,10 +218,12 @@ class _PreOrderPanel extends StatelessWidget {
   static const _slotChoices = [15, 30, 60, 90];
   static const _leadChoices = [30, 60, 90, 120, 180];
 
-  static String _minutes(int m) {
-    if (m < 60) return '$m min';
+  static String _minutes(AppLocalizations l, int m) {
+    if (m < 60) return l.studioSvcMinutes(minutes: m);
     final h = m ~/ 60, r = m % 60;
-    return r == 0 ? '$h h' : '$h h $r min';
+    return r == 0
+        ? l.studioSvcHours(hours: h)
+        : l.studioSvcHoursMinutes(hours: h, minutes: r);
   }
 
   static int _toMinutes(String hm) =>
@@ -235,6 +232,7 @@ class _PreOrderPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final text = Theme.of(context).textTheme;
     final s = settings;
     final badHours =
@@ -251,16 +249,16 @@ class _PreOrderPanel extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Book ahead', style: text.titleSmall),
+                  Text(l.studioSvcBookAhead, style: text.titleSmall),
                   Text(
-                    'Up to ${s.daysAhead} ${s.daysAhead == 1 ? 'day' : 'days'}, today included',
+                    l.studioSvcBookDays(count: s.daysAhead),
                     style: text.bodySmall,
                   ),
                 ],
               ),
             ),
             IconButton.outlined(
-              tooltip: 'Fewer days',
+              tooltip: l.studioSvcFewerDays,
               onPressed: s.daysAhead > 1
                   ? () =>
                         onChanged((p) => p.copyWith(daysAhead: p.daysAhead - 1))
@@ -276,7 +274,7 @@ class _PreOrderPanel extends StatelessWidget {
               ),
             ),
             IconButton.outlined(
-              tooltip: 'More days',
+              tooltip: l.studioSvcMoreDays,
               onPressed: s.daysAhead < 14
                   ? () =>
                         onChanged((p) => p.copyWith(daysAhead: p.daysAhead + 1))
@@ -290,7 +288,7 @@ class _PreOrderPanel extends StatelessWidget {
           children: [
             Expanded(
               child: _TimeBox(
-                label: 'Opens at',
+                label: l.studioSvcOpensAt,
                 value: s.opensAt,
                 onTap: () => onPickTime(
                   s.opensAt,
@@ -301,7 +299,7 @@ class _PreOrderPanel extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: _TimeBox(
-                label: 'Closes at',
+                label: l.studioSvcClosesAt,
                 value: s.closesAt,
                 onTap: () => onPickTime(
                   s.closesAt,
@@ -314,12 +312,12 @@ class _PreOrderPanel extends StatelessWidget {
         if (badHours) ...[
           const SizedBox(height: 8),
           Text(
-            'Closing time must be at least one slot after opening time.',
+            l.studioSvcBadHours,
             style: TextStyle(color: t.danger, fontSize: 13),
           ),
         ],
         const SizedBox(height: 16),
-        Text('Pickup slots every', style: text.titleSmall),
+        Text(l.studioSvcSlotEvery, style: text.titleSmall),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
@@ -327,14 +325,14 @@ class _PreOrderPanel extends StatelessWidget {
           children: [
             for (final m in _slotChoices)
               ChoiceChip(
-                label: Text(_minutes(m)),
+                label: Text(_minutes(l, m)),
                 selected: s.slotMinutes == m,
                 onSelected: (_) => onChanged((p) => p.copyWith(slotMinutes: m)),
               ),
           ],
         ),
         const SizedBox(height: 16),
-        Text('Minimum notice', style: text.titleSmall),
+        Text(l.studioSvcLead, style: text.titleSmall),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
@@ -342,7 +340,7 @@ class _PreOrderPanel extends StatelessWidget {
           children: [
             for (final m in _leadChoices)
               ChoiceChip(
-                label: Text(_minutes(m)),
+                label: Text(_minutes(l, m)),
                 selected: s.leadMinutes == m,
                 onSelected: (_) => onChanged((p) => p.copyWith(leadMinutes: m)),
               ),
@@ -351,16 +349,16 @@ class _PreOrderPanel extends StatelessWidget {
         const SizedBox(height: 20),
         const PanelDivider(indent: 0),
         const SizedBox(height: 14),
-        Text('What guests can pick', style: text.titleSmall),
+        Text(l.studioSvcGuestPick, style: text.titleSmall),
         const SizedBox(height: 10),
         _SlotRow(
-          day: 'Today',
+          day: l.commonToday,
           slots: s.allSlotsFor(today),
           isOpen: bookable.contains,
         ),
         const SizedBox(height: 12),
         _SlotRow(
-          day: 'Tomorrow',
+          day: l.studioSvcTomorrow,
           slots: s.allSlotsFor(tomorrow),
           isOpen: (_) => true,
         ),
@@ -383,7 +381,7 @@ class _TimeBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
-    final shown = DateFormat('h:mm a').format(
+    final shown = wallClock(
       DateTime(
         2000,
         1,
@@ -446,14 +444,14 @@ class _SlotRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
     final text = Theme.of(context).textTheme;
-    final format = DateFormat('h:mm a');
+    final l = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(day, style: text.labelLarge),
         const SizedBox(height: 6),
         if (slots.isEmpty)
-          Text('No pickup times', style: text.bodySmall)
+          Text(l.studioSvcNoSlots, style: text.bodySmall)
         else
           Wrap(
             spacing: 6,
@@ -470,7 +468,7 @@ class _SlotRow extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
-                    format.format(s),
+                    wallClock(s),
                     style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w600,
@@ -485,3 +483,13 @@ class _SlotRow extends StatelessWidget {
     );
   }
 }
+
+/// The one line under a way to order, as the guest sees it. The names of the
+/// ways (and of templates and category styles) are in `StudioLabels`
+/// (studio_sections.dart); only these hints belong to this screen.
+String _modeHint(AppLocalizations l, GuestServiceMode m) => switch (m) {
+  GuestServiceMode.dineIn => l.studioSvcModeDineInHint,
+  GuestServiceMode.takeaway => l.studioSvcModeTakeawayHint,
+  GuestServiceMode.preOrder => l.studioSvcModePreOrderHint,
+  GuestServiceMode.delivery => l.studioSvcModeDeliveryHint,
+};

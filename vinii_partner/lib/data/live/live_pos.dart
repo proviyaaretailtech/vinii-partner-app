@@ -59,6 +59,7 @@ class LivePos implements PosRepository {
       throw fromSupabase(
         e,
         notReady: 'Tables are not set up in this database yet.',
+        notReadyCode: 'pay_tables_not_ready',
       );
     }
   }
@@ -88,12 +89,14 @@ class LivePos implements PosRepository {
       throw const AppFailure(
         'Add at least one item.',
         kind: FailureKind.rejected,
+        code: 'pay_add_item',
       );
     }
     if (draft.serviceType == ServiceType.dineIn && draft.table == null) {
       throw const AppFailure(
         'Choose a table for a dine-in order.',
         kind: FailureKind.rejected,
+        code: 'pay_choose_table',
       );
     }
     try {
@@ -134,7 +137,11 @@ class LivePos implements PosRepository {
       );
       return _order(_asMap(res), fallbackTable: draft.table);
     } catch (e) {
-      throw fromSupabase(e, notReady: _notReady);
+      throw fromSupabase(
+        e,
+        notReady: _notReady,
+        notReadyCode: 'pay_place_not_ready',
+      );
     }
   }
 
@@ -150,6 +157,7 @@ class LivePos implements PosRepository {
       throw const AppFailure(
         'Enter the amount received.',
         kind: FailureKind.rejected,
+        code: 'pay_enter_received',
       );
     }
     try {
@@ -173,6 +181,7 @@ class LivePos implements PosRepository {
         notReady:
             'Recording payments from the phone needs the POS payment function, a database update '
             'waiting for approval. Settle this bill at the POS counter.',
+        notReadyCode: 'pay_record_not_ready',
       );
     }
   }
@@ -240,6 +249,7 @@ class LivePos implements PosRepository {
         notReady:
             'Changing order status from the phone needs the POS status function, a database update '
             'waiting for approval.',
+        notReadyCode: 'pay_status_not_ready',
       );
     }
   }
@@ -270,6 +280,7 @@ class LivePos implements PosRepository {
             'Changing the service charge on a saved order needs a database update '
             'that is waiting for approval. Until then, remove it before the order '
             'is sent, or change the bill at the POS counter.',
+        notReadyCode: 'charge_adjust_not_ready',
       );
     }
   }
@@ -281,6 +292,7 @@ class LivePos implements PosRepository {
     }
     throw const AppFailure(
       'The server sent an order in a shape this app does not understand.',
+      code: 'pay_bad_order_shape',
     );
   }
 

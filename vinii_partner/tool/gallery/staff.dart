@@ -14,6 +14,7 @@
 //   ?outlet=open|paused|closed      the store status to start with
 //   ?service=0                      start with no service charge
 //   ?cart=1                         start Sell with an order already built
+//   ?lang=en|hi                     the app language (default: the browser's)
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vinii_partner/app/app.dart';
@@ -38,6 +39,8 @@ Future<void> main() async {
   final prefs = LocalPrefs(store);
   await prefs.setIntroSeen();
   await prefs.setRingEnabled(false);
+  final lang = q['lang'];
+  if (lang == 'en' || lang == 'hi') await prefs.setLocaleCode(lang!);
 
   const org = galleryOrg;
   final backend = staffGalleryBackend(
@@ -74,5 +77,6 @@ Future<void> main() async {
       ..setTable(const DiningTable(id: 'tb2', label: 'T2', seats: 4))
       ..setGuestCount(3);
   }
+  await services.locale.restore(); // the saved language, before the first frame
   runApp(ViniiPartnerApp(services: services));
 }

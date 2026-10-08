@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../domain/organization.dart';
 import '../../domain/storefront.dart';
+import '../../l10n/script_fonts.dart';
 
 /// The guest storefront's look, derived from a [StorefrontDefinition]: the
 /// template gives the palette and type, the definition's accent overrides
@@ -177,10 +178,12 @@ class GuestPalette extends ThemeExtension<GuestPalette> {
     Color? color,
   }) => TextStyle(
     fontFamily: displayFamily ?? 'Inter',
+    fontFamilyFallback: kScriptFontFallback,
     fontSize: size,
     // A script face has one weight; a faux bold of it smears.
     fontWeight: displayFace.headingOnly ? FontWeight.w400 : weight,
-    height: 1.08,
+    // Devanagari needs room for its marks above and below the line.
+    height: scriptLineHeight(1.08),
     letterSpacing: displayFace.serif || displayFace.headingOnly ? 0 : -0.8,
     color: color ?? ink,
   );
@@ -190,8 +193,9 @@ class GuestPalette extends ThemeExtension<GuestPalette> {
       ? display(size, color: color)
       : TextStyle(
           fontFamily: scriptFamily,
+          fontFamilyFallback: kScriptFontFallback,
           fontSize: size * 1.05,
-          height: 1.05,
+          height: scriptLineHeight(1.05),
           color: color ?? ink,
         );
 
@@ -201,15 +205,17 @@ class GuestPalette extends ThemeExtension<GuestPalette> {
     Color? color,
   }) => TextStyle(
     fontFamily: bodyFamily ?? 'Inter',
+    fontFamilyFallback: kScriptFontFallback,
     fontSize: size,
     fontWeight: weight,
-    height: 1.4,
+    height: scriptLineHeight(1.4),
     color: color ?? ink,
   );
 
   /// Prices: always bold, tabular figures so totals do not jiggle.
   TextStyle price(double size, {Color? color}) => TextStyle(
     fontFamily: bodyFamily ?? 'Inter',
+    fontFamilyFallback: kScriptFontFallback,
     fontSize: size,
     fontWeight: FontWeight.w800,
     fontFeatures: const [FontFeature.tabularFigures()],
@@ -236,6 +242,7 @@ class GuestPalette extends ThemeExtension<GuestPalette> {
       brightness: brightness,
       colorScheme: scheme,
       fontFamily: bodyFamily ?? 'Inter',
+      fontFamilyFallback: kScriptFontFallback,
     );
     return base.copyWith(
       scaffoldBackgroundColor: background,
@@ -244,6 +251,7 @@ class GuestPalette extends ThemeExtension<GuestPalette> {
         bodyColor: ink,
         displayColor: ink,
         fontFamily: bodyFamily ?? 'Inter',
+        fontFamilyFallback: kScriptFontFallback,
       ),
       sliderTheme: base.sliderTheme.copyWith(
         activeTrackColor: accent,

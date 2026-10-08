@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../app/app_scope.dart';
 import '../../application/session_controller.dart';
 import '../../core/failure.dart';
+import '../../l10n/failure_text.dart';
+import '../../l10n/l10n.dart';
 import '../theme/staff_theme.dart';
 import 'brand_mark.dart';
 
@@ -15,6 +17,7 @@ class SplashScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final services = AppScope.of(context);
     final session = services.session;
+    final l = context.l10n;
     return Scaffold(
       backgroundColor: ViniiColors.pageDark,
       body: SafeArea(
@@ -31,7 +34,7 @@ class SplashScreen extends StatelessWidget {
                   const Center(child: BrandMark(size: 72)),
                   const SizedBox(height: 22),
                   const Text(
-                    'VINII Partner',
+                    'VINII Partner', // i18n-ignore: brand name
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.white,
@@ -41,37 +44,42 @@ class SplashScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  const Text(
-                    'Orders, POS and your storefront',
+                  Text(
+                    l.bootTagline,
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Color(0xFF9A9AA3), fontSize: 15),
+                    style: const TextStyle(
+                      color: Color(0xFF9A9AA3),
+                      fontSize: 15,
+                    ),
                   ),
                   const Spacer(flex: 2),
                   switch (stage) {
                     SessionStage.notConfigured => _Problem(
                       icon: Icons.settings_suggest_outlined,
-                      title: 'This build is not connected',
-                      message:
-                          'It is missing ${services.config.missingSettings.join(' and ')}. '
-                          'Build it with ./tool/run_local.sh and a filled-in .env.local.',
+                      title: l.bootNotConnectedTitle,
+                      message: l.bootNotConnectedBody(
+                        settings: services.config.missingSettings.join(
+                          ' ${l.uiAnd} ',
+                        ),
+                      ),
                     ),
                     SessionStage.bootError => _Problem(
                       icon: session.bootFailure?.kind == FailureKind.offline
                           ? Icons.wifi_off_rounded
                           : Icons.error_outline_rounded,
                       title: session.bootFailure?.kind == FailureKind.offline
-                          ? 'No connection'
-                          : 'Could not start',
-                      message:
-                          session.bootFailure?.message ??
-                          'Something went wrong.',
+                          ? l.bootNoConnection
+                          : l.bootCouldNotStart,
+                      message: session.bootFailure == null
+                          ? l.bootSomethingWrong
+                          : failureText(l, session.bootFailure!),
                       action: FilledButton(
                         style: FilledButton.styleFrom(
                           backgroundColor: ViniiColors.brandGreen,
                           foregroundColor: ViniiColors.ink,
                         ),
                         onPressed: session.boot,
-                        child: const Text('Try again'),
+                        child: Text(l.commonTryAgain),
                       ),
                       secondary: session.user == null
                           ? null
@@ -80,7 +88,7 @@ class SplashScreen extends StatelessWidget {
                                 foregroundColor: Colors.white70,
                               ),
                               onPressed: () => session.signOut(),
-                              child: const Text('Sign out'),
+                              child: Text(l.commonSignOut),
                             ),
                     ),
                     _ => Column(
@@ -94,7 +102,15 @@ class SplashScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          session.bootStep,
+                          switch (session.bootStep) {
+                            BootStep.starting => l.bootStepStarting,
+                            BootStep.connecting => l.bootStepConnecting,
+                            BootStep.findingRestaurants => l.bootStepFinding,
+                            BootStep.opening => l.bootStepOpening(
+                              name: session.bootOrgName,
+                            ),
+                          },
+                          textAlign: TextAlign.center,
                           style: const TextStyle(
                             color: Color(0xFFB4B4BC),
                             fontSize: 14,

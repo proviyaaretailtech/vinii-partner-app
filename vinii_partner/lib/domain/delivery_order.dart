@@ -10,6 +10,10 @@ enum DeliveryStatus {
   cancelled('Cancelled');
 
   const DeliveryStatus(this.label);
+
+  /// English fallback for logs and tests only. Screens use
+  /// `context.l10n.deliveryStatusLabel(status)`.
+  // i18n-ignore: English fallback for logs/tests
   final String label;
 
   static DeliveryStatus fromApi(String? v) =>
@@ -19,16 +23,35 @@ enum DeliveryStatus {
 
 /// The four inbox tabs and the statuses each one holds (server `TAB_STATUSES`).
 enum InboxTab {
-  fresh('new', 'New', {DeliveryStatus.placed}),
-  preparing('preparing', 'Preparing', {DeliveryStatus.accepted}),
-  ready('ready', 'Ready', {DeliveryStatus.packed, DeliveryStatus.out}),
-  past('past', 'Past', {DeliveryStatus.delivered, DeliveryStatus.cancelled});
+  fresh('new', {DeliveryStatus.placed}),
+  preparing('preparing', {DeliveryStatus.accepted}),
+  ready('ready', {DeliveryStatus.packed, DeliveryStatus.out}),
+  past('past', {DeliveryStatus.delivered, DeliveryStatus.cancelled});
 
-  const InboxTab(this.apiName, this.label, this.statuses);
+  /// Tab titles are words, so they live in the language catalogues:
+  /// `context.l10n.inboxTabLabel(tab)`.
+  const InboxTab(this.apiName, this.statuses);
   final String apiName;
-  final String label;
   final Set<DeliveryStatus> statuses;
 }
+
+/// What One Local sends when the customer has no name, and its default way
+/// of paying. They are DATA values, not screen text: the screens show them
+/// through `firstName()` / `customerDisplayName()` / `orderPaymentLabel()` in
+/// order_widgets.dart, which map these known values to the reader's language
+/// and show any other text exactly as stored.
+// i18n-ignore: server data value, mapped to words in order_widgets.dart
+const customerNameFallback = 'Customer';
+// i18n-ignore: server data value, mapped to words in order_widgets.dart
+const paymentCashOnDelivery = 'Cash on delivery';
+
+/// The sentence the inbox gives when this build has no One Local address. The
+/// Orders tab compares against it to show the translated sentence
+/// (`failOrdersUnavailable`); any other reason is shown as written.
+// i18n-ignore: English fallback, translated through failOrdersUnavailable
+const partnerApiUnavailableReason =
+    'Delivery orders come from One Local. This build does not have the One Local server address '
+    '(PARTNER_API_BASE_URL), so it cannot show them.';
 
 class DeliveryLine {
   const DeliveryLine({
@@ -62,7 +85,10 @@ class OrderEvent {
     at: DateTime.tryParse('${j['created_at']}') ?? DateTime.now(),
   );
 
-  /// "Accepted", "Kitchen ticket sent"… for the order timeline.
+  /// "Accepted", "Kitchen ticket sent"… for the order timeline. English
+  /// fallback for logs and tests only: the timeline shows
+  /// `orderEventLabel(l10n, event)` from order_widgets.dart.
+  // i18n-ignore: English fallback for logs/tests
   String get label => switch (kind) {
     'placed' => 'Order placed',
     'accepted' => 'Accepted',
@@ -98,7 +124,7 @@ class DeliveryOrder {
     this.address,
     this.area,
     this.notes,
-    this.payment = 'Cash on delivery',
+    this.payment = paymentCashOnDelivery,
     this.prepMinutes,
     this.cancelReason,
     this.events = const [],
@@ -173,7 +199,7 @@ class DeliveryOrder {
       deadline: j['deadline'] == null
           ? null
           : DateTime.tryParse('${j['deadline']}'),
-      customerName: '${j['customer_name'] ?? 'Customer'}',
+      customerName: '${j['customer_name'] ?? customerNameFallback}',
       customerPhone: j['customer_phone'] as String?,
       address: addressText,
       area: area,
@@ -186,7 +212,7 @@ class DeliveryOrder {
       gst: n(j['gst']),
       deliveryFee: n(j['delivery_fee']),
       total: n(j['total']),
-      payment: '${j['payment'] ?? 'Cash on delivery'}',
+      payment: '${j['payment'] ?? paymentCashOnDelivery}',
       prepMinutes: (j['prep_minutes'] as num?)?.toInt(),
       cancelReason: j['cancel_reason'] as String?,
       events: [
@@ -267,7 +293,11 @@ class OutletStatus {
 }
 
 /// Prep-time chips on accept (PRD PD3) and reject reasons (partner app).
+/// The reasons are what One Local receives and shows the customer, so they
+/// are sent in English whatever the app language; the sheet shows each in the
+/// reader's language through `rejectReasonLabel()` in order_widgets.dart.
 const prepTimeChoices = [10, 15, 20, 30, 45];
+// i18n-ignore: values sent to One Local, labelled through rejectReasonLabel()
 const rejectReasons = [
   'Item out of stock',
   'Kitchen busy',

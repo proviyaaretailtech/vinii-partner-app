@@ -13,6 +13,7 @@ library;
 import '../core/json.dart';
 
 /// The languages a restaurant can write its guest text in.
+// i18n-ignore: a language is named in its own script, whatever the app shows
 enum CopyLanguage {
   en('en', 'English', 'English'),
   hi('hi', 'हिन्दी (Hindi)', 'हिन्दी'),
@@ -54,6 +55,11 @@ class CopyGroup {
   final List<CopyKey> keys;
 }
 
+// i18n-ignore: stored merchant default. The `fallback` English texts below
+// are the guest-facing copy the app writes into a restaurant's storefront
+// (shared with the web registry), not UI. The group `title`s and key `label`s
+// are editor metadata that no phone screen shows yet: when one does, they
+// need AppLocalizations mappings.
 const copyGroups = <CopyGroup>[
   CopyGroup('welcome', 'Welcome', [
     CopyKey('welcome.cta', 'Start button', 'Start exploring', 28),

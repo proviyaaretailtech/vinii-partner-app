@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../application/sell_cart.dart';
+import '../../l10n/l10n.dart';
 import 'pos_widgets.dart';
 import 'ticket_view.dart';
 
@@ -21,7 +22,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Review order')),
+      appBar: AppBar(title: Text(context.l10n.payReviewOrder)),
       body: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(

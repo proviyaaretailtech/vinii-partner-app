@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../application/studio_controller.dart';
 import '../../../domain/storefront.dart';
+import '../../../l10n/l10n.dart';
 import '../../menu/panel.dart';
 import '../../theme/guest_theme.dart';
 
@@ -40,14 +41,15 @@ class _BrandSectionState extends State<BrandSection> {
 
   @override
   Widget build(BuildContext context) {
+    final l = context.l10n;
     final d = widget.controller.draft;
     final t = d.template;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
       children: [
-        const PanelLabel('Welcome screen', top: 4),
+        PanelLabel(l.studioBrandWelcomeScreen, top: 4),
         _WelcomePreview(definition: d),
-        const PanelLabel('Name and place'),
+        PanelLabel(l.studioBrandNamePlace),
         Panel(
           children: [
             TextField(
@@ -55,10 +57,10 @@ class _BrandSectionState extends State<BrandSection> {
               textCapitalization: TextCapitalization.words,
               onChanged: (v) => _edit((b) => b.copyWith(displayName: v)),
               decoration: InputDecoration(
-                labelText: 'Display name',
-                helperText: 'How guests see your restaurant',
+                labelText: l.studioBrandDisplayName,
+                helperText: l.studioBrandDisplayNameHelp,
                 errorText: d.brand.displayName.trim().isEmpty
-                    ? 'Guests need to see a name'
+                    ? l.studioBrandNameRequired
                     : null,
               ),
             ),
@@ -68,9 +70,10 @@ class _BrandSectionState extends State<BrandSection> {
               textCapitalization: TextCapitalization.sentences,
               onChanged: (v) => _edit((b) => b.copyWith(tagline: v)),
               decoration: InputDecoration(
-                labelText: 'Tagline',
+                labelText: l.studioBrandTagline,
+                // i18n-ignore: template example wording, guest-facing and never saved
                 hintText: t.defaultTagline,
-                helperText: 'Optional. One short line under your name.',
+                helperText: l.studioBrandTaglineHelp,
               ),
             ),
             const SizedBox(height: 12),
@@ -78,16 +81,15 @@ class _BrandSectionState extends State<BrandSection> {
               controller: _location,
               textCapitalization: TextCapitalization.words,
               onChanged: (v) => _edit((b) => b.copyWith(locationLine: v)),
-              decoration: const InputDecoration(
-                labelText: 'Location line',
-                hintText: 'Area, City',
-                helperText:
-                    'Optional. Helps guests know they are in the right place.',
+              decoration: InputDecoration(
+                labelText: l.studioBrandLocationLine,
+                hintText: l.studioBrandLocationHint,
+                helperText: l.studioBrandLocationHelp,
               ),
             ),
           ],
         ),
-        const PanelLabel('Welcome words'),
+        PanelLabel(l.studioBrandWelcomeWords),
         Panel(
           children: [
             TextField(
@@ -97,7 +99,8 @@ class _BrandSectionState extends State<BrandSection> {
               minLines: 1,
               onChanged: (v) => _edit((b) => b.copyWith(heroTitle: v)),
               decoration: InputDecoration(
-                labelText: 'Welcome headline',
+                labelText: l.studioBrandHeroTitle,
+                // i18n-ignore: template example wording, guest-facing and never saved
                 hintText: t.defaultHeroTitle,
                 hintMaxLines: 2,
               ),
@@ -110,7 +113,8 @@ class _BrandSectionState extends State<BrandSection> {
               maxLines: 4,
               onChanged: (v) => _edit((b) => b.copyWith(heroSubtitle: v)),
               decoration: InputDecoration(
-                labelText: 'Welcome text',
+                labelText: l.studioBrandHeroText,
+                // i18n-ignore: template example wording, guest-facing and never saved
                 hintText: t.defaultHeroSubtitle,
                 hintMaxLines: 3,
                 alignLabelWithHint: true,
@@ -118,8 +122,8 @@ class _BrandSectionState extends State<BrandSection> {
             ),
             const SizedBox(height: 8),
             Text(
-              'The grey words are only an example for the ${t.label} template. '
-              'Guests see only what you write.',
+              // i18n-ignore: template name
+              l.studioBrandExampleNote(template: t.label),
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
@@ -193,7 +197,7 @@ class _WelcomePreview extends StatelessWidget {
               if (headline.isEmpty)
                 Expanded(
                   child: Text(
-                    'Example headline. Write your own below.',
+                    context.l10n.studioBrandExampleHeadline,
                     style: p.body(11.5, color: p.inkMuted),
                   ),
                 ),

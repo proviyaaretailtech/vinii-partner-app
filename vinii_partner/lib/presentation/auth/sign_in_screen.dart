@@ -4,7 +4,10 @@ import 'package:go_router/go_router.dart';
 import '../../app/app_scope.dart';
 import '../../app/routes.dart';
 import '../../core/failure.dart';
+import '../../l10n/failure_text.dart';
+import '../../l10n/l10n.dart';
 import '../boot/brand_mark.dart';
+import '../settings/language_screen.dart';
 import '../theme/staff_theme.dart';
 
 /// Staff sign in with the email and password they already use for the POS.
@@ -60,6 +63,7 @@ class _SignInScreenState extends State<SignInScreen> {
     final t = ViniiTokens.of(context);
     final text = Theme.of(context).textTheme;
     final config = AppScope.of(context).config;
+    final l = context.l10n;
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -73,17 +77,18 @@ class _SignInScreenState extends State<SignInScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Align(
-                        alignment: Alignment.centerLeft,
-                        child: BrandMark(size: 52, inverted: true),
+                      // The language can be chosen before anyone has signed in.
+                      const Row(
+                        children: [
+                          BrandMark(size: 52, inverted: true),
+                          Spacer(),
+                          LanguageButton(),
+                        ],
                       ),
                       const SizedBox(height: 28),
-                      Text('Sign in', style: text.headlineLarge),
+                      Text(l.commonSignIn, style: text.headlineLarge),
                       const SizedBox(height: 8),
-                      Text(
-                        'Use the email and password you use for the VINII POS.',
-                        style: text.bodyMedium,
-                      ),
+                      Text(l.authSignInIntro, style: text.bodyMedium),
                       const SizedBox(height: 28),
                       if (_failure != null) ...[
                         Container(
@@ -103,7 +108,7 @@ class _SignInScreenState extends State<SignInScreen> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
-                                  _failure!.message,
+                                  failureText(l, _failure!),
                                   style: TextStyle(color: t.ink, height: 1.35),
                                 ),
                               ),
@@ -122,16 +127,16 @@ class _SignInScreenState extends State<SignInScreen> {
                         ],
                         autocorrect: false,
                         enabled: !_busy,
-                        decoration: const InputDecoration(
-                          labelText: 'Email',
-                          prefixIcon: Icon(Icons.mail_outline_rounded),
+                        decoration: InputDecoration(
+                          labelText: l.commonEmail,
+                          prefixIcon: const Icon(Icons.mail_outline_rounded),
                         ),
                         validator: (v) {
                           final s = v?.trim() ?? '';
-                          if (s.isEmpty) return 'Enter your email';
+                          if (s.isEmpty) return l.authEmailRequired;
                           if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
                               .hasMatch(s)) {
-                            return 'That does not look like an email';
+                            return l.authEmailInvalid;
                           }
                           return null;
                         },
@@ -146,10 +151,12 @@ class _SignInScreenState extends State<SignInScreen> {
                         autofillHints: const [AutofillHints.password],
                         enabled: !_busy,
                         decoration: InputDecoration(
-                          labelText: 'Password',
+                          labelText: l.commonPassword,
                           prefixIcon: const Icon(Icons.lock_outline_rounded),
                           suffixIcon: IconButton(
-                            tooltip: _hide ? 'Show password' : 'Hide password',
+                            tooltip: _hide
+                                ? l.authShowPassword
+                                : l.authHidePassword,
                             icon: Icon(
                               _hide
                                   ? Icons.visibility_outlined
@@ -159,7 +166,7 @@ class _SignInScreenState extends State<SignInScreen> {
                           ),
                         ),
                         validator: (v) =>
-                            (v ?? '').isEmpty ? 'Enter your password' : null,
+                            (v ?? '').isEmpty ? l.authPasswordRequired : null,
                         onFieldSubmitted: (_) => _submit(),
                       ),
                       Align(
@@ -168,7 +175,7 @@ class _SignInScreenState extends State<SignInScreen> {
                           onPressed: _busy
                               ? null
                               : () => context.push(Routes.resetPassword),
-                          child: const Text('Forgot password?'),
+                          child: Text(l.authForgotPassword),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -182,17 +189,18 @@ class _SignInScreenState extends State<SignInScreen> {
                                   color: t.onAccent,
                                 ),
                               )
-                            : const Text('Sign in'),
+                            : Text(l.commonSignIn),
                       ),
                       const SizedBox(height: 28),
                       Text(
-                        'No account? Your restaurant\'s admin adds staff from the VINII OS.',
+                        l.authNoAccountNote,
                         textAlign: TextAlign.center,
                         style: text.bodySmall,
                       ),
                       if (config.appEnv != 'production') ...[
                         const SizedBox(height: 6),
                         Text(
+                          // i18n-ignore: debug environment line
                           '${config.appEnv} · ${config.databaseHost}',
                           textAlign: TextAlign.center,
                           style: text.bodySmall?.copyWith(fontSize: 11),

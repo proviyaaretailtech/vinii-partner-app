@@ -13,6 +13,15 @@ import '../domain/storefront.dart';
 import 'guest_gateway.dart';
 import 'menu_editor.dart';
 
+/// `StorefrontState.note` while the storefront tables are missing from the
+/// database and drafts stay on this phone. English fallback and the exact text
+/// `LiveStorefront` writes; Studio shows its translation for this text and any
+/// other note as it is.
+// i18n-ignore: English fallback, translated by studioNoteDraftOnPhone
+const storefrontDraftOnPhoneNote =
+    'Publishing needs the storefront tables, a database update waiting for approval. '
+    'Your draft is kept on this phone until then.';
+
 /// Storefront Studio's shared state: what is published, the saved draft,
 /// and the working copy ([draft]) every Studio section edits.
 ///
@@ -155,24 +164,54 @@ class StudioController extends ChangeNotifier {
     _apply(await _repo.load(org), resetEdits: true);
   });
 
-  /// Why the working copy cannot be published yet, in plain words. Empty
-  /// when it can.
-  List<String> publishProblems() {
+  /// Why the working copy cannot be published yet, one failure per problem
+  /// (each has a code the screen translates; [AppFailure.message] is the
+  /// English sentence). Empty when it can.
+  List<AppFailure> publishProblems() {
     final d = _draft;
-    if (d == null) return const ['The storefront has not loaded yet.'];
+    if (d == null) {
+      return const [
+        AppFailure(
+          'The storefront has not loaded yet.',
+          kind: FailureKind.rejected,
+          code: 'studio_not_loaded',
+        ),
+      ];
+    }
     final b = d.features.budget;
     return [
       if (d.brand.displayName.trim().isEmpty)
-        "Add your restaurant's name in Brand & welcome.",
+        const AppFailure(
+          "Add your restaurant's name in Brand & welcome.",
+          kind: FailureKind.rejected,
+          code: 'studio_problem_name',
+        ),
       if (d.serviceModes.isEmpty)
-        'Turn on at least one way to order in How guests order.',
+        const AppFailure(
+          'Turn on at least one way to order in How guests order.',
+          kind: FailureKind.rejected,
+          code: 'studio_problem_modes',
+        ),
       if (b.enabled &&
           !(b.min > 0 && b.min <= b.defaultAmount && b.defaultAmount <= b.max))
-        'Budget amounts need minimum ≤ starting amount ≤ maximum, in Guest features.',
+        const AppFailure(
+          'Budget amounts need minimum ≤ starting amount ≤ maximum, in Guest features.',
+          kind: FailureKind.rejected,
+          code: 'studio_problem_budget',
+        ),
       if (d.offers(GuestServiceMode.preOrder) &&
           d.preOrder.allSlotsFor(DateTime.now()).isEmpty)
-        'Pre-order has no pickup times: the closing time must be at least one slot after the opening time.',
-      if (GuestCatalog(menu: menu, definition: d).isEmpty) 'Guests would see an empty menu. Add dishes with a price in the Menu tab, keep them available, and keep at least one category visible.',
+        const AppFailure(
+          'Pre-order has no pickup times: the closing time must be at least one slot after the opening time.',
+          kind: FailureKind.rejected,
+          code: 'studio_problem_preorder',
+        ),
+      if (GuestCatalog(menu: menu, definition: d).isEmpty)
+        const AppFailure(
+          'Guests would see an empty menu. Add dishes with a price in the Menu tab, keep them available, and keep at least one category visible.',
+          kind: FailureKind.rejected,
+          code: 'studio_problem_empty_menu',
+        ),
     ];
   }
 
@@ -180,9 +219,7 @@ class StudioController extends ChangeNotifier {
   /// (including `notReady` while the storefront tables are missing).
   Future<StorefrontVersion> publish({required String publishedBy}) async {
     final problems = publishProblems();
-    if (problems.isNotEmpty) {
-      throw AppFailure(problems.first, kind: FailureKind.rejected);
-    }
+    if (problems.isNotEmpty) throw problems.first;
     late StorefrontVersion v;
     await _run(() async {
       v = await _repo.publish(org, _draft!, publishedBy: publishedBy);
@@ -256,7 +293,10 @@ class StudioController extends ChangeNotifier {
 
   Future<void> _run(Future<void> Function() job) async {
     if (_draft == null) {
-      throw const AppFailure('The storefront has not loaded yet.');
+      throw const AppFailure(
+        'The storefront has not loaded yet.',
+        code: 'studio_not_loaded',
+      );
     }
     _busy = true;
     _notify();

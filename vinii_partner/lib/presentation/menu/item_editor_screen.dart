@@ -13,12 +13,14 @@ import '../../core/money.dart';
 import '../../domain/menu.dart';
 import '../../domain/staff.dart';
 import '../../domain/storefront.dart';
+import '../../l10n/l10n.dart';
 import '../studio/studio_scope.dart';
 import '../theme/staff_theme.dart';
 import '../widgets/chips.dart';
 import '../widgets/food_art.dart';
 import '../widgets/state_views.dart';
 import 'item_storefront_card.dart';
+import 'menu_labels.dart';
 import 'menu_scope.dart';
 import 'panel.dart';
 
@@ -162,7 +164,10 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
         _studioLoading = false;
         _studioFailure =
             studio.failure ??
-            const AppFailure('The storefront could not be loaded.');
+            const AppFailure(
+              'The storefront could not be loaded.',
+              code: 'menu_storefront_not_loaded',
+            );
       });
       return;
     }
@@ -239,6 +244,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
   }
 
   Future<void> _save() async {
+    final l = context.l10n;
     final editMenu = _can(Capability.editMenu);
     final editStorefront =
         _can(Capability.editStorefront) && _studio != null && _studioReady;
@@ -272,7 +278,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
         _savedPresentation = _presentationSignature();
       }
       if (!mounted) return;
-      showDone(context, wasNew ? '$name is on the menu' : 'Saved');
+      showDone(context, wasNew ? l.menuItemAdded(name: name) : l.menuSaved);
       context.pop();
     } catch (e) {
       if (mounted) showFailure(context, e);
@@ -283,6 +289,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
 
   Future<void> _photo() async {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final hasPhoto = _imageUrl != null || _pendingPhoto != null;
     final action = await showModalBottomSheet<_PhotoAction>(
       context: context,
@@ -294,19 +301,19 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
             children: [
               ListTile(
                 leading: const Icon(Icons.photo_camera_outlined),
-                title: const Text('Take photo'),
+                title: Text(l.menuPhotoTake),
                 onTap: () => Navigator.pop(context, _PhotoAction.camera),
               ),
               ListTile(
                 leading: const Icon(Icons.photo_library_outlined),
-                title: const Text('Choose from gallery'),
+                title: Text(l.menuPhotoGallery),
                 onTap: () => Navigator.pop(context, _PhotoAction.gallery),
               ),
               if (hasPhoto)
                 ListTile(
                   leading: Icon(Icons.delete_outline_rounded, color: t.danger),
                   title: Text(
-                    'Remove photo',
+                    l.menuPhotoRemove,
                     style: TextStyle(color: t.danger),
                   ),
                   onTap: () => Navigator.pop(context, _PhotoAction.remove),
@@ -339,6 +346,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
           context,
           const AppFailure(
             'Could not open the camera or photos. Allow access in the phone settings and try again.',
+            code: 'menu_photo_picker',
           ),
         );
       }
@@ -364,7 +372,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
         _imageUrl = url;
         _pendingPhoto = null;
       });
-      showDone(context, 'Photo uploaded. Save to keep it on the dish.');
+      showDone(context, l.menuPhotoUploaded);
     } catch (e) {
       if (mounted) showFailure(context, e);
     } finally {
@@ -390,9 +398,10 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
     final viewStorefront = _can(Capability.viewStorefront);
     final editStorefront = _can(Capability.editStorefront);
     final canSave = editMenu || (viewStorefront && editStorefront);
+    final l = context.l10n;
     final title = widget.itemId == ItemEditorScreen.newId
-        ? 'New item'
-        : (editMenu ? 'Edit item' : 'Item');
+        ? l.menuItemNewTitle
+        : (editMenu ? l.menuItemEditTitle : l.commonItem);
     return PopScope(
       canPop: !_dirty || _saving,
       onPopInvokedWithResult: (didPop, _) {
@@ -414,8 +423,8 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
                         : Text(
                             widget.itemId == ItemEditorScreen.newId &&
                                     _createdId == null
-                                ? 'Add to menu'
-                                : 'Save changes',
+                                ? l.menuItemAddToMenu
+                                : l.menuItemSaveChanges,
                           ),
                   ),
                 ),
@@ -435,12 +444,13 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
     required bool viewStorefront,
     required bool editStorefront,
   }) {
+    final l = context.l10n;
     if (_missing) {
       return EmptyView(
         icon: Icons.no_food_outlined,
-        title: 'This dish is no longer on the menu',
-        message: 'Someone may have removed it on another device.',
-        actionLabel: 'Back to menu',
+        title: l.menuItemGoneTitle,
+        message: l.menuItemGoneMessage,
+        actionLabel: l.menuItemBackToMenu,
         onAction: () => context.pop(),
       );
     }
@@ -459,9 +469,9 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         children: [
           if (!editMenu) ...[
-            const NoticeBanner(
+            NoticeBanner(
               icon: Icons.lock_outline_rounded,
-              message: 'Only owners, admins and managers can change dishes.',
+              message: l.menuItemReadOnlyNotice,
             ),
             const SizedBox(height: 12),
           ],
@@ -472,7 +482,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
             uploading: _uploading,
             onTap: editMenu && !_uploading ? _photo : null,
           ),
-          const PanelLabel('Details'),
+          PanelLabel(l.menuSectionDetails),
           Panel(
             children: [
               TextFormField(
@@ -481,9 +491,9 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
                 textCapitalization: TextCapitalization.words,
                 textInputAction: TextInputAction.next,
                 onChanged: (_) => changed(),
-                decoration: const InputDecoration(labelText: 'Name'),
+                decoration: InputDecoration(labelText: l.commonName),
                 validator: (v) =>
-                    (v?.trim().isEmpty ?? true) ? 'Give the dish a name' : null,
+                    (v?.trim().isEmpty ?? true) ? l.menuItemNameRequired : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -493,9 +503,9 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
                 maxLines: 5,
                 textCapitalization: TextCapitalization.sentences,
                 onChanged: (_) => changed(),
-                decoration: const InputDecoration(
-                  labelText: 'Description',
-                  hintText: 'What makes it good, in a line or two',
+                decoration: InputDecoration(
+                  labelText: l.menuItemDescription,
+                  hintText: l.menuItemDescriptionHint,
                   alignLabelWithHint: true,
                 ),
               ),
@@ -516,15 +526,15 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
                         ),
                       ],
                       onChanged: (_) => changed(),
-                      decoration: const InputDecoration(
-                        labelText: 'Price',
-                        prefixText: '₹ ',
-                        helperText: 'Before GST',
+                      decoration: InputDecoration(
+                        labelText: l.commonPrice,
+                        prefixText: '₹ ', // i18n-ignore: currency symbol
+                        helperText: l.menuItemBeforeGst,
                       ),
                       validator: (v) {
                         final p = double.tryParse(v?.trim() ?? '');
-                        if (p == null) return 'Enter a price';
-                        if (p < 0) return 'Price cannot be negative';
+                        if (p == null) return l.menuItemPriceRequired;
+                        if (p < 0) return l.menuItemPriceNegative;
                         return null;
                       },
                     ),
@@ -540,10 +550,10 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
                         LengthLimitingTextInputFormatter(3),
                       ],
                       onChanged: (_) => changed(),
-                      decoration: const InputDecoration(
-                        labelText: 'Prep time',
-                        suffixText: 'min',
-                        helperText: 'Optional',
+                      decoration: InputDecoration(
+                        labelText: l.menuItemPrepTime,
+                        suffixText: l.menuMinutesShort,
+                        helperText: l.commonOptional,
                       ),
                     ),
                   ),
@@ -552,23 +562,23 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
               if (!editMenu && _original != null) ...[
                 const SizedBox(height: 8),
                 Text(
-                  'Sells at ${rupees(_original!.price)} before GST',
+                  l.menuItemSellsAt(price: rupees(_original!.price)),
                   style: text.bodySmall,
                 ),
               ],
             ],
           ),
-          const PanelLabel('Kind'),
+          PanelLabel(l.menuSectionKind),
           Panel(
             children: [
               DropdownButtonFormField<String?>(
                 initialValue: _categoryId,
                 isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Category'),
+                decoration: InputDecoration(labelText: l.commonCategory),
                 items: [
-                  const DropdownMenuItem<String?>(
+                  DropdownMenuItem<String?>(
                     value: null,
-                    child: Text('Uncategorised'),
+                    child: Text(l.menuUncategorised),
                   ),
                   for (final c in _c.categories)
                     DropdownMenuItem<String?>(
@@ -581,7 +591,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
                     : null,
               ),
               const SizedBox(height: 16),
-              Text('Food type', style: text.labelLarge),
+              Text(l.menuFoodType, style: text.labelLarge),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -590,7 +600,9 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
                   for (final f in [...FoodType.values, null])
                     ChoiceChip(
                       avatar: f == null ? null : FoodTypeMark(f, size: 14),
-                      label: Text(f?.label ?? 'Not set'),
+                      label: Text(
+                        f == null ? l.menuFoodTypeNotSet : l.foodTypeLabel(f),
+                      ),
                       selected: _foodType == f,
                       onSelected: editMenu
                           ? (_) => setState(() => _foodType = f)
@@ -599,19 +611,19 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              Text('Course', style: text.labelLarge),
+              Text(l.menuCourse, style: text.labelLarge),
               const SizedBox(height: 8),
               SegmentedButton<String>(
-                segments: const [
+                segments: [
                   ButtonSegment(
                     value: 'eat',
-                    label: Text('Food'),
-                    icon: Icon(Icons.restaurant_rounded),
+                    label: Text(l.menuCourseFood),
+                    icon: const Icon(Icons.restaurant_rounded),
                   ),
                   ButtonSegment(
                     value: 'drink',
-                    label: Text('Drink'),
-                    icon: Icon(Icons.local_cafe_outlined),
+                    label: Text(l.menuCourseDrink),
+                    icon: const Icon(Icons.local_cafe_outlined),
                   ),
                 ],
                 selected: {_course},
@@ -622,14 +634,14 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
               ),
             ],
           ),
-          const PanelLabel('Selling'),
+          PanelLabel(l.menuSectionSelling),
           Panel(
             padding: null,
             children: [
               SwitchListTile(
                 secondary: Icon(Icons.star_outline_rounded, color: t.warning),
-                title: const Text('Bestseller'),
-                subtitle: const Text('Marked for guests and on the POS'),
+                title: Text(l.menuBestseller),
+                subtitle: Text(l.menuBestsellerHint),
                 value: _recommended,
                 onChanged: editMenu
                     ? (v) => setState(() => _recommended = v)
@@ -638,8 +650,8 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
               const PanelDivider(),
               SwitchListTile(
                 secondary: const Icon(Icons.point_of_sale_outlined),
-                title: const Text('Available in the POS'),
-                subtitle: const Text('Off = sold out everywhere you sell'),
+                title: Text(l.menuAvailablePos),
+                subtitle: Text(l.menuAvailablePosHint),
                 value: _available,
                 onChanged: editMenu
                     ? (v) => setState(() => _available = v)
@@ -648,7 +660,7 @@ class _ItemEditorScreenState extends State<ItemEditorScreen> {
             ],
           ),
           if (viewStorefront) ...[
-            const PanelLabel('On your storefront'),
+            PanelLabel(l.menuSectionStorefront),
             ItemStorefrontCard(
               enabled: editStorefront,
               loading:
@@ -694,6 +706,7 @@ class _PhotoBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     final has = imageUrl != null || pending != null;
     return AspectRatio(
       aspectRatio: 16 / 10,
@@ -706,6 +719,7 @@ class _PhotoBlock extends StatelessWidget {
               Image.memory(pending!, fit: BoxFit.cover)
             else
               FoodArt(
+                // i18n-ignore: art lookup key, never shown
                 name: name.isEmpty ? 'Dish' : name,
                 imageUrl: imageUrl,
                 radius: 0,
@@ -744,11 +758,13 @@ class _PhotoBlock extends StatelessWidget {
                             color: t.ink,
                           ),
                           const SizedBox(width: 6),
-                          Text(
-                            has ? 'Change photo' : 'Add photo',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: t.ink,
+                          Flexible(
+                            child: Text(
+                              has ? l.menuPhotoChange : l.menuPhotoAdd,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: t.ink,
+                              ),
                             ),
                           ),
                         ],
@@ -762,7 +778,7 @@ class _PhotoBlock extends StatelessWidget {
                 left: 12,
                 bottom: 12,
                 child: Text(
-                  'No photo yet',
+                  l.menuPhotoNone,
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.85),
                     fontWeight: FontWeight.w600,

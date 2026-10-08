@@ -5,6 +5,7 @@ import '../../app/app_scope.dart';
 import '../../app/routes.dart';
 import '../../application/studio_controller.dart';
 import '../../domain/staff.dart';
+import '../../l10n/l10n.dart';
 import '../theme/staff_theme.dart';
 import '../widgets/state_views.dart';
 import 'sections/brand_section.dart';
@@ -44,14 +45,15 @@ class _StudioSectionScreenState extends State<StudioSectionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = context.l10n;
     final section = StudioSection.fromKey(widget.sectionKey);
     if (section == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Storefront Studio')),
+        appBar: AppBar(title: Text(l.studioTitle)),
         body: EmptyView(
           icon: Icons.help_outline_rounded,
-          title: 'This part of Studio does not exist',
-          actionLabel: 'Back to Studio',
+          title: l.studioSectionMissing,
+          actionLabel: l.studioBackToStudio,
           onAction: () => context.go(Routes.storefront),
         ),
       );
@@ -63,11 +65,11 @@ class _StudioSectionScreenState extends State<StudioSectionScreen> {
         final loaded = _c.loaded;
         return Scaffold(
           appBar: AppBar(
-            title: Text(section.title),
+            title: Text(l.studioSectionTitle(section)),
             actions: [
               if (loaded && section.edits)
                 IconButton(
-                  tooltip: 'Open full preview',
+                  tooltip: l.studioOpenFullPreview,
                   icon: const Icon(Icons.phone_iphone_rounded),
                   onPressed: () => context.push(Routes.storefrontPreview),
                 ),
@@ -102,11 +104,11 @@ class _StudioSectionScreenState extends State<StudioSectionScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16, 4, 16, 8),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
           child: NoticeBanner(
             icon: Icons.visibility_outlined,
-            message: 'You can look, but only owners, admins, managers and marketing can change this.',
+            message: context.l10n.studioReadOnlySection,
           ),
         ),
         Expanded(child: AbsorbPointer(child: body)),
@@ -122,6 +124,7 @@ class _DoneBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = ViniiTokens.of(context);
+    final l = context.l10n;
     return DecoratedBox(
       decoration: BoxDecoration(
         color: t.surface,
@@ -135,16 +138,14 @@ class _DoneBar extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  dirty
-                      ? 'Changes show in the preview. Save or publish them in Studio.'
-                      : 'Changes show in the preview straight away.',
+                  dirty ? l.studioDoneBarDirty : l.studioDoneBarClean,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
               const SizedBox(width: 12),
               FilledButton(
                 onPressed: () => context.pop(),
-                child: const Text('Done'),
+                child: Text(l.commonDone),
               ),
             ],
           ),
